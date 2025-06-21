@@ -1,0 +1,10 @@
+{
+  "id": "snowflake",
+  "name": "Snowflake",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Automatically adds unique Nano IDs to notes in frontmatter",
+  "author": "Ali Yahya",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
