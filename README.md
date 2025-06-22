@@ -72,22 +72,23 @@ Snowflake uses the [Nano ID](https://github.com/ai/nanoid) algorithm to generate
 
 ## Development
 
-Directory Structure
+The plugin is built as a single-file architecture for simplicity and compatibility with Obsidian's plugin system. All functionality is contained within `main.js`, organized into logical sections:
+
+- Constants and settings
+- Nano ID generation
+- Frontmatter utilities
+- File processing logic
+- UI components (folder modal, settings tab)
+- Main plugin class
+
+### Project Structure
 
 ```
 obsidian-snowflake/
-├── main.js                    # Plugin entry point
-├── src/
-│   ├── constants.js          # Configuration constants
-│   ├── file-processor.js     # Core file processing logic
-│   ├── ui/
-│   │   ├── folder-modal.js   # Folder selection modal
-│   │   └── settings-tab.js   # Settings interface
-│   └── utils/
-│       ├── frontmatter.js    # YAML frontmatter utilities
-│       └── nano-id.js        # ID generation
-├── manifest.json             # Plugin metadata
-└── package.json             # Dependencies
+├── main.js         # All plugin code in a single file
+├── manifest.json   # Plugin metadata
+├── README.md       # Documentation
+└── LICENSE        # MIT license
 ```
 
 
