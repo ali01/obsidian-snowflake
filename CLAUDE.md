@@ -4,37 +4,68 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is the Obsidian Snowflake plugin - a simple tool that automatically adds unique Nano IDs to notes in frontmatter. The project uses a deliberately minimal, single-file architecture with no build process or external dependencies.
+This is the Obsidian Snowflake plugin - a tool that automatically adds unique Nano IDs to notes in frontmatter. The project uses TypeScript with a modern build system based on esbuild.
 
 ## Key Architecture Decisions
 
-### Single-File Design
-All plugin functionality is contained in `main.js` (462 lines). This is intentional - the plugin runs directly as vanilla JavaScript without compilation. The code is organized into logical modules within this single file:
+### TypeScript-Based Architecture
+The plugin is written in TypeScript and organized into modular source files:
 
-- **Constants Module** (lines 24-33): Default settings configuration
-- **Nano ID Module** (lines 36-64): Self-contained ID generation using crypto API
-- **Frontmatter Utilities** (lines 67-113): YAML parsing and manipulation
-- **File Processor Module** (lines 116-211): Async file operations and batch processing
-- **UI Components** (lines 214-335): Modal dialogs and settings interface
-- **Main Plugin Class** (lines 338-461): Core plugin lifecycle and event handling
+- **src/main.ts**: Plugin entry point and lifecycle management
+- **src/constants.ts**: Default settings configuration
+- **src/nanoid.ts**: Self-contained ID generation using crypto API
+- **src/frontmatter.ts**: YAML parsing and manipulation utilities
+- **src/file-processor.ts**: Async file operations and batch processing
+- **src/types.ts**: TypeScript type definitions
+- **src/ui/folder-modal.ts**: Folder selection dialog
+- **src/ui/settings-tab.ts**: Plugin settings interface
 
-### No Build Process
-- No `package.json` or npm dependencies
-- No TypeScript compilation
-- No bundling or minification
-- Direct JavaScript execution in Obsidian
+### Build Process
+The project uses esbuild for fast TypeScript compilation and bundling:
+
+- **Build tool**: esbuild (configured in `esbuild.config.mjs`)
+- **Entry point**: `src/main.ts`
+- **Output**: Single bundled `main.js` file
+- **Format**: CommonJS (required for Obsidian plugins)
+- **Target**: ES2018 for broad compatibility
+
+#### Build Configuration Details
+- **TypeScript**: Strict mode enabled with full type checking
+- **Bundling**: All dependencies bundled except Obsidian API
+- **External modules**: `obsidian`, `@codemirror/*`, Node.js built-ins
+- **Source maps**: Inline in development, none in production
+- **Tree shaking**: Enabled for optimal bundle size
 
 ## Development Workflow
 
-Since there's no build process, development is straightforward:
+### Build Commands
 
-1. Edit `main.js` directly
-2. Reload the plugin in Obsidian (Settings → Community plugins → Reload)
-3. Test changes manually within Obsidian
+```bash
+# Install dependencies
+npm install
+
+# Development build with watch mode
+npm run dev
+
+# Production build
+npm run build
+
+# Clean build artifacts
+npm run clean
+```
+
+### Development Process
+
+1. Edit TypeScript files in the `src/` directory
+2. Run `npm run dev` to start the build watcher
+3. The plugin will automatically rebuild when files change
+4. Reload the plugin in Obsidian (Settings → Community plugins → Reload)
+5. Test changes manually within Obsidian
 
 For debugging:
 - Use `console.log()` and `console.error()` statements
 - View output in Obsidian's developer console (Ctrl/Cmd+Shift+I)
+- Development builds include inline source maps for easier debugging
 
 ## Important Implementation Details
 
@@ -93,29 +124,34 @@ Manual testing within Obsidian is the primary approach. Key test scenarios:
 
 ## Code Style Guidelines
 
-- Use clear module separation with comment headers
+- Write idiomatic TypeScript with proper type annotations
+- Use clear module separation in different files
 - Maintain comprehensive error handling with try-catch blocks
 - Provide user feedback via `new Notice()` for all operations
-- Keep all code in single file per project architecture
 - Use async/await for all file operations
 - Add descriptive comments for complex logic
+- Follow TypeScript strict mode requirements
 
 ## Common Tasks
 
 ### Adding New Features
-1. Identify appropriate module in `main.js`
-2. Add functionality maintaining existing patterns
-3. Update manifest.json version if needed
-4. Test thoroughly in Obsidian
-5. Update README.md if user-facing changes
+1. Create or modify appropriate TypeScript files in `src/`
+2. Add functionality maintaining existing patterns and types
+3. Run `npm run build` to compile changes
+4. Update manifest.json version if needed
+5. Test thoroughly in Obsidian
+6. Update README.md if user-facing changes
 
 ### Debugging Issues
-1. Add console.log statements in relevant functions
-2. Check Obsidian developer console for errors
-3. Verify file permissions and vault structure
-4. Test with minimal vault to isolate issues
+1. Run `npm run dev` for watch mode with source maps
+2. Add console.log statements in relevant functions
+3. Check Obsidian developer console for errors
+4. Use TypeScript type checking to catch issues early
+5. Verify file permissions and vault structure
+6. Test with minimal vault to isolate issues
 
 ### Modifying ID Generation
-- Edit `NanoIDGenerator` class (lines 36-64)
+- Edit `NanoIDGenerator` class in `src/nanoid.ts`
 - Adjust `ID_LENGTH` or `ALPHABET` constants
 - Ensure cryptographic security is maintained
+- Run tests to verify ID uniqueness and format
