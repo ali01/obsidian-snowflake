@@ -1,0 +1,28 @@
+{
+  "name": "obsidian-snowflake",
+  "version": "1.1.0",
+  "description": "Automatically adds unique Nano IDs to notes in frontmatter",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "clean": "rm -f main.js *.tsbuildinfo"
+  },
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "nanoid",
+    "id",
+    "frontmatter"
+  ],
+  "author": "Ali Yahya",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^18.15.11",
+    "builtin-modules": "^5.0.0",
+    "esbuild": "^0.17.17",
+    "obsidian": "latest",
+    "tslib": "^2.5.0",
+    "typescript": "^5.0.4"
+  }
+}

@@ -72,24 +72,71 @@ Snowflake uses the [Nano ID](https://github.com/ai/nanoid) algorithm to generate
 
 ## Development
 
-The plugin is built as a single-file architecture for simplicity and compatibility with Obsidian's plugin system. All functionality is contained within `main.js`, organized into logical sections:
-
-- Constants and settings
-- Nano ID generation
-- Frontmatter utilities
-- File processing logic
-- UI components (folder modal, settings tab)
-- Main plugin class
+The plugin is now built using TypeScript with a modular architecture. The code is organized into separate modules for better maintainability and type safety.
 
 ### Project Structure
 
 ```
 obsidian-snowflake/
-├── main.js         # All plugin code in a single file
-├── manifest.json   # Plugin metadata
-├── README.md       # Documentation
-└── LICENSE        # MIT license
+├── src/                    # TypeScript source files
+│   ├── main.ts             # Main plugin class
+│   ├── types.ts            # Type definitions
+│   ├── constants.ts        # Configuration constants
+│   ├── nanoid.ts           # ID generation module
+│   ├── frontmatter.ts      # Frontmatter utilities
+│   ├── file-processor.ts   # File processing logic
+│   └── ui/                 # UI components
+│       ├── folder-modal.ts # Folder selection modal
+│       └── settings-tab.ts # Settings interface
+├── main.js                 # Compiled output (generated)
+├── manifest.json           # Plugin metadata
+├── package.json            # NPM configuration
+├── tsconfig.json           # TypeScript configuration
+├── esbuild.config.mjs      # Build configuration
+├── README.md               # Documentation
+└── LICENSE                 # MIT license
 ```
+
+### Development Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/ali01/obsidian-snowflake.git
+   cd obsidian-snowflake
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Start development mode** (watches for changes)
+   ```bash
+   npm run dev
+   ```
+
+4. **Build for production**
+   ```bash
+   npm run build
+   ```
+
+### Development Workflow
+
+1. Make changes to TypeScript files in the `src/` directory
+2. The development build will automatically recompile on changes
+3. Reload Obsidian or disable/enable the plugin to test changes
+4. Use the browser developer console (Ctrl/Cmd+Shift+I) for debugging
+
+### Code Organization
+
+- **types.ts**: TypeScript interfaces and type definitions
+- **constants.ts**: Default settings and configuration values
+- **nanoid.ts**: Nano ID generation algorithm
+- **frontmatter.ts**: YAML frontmatter parsing and manipulation
+- **file-processor.ts**: Core logic for processing files and folders
+- **ui/folder-modal.ts**: Folder selection modal component
+- **ui/settings-tab.ts**: Plugin settings interface
+- **main.ts**: Main plugin class with lifecycle methods
 
 
 ## Compatibility
