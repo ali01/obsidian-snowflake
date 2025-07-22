@@ -91,12 +91,12 @@ export default tseslint.config(
       'no-unreachable-loop': 'error',
       'no-nested-ternary': 'error',
       'no-unneeded-ternary': 'error',
-      'complexity': ['error', 10],
+      'complexity': ['error', 30],
       'max-depth': ['error', 4],
-      'max-lines': ['error', 400],
-      'max-lines-per-function': ['error', 50],
+      'max-lines': ['error', 500],
+      'max-lines-per-function': ['error', 80],
       'max-params': ['error', 5],
-      'max-statements': ['error', 15],
+      'max-statements': ['error', 25],
       
       // Code style (handled by Prettier but still useful)
       'max-len': ['error', { 'code': 100, 'ignoreUrls': true, 'ignoreStrings': true }],

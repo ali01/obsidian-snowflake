@@ -38,7 +38,6 @@ function isValidTemplateMapping(value: unknown): value is Record<string, string>
  * @param settings - Settings to validate
  * @returns True if settings are valid
  */
-// eslint-disable-next-line complexity
 export function areSettingsValid(settings: unknown): settings is SnowflakeSettings {
   if (settings === null || settings === undefined || typeof settings !== 'object') {
     return false;
@@ -64,7 +63,6 @@ export function areSettingsValid(settings: unknown): settings is SnowflakeSettin
  * @param path - Path to validate
  * @returns True if path is valid
  */
-// eslint-disable-next-line max-statements
 export function isValidTemplatePath(path: string): boolean {
   if (!path || typeof path !== 'string') {
     return false;
@@ -131,7 +129,6 @@ export function normalizeTemplatePath(path: string): string {
  * @param settings - Settings to validate
  * @returns Validation result with isValid flag and error messages
  */
-// eslint-disable-next-line max-statements, complexity, max-lines-per-function
 export function validateSettings(settings: unknown): { isValid: boolean; errors: string[] } {
   const errors: string[] = [];
 
@@ -191,7 +188,6 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
  * @param settings - Settings that may be in old format
  * @returns Settings in current format
  */
-// eslint-disable-next-line max-lines-per-function, max-statements, complexity
 export function migrateSettings(settings: unknown): SnowflakeSettings {
   if (areSettingsValid(settings)) {
     // Already in current format

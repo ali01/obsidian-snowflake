@@ -178,9 +178,21 @@ export class FrontmatterMerger {
     const keyMatch = line.match(/^(\w+):\s*(.*)$/);
     if (keyMatch) {
       this.handleKeyValueLine(keyMatch, data, state);
-    } else if (state.currentKey !== null && line.startsWith('  ')) {
-      // Continuation of multi-line value
-      state.currentValue.push(line.slice(2));
+    } else if (state.currentKey !== null) {
+      // Check for array items with dash notation
+      const arrayMatch = line.match(/^\s+- (.+)$/);
+      if (arrayMatch) {
+        // This is an array item
+        if (!Array.isArray(data[state.currentKey])) {
+          data[state.currentKey] = [];
+        }
+        // Parse the array item value
+        const itemValue = this.parseValue(arrayMatch[1].trim());
+        (data[state.currentKey] as unknown[]).push(itemValue);
+      } else if (line.startsWith('  ')) {
+        // Continuation of multi-line value
+        state.currentValue.push(line.slice(2));
+      }
     }
   }
 
@@ -204,7 +216,9 @@ export class FrontmatterMerger {
       state.currentKey = null;
       state.currentValue = [];
     } else {
-      // Start of multi-line value (other format)
+      // Empty value or start of array/multi-line
+      // Keep the key active to handle arrays or just store empty string
+      data[state.currentKey] = '';
       state.currentValue = [];
     }
   }
@@ -301,12 +315,24 @@ export class FrontmatterMerger {
       return `${key}: null`;
     }
 
+    if (value === '') {
+      return `${key}: `;
+    }
+
     if (typeof value === 'boolean' || typeof value === 'number') {
       return `${key}: ${String(value)}`;
     }
 
     if (Array.isArray(value)) {
-      return `${key}: [${value.map((v) => this.formatValue(v)).join(', ')}]`;
+      if (value.length === 0) {
+        return `${key}: []`;
+      }
+      // Use dash notation for arrays
+      const lines = [`${key}:`];
+      for (const item of value) {
+        lines.push(`  - ${this.formatValue(item)}`);
+      }
+      return lines;
     }
 
     if (typeof value === 'string') {
@@ -347,6 +373,13 @@ export class FrontmatterMerger {
    */
   private formatValue(value: unknown): string {
     if (typeof value === 'string') {
+      // Don't double-quote values that are already quoted
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        return value;
+      }
       // Quote if contains special characters
       if (/[:[\]{},>|]/.test(value)) {
         return `"${value.replace(/"/g, '\\"')}"`;

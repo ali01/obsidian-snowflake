@@ -34,7 +34,7 @@ describe('FileCreationHandler', () => {
     mockVault = {
       on: jest.fn().mockReturnValue('event-ref'),
       offref: jest.fn(),
-      read: jest.fn().mockResolvedValue(''),
+      read: jest.fn().mockResolvedValue(''), // Default to empty content for new files
       getAbstractFileByPath: jest.fn()
     } as any;
 
@@ -121,12 +121,23 @@ describe('FileCreationHandler', () => {
     test('Should process markdown files when enabled', async () => {
       const file = createMockFile('test.md', 'Projects');
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content for new file
 
       await handleFileCreation(file);
 
       expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
         isManualCommand: false
       });
+    });
+
+    test('Should skip files with existing content', async () => {
+      const file = createMockFile('test.md', 'Projects');
+      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue('Existing content'); // Non-empty content
+
+      await handleFileCreation(file);
+
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
     test('Should skip if file was deleted during processing', async () => {
@@ -141,6 +152,7 @@ describe('FileCreationHandler', () => {
     test('Should prevent double processing of same file', async () => {
       const file = createMockFile('test.md', 'Projects');
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
 
       // Start two concurrent processes
       const promise1 = handleFileCreation(file);
@@ -195,6 +207,7 @@ describe('FileCreationHandler', () => {
 
       // Start processing
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
       handler.start();
       const handleFileCreation = (mockVault.on as jest.Mock).mock.calls[0][1];
 

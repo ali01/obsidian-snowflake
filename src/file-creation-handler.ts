@@ -123,6 +123,18 @@ export class FileCreationHandler {
       return;
     }
 
+    // Check if file has content - we only want to apply templates to new/empty files
+    try {
+      const content = await this.vault.read(file);
+      if (content.trim() !== '') {
+        // File already has content, skip template application
+        return;
+      }
+    } catch {
+      // If we can't read the file, skip it
+      return;
+    }
+
     try {
       const context: CommandContext = { isManualCommand: false };
       await this.templateApplicator.applyTemplate(file as MarkdownFile, context);

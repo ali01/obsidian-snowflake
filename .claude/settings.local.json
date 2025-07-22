@@ -18,7 +18,8 @@
       "Bash(mv:*)",
       "Bash(npm run prettier:*)",
       "Bash(npx eslint:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm run test:*)"
     ],
     "deny": []
   }

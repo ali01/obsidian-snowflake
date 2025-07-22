@@ -32,7 +32,7 @@ tags: [template]`;
       expect(result.merged).toContain('title: My Note');
       expect(result.merged).toContain('date: 2024-01-01');
       expect(result.merged).toContain('author: John Doe');
-      expect(result.merged).toContain('tags: [personal]'); // File value preserved
+      expect(result.merged).toContain('tags:\n  - personal'); // File value preserved
     });
 
     test('REQ-009: Should preserve file values when keys conflict', () => {
@@ -64,7 +64,7 @@ author: John`;
 
       const result = merger.merge(fileContent, templateFrontmatter);
 
-      expect(result.merged).toContain('tags: [daily]');
+      expect(result.merged).toContain('tags:\n  - daily');
       expect(result.merged).toContain('date: 2024-01-01');
       expect(result.merged).toContain('author: John');
       expect(result.added).toEqual(['tags', 'date', 'author']);
@@ -72,6 +72,58 @@ author: John`;
   });
 
   describe('Edge Cases', () => {
+    test('Should preserve empty values in original file', () => {
+      const fileContent = `---
+related:
+references:
+tags:
+  - index
+id: L6P6XxLDv4
+---`;
+      const templateFrontmatter = 'newField: value';
+
+      const result = merger.merge(fileContent, templateFrontmatter);
+
+      expect(result.merged).toContain('related: ');
+      expect(result.merged).toContain('references: ');
+      expect(result.merged).toContain('tags:\n  - index');
+      expect(result.merged).toContain('id: L6P6XxLDv4');
+      expect(result.merged).toContain('newField: value');
+    });
+
+    test('Should format arrays with dash notation', () => {
+      const fileContent = `---
+tags:
+  - tag1
+  - tag2
+---`;
+      const templateFrontmatter = '';
+
+      const result = merger.merge(fileContent, templateFrontmatter);
+
+      expect(result.merged).toContain('tags:\n  - tag1\n  - tag2');
+    });
+
+    test('Should not double-escape quoted array values', () => {
+      const fileContent = `---
+related:
+  - "[[~AI Software Engineering]]"
+references:
+tags:
+  - index
+id: L6P6XxLDv4
+---`;
+      const templateFrontmatter = '';
+
+      const result = merger.merge(fileContent, templateFrontmatter);
+
+      // Should preserve the original quoted value without double-escaping
+      expect(result.merged).toContain('related:\n  - "[[~AI Software Engineering]]"');
+      expect(result.merged).not.toContain('\\"');
+      expect(result.merged).toContain('references: ');
+      expect(result.merged).toContain('tags:\n  - index');
+      expect(result.merged).toContain('id: L6P6XxLDv4');
+    });
     test('Should handle file with no frontmatter', () => {
       const fileContent = '# Just content\nNo frontmatter here';
       const templateFrontmatter = 'title: New Note\ntags: [template]';
@@ -79,7 +131,7 @@ author: John`;
       const result = merger.merge(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('title: New Note');
-      expect(result.merged).toContain('tags: [template]');
+      expect(result.merged).toContain('tags:\n  - template');
       expect(result.added).toEqual(['title', 'tags']);
       expect(result.conflicts).toEqual([]);
     });
@@ -154,8 +206,8 @@ tags: [one, two]
 
       const result = merger.merge(fileContent, templateFrontmatter);
 
-      expect(result.merged).toContain('tags: [one, two]');
-      expect(result.merged).toContain('categories: [blog, tech]');
+      expect(result.merged).toContain('tags:\n  - one\n  - two');
+      expect(result.merged).toContain('categories:\n  - blog\n  - tech');
     });
 
     test('Should handle multi-line string values', () => {
@@ -281,7 +333,7 @@ priority: medium`;
       // File values should be preserved
       expect(result.merged).toContain('title: My Project Note');
       expect(result.merged).toContain('author: John Doe');
-      expect(result.merged).toContain('tags: [project, important]');
+      expect(result.merged).toContain('tags:\n  - project\n  - important');
       expect(result.merged).toContain('status: in-progress');
 
       // Template-only values should be added
