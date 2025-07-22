@@ -58,3 +58,34 @@ export class Notice {
     console.log('Notice:', message);
   }
 }
+
+export interface EditorPosition {
+  line: number;
+  ch: number;
+}
+
+export class Editor {
+  private cursor: EditorPosition = { line: 0, ch: 0 };
+
+  getCursor(): EditorPosition {
+    return this.cursor;
+  }
+
+  setCursor(pos: EditorPosition) {
+    this.cursor = pos;
+  }
+}
+
+export class Vault {
+  async read(file: TFile): Promise<string> {
+    return '';
+  }
+
+  async modify(file: TFile, content: string): Promise<void> {
+    return;
+  }
+
+  getAbstractFileByPath(path: string): TFile | null {
+    return null;
+  }
+}

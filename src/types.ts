@@ -155,28 +155,6 @@ export function isMarkdownFile(file: TFile): file is MarkdownFile {
   return file.extension === "md";
 }
 
-
-// FrontmatterParseResult removed in Stage 4 - replaced by FrontmatterMerger's
-// internal ParsedFrontmatter interface
-
-/**
- * ProcessResult: Result from processing a file
- *
- * This interface will be removed when file-processor.ts is rewritten
- * for template processing instead of just ID addition.
- *
- * TODO(Stage 5): Remove this interface when implementing the Template Loader
- * & Applicator. The new template processing system will use
- * TemplateProcessResult instead.
- */
-export interface ProcessResult {
-  success: boolean;
-  message: string;
-  id?: string;
-  alreadyHasID?: boolean;
-  error?: boolean;
-}
-
 /**
  * Additional type definitions to support various requirements:
  */
