@@ -98,7 +98,7 @@ export class FrontmatterMerger {
       return formattedFrontmatter + fileContent.slice(parsed.endPosition);
     } else {
       // Add frontmatter at the beginning
-      return formattedFrontmatter + '\n\n' + fileContent;
+      return formattedFrontmatter + '\n' + fileContent;
     }
   }
 

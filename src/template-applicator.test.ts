@@ -417,6 +417,41 @@ Template`;
       expect(result.message).toContain('No template configured');
       expect(mockVault.modify).not.toHaveBeenCalled();
     });
+
+    test('Should not add extra newlines when applying template', async () => {
+      // Test case 1: Empty file with template
+      mockVault.read.mockResolvedValue('');
+      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/test.md');
+      mockTemplateLoader.loadTemplate.mockResolvedValue('# Test\n\nContent\n');
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: '# Test\n\nContent\n',
+        variables: {},
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.merge.mockReturnValue({
+        merged: '',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation((content) => content);
+
+      const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
+
+      expect(result.success).toBe(true);
+      expect(mockVault.modify).toHaveBeenCalledWith(mockFile, '# Test\n\nContent');
+
+      // Test case 2: File with frontmatter
+      mockVault.read.mockResolvedValue('---\ntitle: Test\n---\n');
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (content, merged) => '---\ntitle: Test\n---\n'
+      );
+
+      const result2 = await applicator.applyTemplate(mockFile, { isManualCommand: false });
+
+      expect(result2.success).toBe(true);
+      const finalContent = mockVault.modify.mock.calls[mockVault.modify.mock.calls.length - 1][1];
+      expect(finalContent).toBe('---\ntitle: Test\n---\n# Test\n\nContent');
+      expect(finalContent).not.toMatch(/\n{3,}/);
+    });
   });
 
   describe('applySpecificTemplate', () => {

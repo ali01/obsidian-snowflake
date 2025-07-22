@@ -249,7 +249,7 @@ title: Old
 
       const result = merger.applyToFile(fileContent, mergedFrontmatter);
 
-      expect(result).toBe('---\ntitle: New Note\n---\n\n# Just content');
+      expect(result).toBe('---\ntitle: New Note\n---\n# Just content');
     });
 
     test('Should handle empty file content', () => {
@@ -258,7 +258,7 @@ title: Old
 
       const result = merger.applyToFile(fileContent, mergedFrontmatter);
 
-      expect(result).toBe('---\ntitle: Empty\n---\n\n');
+      expect(result).toBe('---\ntitle: Empty\n---\n');
     });
   });
 

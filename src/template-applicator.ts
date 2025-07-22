@@ -211,7 +211,8 @@ export class TemplateApplicator {
       editor
     );
 
-    await this.vault.modify(file, finalContent);
+    // Ensure we don't have trailing newlines
+    await this.vault.modify(file, finalContent.trimEnd());
     return { success: true, message: 'Template applied successfully' };
   }
 
@@ -245,7 +246,15 @@ export class TemplateApplicator {
     }
 
     if (currentBody === '' || editor === undefined) {
-      return currentContent.trimEnd() + '\n\n' + templateBody;
+      // Ensure we don't add extra newlines
+      const trimmedContent = currentContent.trimEnd();
+      const trimmedTemplate = templateBody.trimEnd();
+
+      // Add single newline if there's existing content
+      if (trimmedContent !== '') {
+        return trimmedContent + '\n' + trimmedTemplate;
+      }
+      return trimmedTemplate;
     }
 
     return this.insertAtCursor(currentContent, templateBody, currentBody, editor);
@@ -260,11 +269,16 @@ export class TemplateApplicator {
     const cursor = editor.getCursor();
     const lines = currentBody.split('\n');
 
+    // Trim trailing newlines from template body to avoid extra lines
+    const trimmedTemplateBody = templateBody.trimEnd();
+
     if (cursor.line < lines.length) {
       lines[cursor.line] =
-        lines[cursor.line].slice(0, cursor.ch) + templateBody + lines[cursor.line].slice(cursor.ch);
+        lines[cursor.line].slice(0, cursor.ch) +
+        trimmedTemplateBody +
+        lines[cursor.line].slice(cursor.ch);
     } else {
-      lines.push(templateBody);
+      lines.push(trimmedTemplateBody);
     }
 
     const parts = this.splitContent(currentContent);
