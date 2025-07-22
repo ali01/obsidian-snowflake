@@ -1,9 +1,18 @@
 /**
  * Frontmatter utilities for parsing and manipulating YAML frontmatter
+ *
+ * TODO(Stage 5): Remove this entire file when implementing the Template Loader & Applicator.
+ * This functionality will be replaced by the new FrontmatterMerger class.
  */
 
-import { FrontmatterParseResult } from './types';
 import { FRONTMATTER_REGEX } from './constants';
+
+// TODO(Stage 5): Remove this temporary interface
+interface FrontmatterParseResult {
+    exists: boolean;
+    content?: string;
+    fullMatch?: string;
+}
 
 /**
  * Parse frontmatter from markdown content

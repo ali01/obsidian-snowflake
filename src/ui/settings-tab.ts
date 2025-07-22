@@ -1,5 +1,8 @@
 /**
  * Settings tab for the Snowflake plugin
+ *
+ * TODO(Stage 8): Completely rewrite this file to implement the new settings UI
+ * with template mappings, file pickers, and visual polish.
  */
 
 import { App, PluginSettingTab, Setting, Notice } from 'obsidian';

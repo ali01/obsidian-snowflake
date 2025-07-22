@@ -16,8 +16,8 @@
 import { Plugin, TFile, Notice } from 'obsidian';
 import { SnowflakeSettings } from './types';
 import { DEFAULT_SETTINGS } from './constants';
-import { hasID } from './frontmatter';
-import { processFile, processFolder } from './file-processor';
+import { hasID } from './frontmatter'; // TODO(Stage 5): Remove frontmatter import
+import { processFile, processFolder } from './file-processor'; // TODO(Stage 5): Remove file-processor import
 import { FolderSuggestModal } from './ui/folder-modal';
 import { SnowflakeSettingTab } from './ui/settings-tab';
 import { mergeWithDefaults } from './settings-utils';
@@ -113,6 +113,7 @@ export default class SnowflakePlugin extends Plugin {
     }
 
     async handleFileCreate(file: TFile) {
+        // TODO(Stage 6): Replace this entire method with new template processing logic
         // Check if auto-add is enabled globally
         if (!this.settings.enableAutoAdd) {
             return;
@@ -154,6 +155,7 @@ export default class SnowflakePlugin extends Plugin {
         }, 100);
     }
 
+    // TODO(Stage 7): Replace with "Insert template" command
     async addIDToCurrentNote() {
         const activeFile = this.app.workspace.getActiveFile();
 
@@ -178,6 +180,7 @@ export default class SnowflakePlugin extends Plugin {
         }
     }
 
+    // TODO(Stage 7): Replace with "Insert template to all notes in folder" command
     async addIDsToFolder() {
         new FolderSuggestModal(this.app, async (folder) => {
             await processFolder(folder, this.app.vault, this.app);

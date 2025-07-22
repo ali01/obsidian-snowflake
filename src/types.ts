@@ -156,21 +156,8 @@ export function isMarkdownFile(file: TFile): file is MarkdownFile {
 }
 
 
-/**
- * FrontmatterParseResult: Result from parsing frontmatter
- *
- * This is used internally by the frontmatter utilities to parse existing
- * frontmatter before merging with template frontmatter.
- *
- * TODO(Stage 4): Remove this interface when implementing the Frontmatter
- * Merge Engine. The new FrontmatterMerger will have its own internal
- * parsing logic.
- */
-export interface FrontmatterParseResult {
-  exists: boolean;
-  content?: string;
-  fullMatch?: string;
-}
+// FrontmatterParseResult removed in Stage 4 - replaced by FrontmatterMerger's
+// internal ParsedFrontmatter interface
 
 /**
  * ProcessResult: Result from processing a file

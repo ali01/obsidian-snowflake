@@ -1,9 +1,12 @@
 /**
  * File processing module for adding IDs to notes
+ *
+ * TODO(Stage 5): Remove this entire file when implementing the Template Loader & Applicator.
+ * This functionality will be replaced by the new template processing system.
  */
 
 import { TFile, TFolder, Vault, App, Notice } from 'obsidian';
-import { ProcessResult } from './types';
+import { ProcessResult } from './types'; // TODO(Stage 5): Remove ProcessResult
 import { hasID, extractID, addIDToContent } from './frontmatter';
 import { generateNanoID } from './nanoid';
 
