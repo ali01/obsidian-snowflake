@@ -17,6 +17,8 @@ import type { App } from 'obsidian';
 import type SnowflakePlugin from '../main';
 import { FolderSuggestModal } from './folder-modal';
 import { TemplateFileSuggestModal } from './template-file-modal';
+import { FolderInputSuggest } from './folder-input-suggest';
+import { FileInputSuggest } from './file-input-suggest';
 import { ErrorHandler } from '../error-handler';
 import type { ErrorContext } from '../types';
 
@@ -78,15 +80,17 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName('Templates folder')
       .setDesc('The folder where your template files are stored')
-      .addText((text) =>
+      .addText((text) => {
+        new FolderInputSuggest(this.app, text.inputEl);
         text
           .setPlaceholder('Templates')
           .setValue(this.plugin.settings.templatesFolder)
           .onChange(async (value) => {
             this.plugin.settings.templatesFolder = value || 'Templates';
             await this.plugin.saveSettings();
-          })
-      );
+          });
+        return text;
+      });
   }
 
   private addDefaultTemplateSetting(containerEl: HTMLElement): void {
@@ -94,6 +98,7 @@ export class SnowflakeSettingTab extends PluginSettingTab {
       .setName('Default template')
       .setDesc('Template to use for folders without specific mappings (leave empty for none)')
       .addText((text) => {
+        new FileInputSuggest(this.app, text.inputEl, 'md', this.plugin.settings.templatesFolder);
         text
           .setPlaceholder('Templates/default.md')
           .setValue(this.plugin.settings.defaultTemplate)
@@ -101,17 +106,8 @@ export class SnowflakeSettingTab extends PluginSettingTab {
             this.plugin.settings.defaultTemplate = value;
             await this.plugin.saveSettings();
           });
-      })
-      .addButton((button) =>
-        button.setButtonText('Browse').onClick(() => {
-          new TemplateFileSuggestModal(this.app, this.plugin.settings.templatesFolder, (file) => {
-            this.plugin.settings.defaultTemplate = file.path;
-            // eslint-disable-next-line no-void
-            void this.plugin.saveSettings();
-            this.display();
-          }).open();
-        })
-      );
+        return text;
+      });
   }
 
   private addTemplateMappings(containerEl: HTMLElement): void {

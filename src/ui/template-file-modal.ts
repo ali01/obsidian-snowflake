@@ -30,7 +30,14 @@ export class TemplateFileSuggestModal extends FuzzySuggestModal<TFile> {
    * Collect all markdown files from the templates folder
    */
   private collectTemplateFiles(): void {
-    const folder = this.app.vault.getAbstractFileByPath(this.templatesFolder);
+    let folder = this.app.vault.getAbstractFileByPath(this.templatesFolder);
+
+    // Try case-insensitive search if exact match fails
+    if (!folder) {
+      const allFolders = this.app.vault.getAllLoadedFiles().filter((f) => f instanceof TFolder);
+      folder =
+        allFolders.find((f) => f.path.toLowerCase() === this.templatesFolder.toLowerCase()) ?? null;
+    }
 
     if (!folder || !(folder instanceof TFolder)) {
       // Templates folder doesn't exist or is not a folder

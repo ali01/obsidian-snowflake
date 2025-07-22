@@ -17,7 +17,8 @@
       "Bash(npm run test:coverage:*)",
       "Bash(mv:*)",
       "Bash(npm run prettier:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }
