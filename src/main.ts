@@ -20,6 +20,7 @@ import { hasID } from './frontmatter';
 import { processFile, processFolder } from './file-processor';
 import { FolderSuggestModal } from './ui/folder-modal';
 import { SnowflakeSettingTab } from './ui/settings-tab';
+import { mergeWithDefaults } from './settings-utils';
 
 /**
  * Main plugin class for Snowflake
@@ -66,15 +67,49 @@ export default class SnowflakePlugin extends Plugin {
     }
 
     async loadSettings() {
-        this.settings = Object.assign(
-            {},
-            DEFAULT_SETTINGS,
-            await this.loadData(),
-        );
+        const data = await this.loadData();
+
+        // Use the settings utilities to properly merge with defaults
+        this.settings = mergeWithDefaults(data || {});
+
+        // Validate settings to ensure they're properly formed
+        this.validateSettings();
     }
 
     async saveSettings() {
+        // Validate before saving
+        this.validateSettings();
         await this.saveData(this.settings);
+    }
+
+    /**
+     * Validates and fixes settings to ensure they're properly formed
+     *
+     * REQ-023: Ensures all required settings exist with valid values
+     */
+    validateSettings() {
+        // Ensure templateMappings is an object (not null or array)
+        if (!this.settings.templateMappings ||
+            typeof this.settings.templateMappings !== 'object' ||
+            Array.isArray(this.settings.templateMappings)) {
+            this.settings.templateMappings = {};
+        }
+
+        // Ensure defaultTemplate is a string
+        if (typeof this.settings.defaultTemplate !== 'string') {
+            this.settings.defaultTemplate = "";
+        }
+
+        // Ensure enableAutoTemplating is a boolean
+        if (typeof this.settings.enableAutoTemplating !== 'boolean') {
+            this.settings.enableAutoTemplating = true;
+        }
+
+        // Ensure templatesFolder is a non-empty string
+        if (typeof this.settings.templatesFolder !== 'string' ||
+            this.settings.templatesFolder.trim() === '') {
+            this.settings.templatesFolder = "Templates";
+        }
     }
 
     async handleFileCreate(file: TFile) {
@@ -100,7 +135,8 @@ export default class SnowflakePlugin extends Plugin {
             return;
         }
 
-        // Wait a bit for file to be fully created and any template to be applied
+        // Wait a bit for file to be fully created and any
+        // template to be applied
         setTimeout(async () => {
             try {
                 const content = await this.app.vault.read(file);

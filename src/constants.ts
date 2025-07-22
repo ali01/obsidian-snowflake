@@ -6,15 +6,26 @@ import { SnowflakeSettings } from './types';
 
 /**
  * Default settings for the plugin
+ *
+ * REQ-023: The plugin shall allow users to configure these settings:
+ * - templateMappings: Which folders use which templates
+ * - defaultTemplate: Fallback template for unmapped folders
+ * - enableAutoTemplating: Turn automatic templating on/off
+ * - templatesFolder: Where to look for template files
  */
 export const DEFAULT_SETTINGS: SnowflakeSettings = {
-    // Array of folder paths where auto-ID is enabled
-    // Empty array means no automatic ID addition
-    autoAddFolders: [],
+    // Folder-specific template assignments (REQ-002)
+    templateMappings: {},
 
-    // Global toggle for auto-add feature
-    // Even if folders are configured, this can disable the feature
-    enableAutoAdd: true,
+    // Fallback template for unmapped folders (REQ-003)
+    // Empty string means no default template
+    defaultTemplate: "",
+
+    // Master switch for automatic template application (REQ-005)
+    enableAutoTemplating: true,
+
+    // Base directory where templates are stored
+    templatesFolder: "Templates",
 };
 
 /**
@@ -27,7 +38,9 @@ export const ID_CONFIG = {
     // Alphabet of 62 alphanumeric characters
     // Includes: lowercase, uppercase, numbers
     // Excludes: Special characters (no dashes or underscores)
-    ALPHABET: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    ALPHABET: "0123456789" +
+        "abcdefghijklmnopqrstuvwxyz" +
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 } as const;
 
 /**

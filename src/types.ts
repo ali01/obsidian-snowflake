@@ -1,21 +1,25 @@
 /**
  * Type definitions for the Snowflake Auto-Templating Plugin
  *
- * REQ-001: The plugin transforms from a simple ID generator into a comprehensive
- * auto-templating system for Obsidian notes.
+ * REQ-001: The plugin transforms from a simple ID generator into a
+ * comprehensive auto-templating system for Obsidian notes.
  */
 
 import { TFile } from "obsidian";
 
 /**
- * TemplateMapping: Core configuration type for folder-to-template associations
+ * TemplateMapping: Core configuration type for folder-to-template
+ * associations
  *
- * Purpose: Stores which template should be applied to files created in specific folders.
+ * Purpose: Stores which template should be applied to files created in
+ * specific folders.
  *
- * REQ-002: When a user creates a new markdown file in a folder that has a template
- * mapping, the plugin shall automatically apply that folder's template to the file.
+ * REQ-002: When a user creates a new markdown file in a folder that has a
+ * template mapping, the plugin shall automatically apply that folder's
+ * template to the file.
  *
- * Example: { "Projects": "Templates/project.md", "Daily Notes": "Templates/daily.md" }
+ * Example:
+ * { "Projects": "Templates/project.md", "Daily Notes": "Templates/daily.md" }
  */
 export interface TemplateMapping {
   [folderPath: string]: string; // folder path -> template path
@@ -24,8 +28,8 @@ export interface TemplateMapping {
 /**
  * SnowflakeSettings: Complete plugin configuration
  *
- * Purpose: Defines all user-configurable options for the plugin. Stored persistently
- * in data.json.
+ * Purpose: Defines all user-configurable options for the plugin. Stored
+ * persistently in data.json.
  *
  * REQ-023: The plugin shall allow users to configure these settings:
  * - templateMappings: Which folders use which templates
@@ -36,7 +40,8 @@ export interface TemplateMapping {
  * Fields:
  * - templateMappings: Folder-specific template assignments (REQ-002)
  * - defaultTemplate: Fallback template for unmapped folders (REQ-003)
- * - enableAutoTemplating: Master switch for automatic template application (REQ-005)
+ * - enableAutoTemplating: Master switch for automatic template application
+ *   (REQ-005)
  * - templatesFolder: Base directory where templates are stored
  */
 export interface SnowflakeSettings {
@@ -49,9 +54,10 @@ export interface SnowflakeSettings {
 /**
  * TemplateVariableContext: Data available for template variable replacement
  *
- * Purpose: Provides all the information needed to replace template variables like
- * {{title}} or {{date}}. This context is built when processing a template and
- * ensures all variables have consistent values throughout a single template.
+ * Purpose: Provides all the information needed to replace template variables
+ * like {{title}} or {{date}}. This context is built when processing a
+ * template and ensures all variables have consistent values throughout a
+ * single template.
  *
  * REQ-011: When processing templates, the plugin shall replace these variables:
  * - {{title}} → The filename without .md extension
@@ -69,25 +75,27 @@ export interface TemplateVariableContext {
   title: string; // filename without extension (REQ-011)
   date: string; // formatted date (REQ-012, REQ-014)
   time: string; // formatted time (REQ-013, REQ-014)
-  snowflake_id?: string; // 10-character alphanumeric ID (REQ-015) - only set if template contains {{snowflake_id}}
+  snowflake_id?: string; // 10-character alphanumeric ID (REQ-015)
+  // only set if template contains {{snowflake_id}}
 }
 
 /**
  * TemplateProcessResult: Output of template variable processing
  *
- * Purpose: Encapsulates the result of processing a template, including the final
- * content and metadata about what was processed. This allows callers to know
- * whether a snowflake_id was generated and what values were used for variables.
+ * Purpose: Encapsulates the result of processing a template, including the
+ * final content and metadata about what was processed. This allows callers to
+ * know whether a snowflake_id was generated and what values were used for
+ * variables.
  *
- * REQ-016: If a template contains {{snowflake_id}} multiple times, then the plugin
- * shall replace ALL instances with the SAME ID value.
+ * REQ-016: If a template contains {{snowflake_id}} multiple times, then the
+ * plugin shall replace ALL instances with the SAME ID value.
  *
  * Used for: Debugging, testing, and potentially showing users what variables
  * were replaced in their template.
  */
 export interface TemplateProcessResult {
   content: string; // The processed template content
-  hasSnowflakeId: boolean; // Whether a snowflake_id was generated (REQ-016)
+  hasSnowflakeId: boolean; // Whether ID was generated (REQ-016)
   variables: TemplateVariableContext; // All variables used in processing
 }
 
@@ -113,7 +121,7 @@ export interface TemplateProcessResult {
  */
 export interface FrontmatterMergeResult {
   merged: string; // The final merged frontmatter (REQ-008)
-  conflicts: string[]; // Keys that existed in both - file values kept (REQ-009)
+  conflicts: string[]; // Keys existed in both - file values kept (REQ-009)
   added: string[]; // Keys added from template (REQ-010)
 }
 
@@ -121,11 +129,11 @@ export interface FrontmatterMergeResult {
  * MarkdownFile: Type-safe representation of a markdown file
  *
  * Purpose: Creates a branded type that guarantees at compile-time that we're
- * only operating on markdown files. This prevents accidentally applying templates
- * to non-markdown files and enables better TypeScript inference.
+ * only operating on markdown files. This prevents accidentally applying
+ * templates to non-markdown files and enables better TypeScript inference.
  *
- * REQ-004: When a user creates any non-markdown file (like .txt, .pdf, .json),
- * the plugin shall NOT apply any template.
+ * REQ-004: When a user creates any non-markdown file (like .txt, .pdf,
+ * .json), the plugin shall NOT apply any template.
  *
  * Pattern: Intersection type that adds a type constraint to Obsidian's TFile
  */
@@ -135,11 +143,11 @@ export type MarkdownFile = TFile & { extension: "md" };
  * isMarkdownFile: Type guard for safe markdown file operations
  *
  * Purpose: Runtime check that also serves as a TypeScript type guard. After
- * calling this function, TypeScript knows the file is a MarkdownFile, enabling
- * access to markdown-specific operations without casting.
+ * calling this function, TypeScript knows the file is a MarkdownFile,
+ * enabling access to markdown-specific operations without casting.
  *
- * REQ-004: When a user creates any non-markdown file (like .txt, .pdf, .json),
- * the plugin shall NOT apply any template.
+ * REQ-004: When a user creates any non-markdown file (like .txt, .pdf,
+ * .json), the plugin shall NOT apply any template.
  *
  * Critical for: Ensuring templates are never applied to .pdf, .png, etc.
  */
@@ -154,8 +162,9 @@ export function isMarkdownFile(file: TFile): file is MarkdownFile {
  * This is used internally by the frontmatter utilities to parse existing
  * frontmatter before merging with template frontmatter.
  *
- * TODO(Stage 4): Remove this interface when implementing the Frontmatter Merge Engine.
- * The new FrontmatterMerger will have its own internal parsing logic.
+ * TODO(Stage 4): Remove this interface when implementing the Frontmatter
+ * Merge Engine. The new FrontmatterMerger will have its own internal
+ * parsing logic.
  */
 export interface FrontmatterParseResult {
   exists: boolean;
@@ -169,8 +178,9 @@ export interface FrontmatterParseResult {
  * This interface will be removed when file-processor.ts is rewritten
  * for template processing instead of just ID addition.
  *
- * TODO(Stage 5): Remove this interface when implementing the Template Loader & Applicator.
- * The new template processing system will use TemplateProcessResult instead.
+ * TODO(Stage 5): Remove this interface when implementing the Template Loader
+ * & Applicator. The new template processing system will use
+ * TemplateProcessResult instead.
  */
 export interface ProcessResult {
   success: boolean;
@@ -193,11 +203,11 @@ export interface ProcessResult {
  * REQ-019: When a user runs "Insert template to all notes in folder",
  * the plugin shall show a folder selection dialog.
  *
- * REQ-025: Where auto-templating is disabled but a user runs a manual command,
- * the plugin shall still apply the template.
+ * REQ-025: Where auto-templating is disabled but a user runs a manual
+ * command, the plugin shall still apply the template.
  */
 export interface CommandContext {
-  isManualCommand: boolean; // True when user explicitly runs a command (REQ-025)
+  isManualCommand: boolean; // True when user runs a command (REQ-025)
 }
 
 /**
@@ -217,8 +227,8 @@ export interface BatchResult {
 /**
  * ErrorContext: Context for error handling
  *
- * REQ-026: If a template file doesn't exist when needed, then the plugin shall
- * create the new file empty and show a notice.
+ * REQ-026: If a template file doesn't exist when needed, then the plugin
+ * shall create the new file empty and show a notice.
  *
  * REQ-027: If a template contains malformed variable syntax, then the plugin
  * shall leave it unchanged in the output.
@@ -226,8 +236,9 @@ export interface BatchResult {
  * REQ-028: When encountering invalid template variables, the plugin shall show
  * a warning to help users fix their templates.
  *
- * REQ-029: If the plugin cannot read a template due to permissions, then the
- * plugin shall show a user-friendly error and create the file without a template.
+ * REQ-029: If the plugin cannot read a template due to permissions, then
+ * the plugin shall show a user-friendly error and create the file without a
+ * template.
  */
 export interface ErrorContext {
   operation: "load_template" | "apply_template" | "merge_frontmatter";
@@ -251,11 +262,13 @@ export interface SettingsUpdateContext {
 /**
  * Future type definitions prepared for template inheritance
  *
- * REQ-032: [FUTURE] Where template inheritance is implemented, the plugin shall
- * apply BOTH parent and child templates when a file is created in a nested folder.
+ * REQ-032: [FUTURE] Where template inheritance is implemented, the plugin
+ * shall apply BOTH parent and child templates when a file is created in a
+ * nested folder.
  *
- * REQ-033: [FUTURE] When applying multiple inherited templates, the plugin shall
- * merge them with child templates taking precedence over parent templates.
+ * REQ-033: [FUTURE] When applying multiple inherited templates, the plugin
+ * shall merge them with child templates taking precedence over parent
+ * templates.
  *
  * These types are defined now to ensure the architecture supports future
  * enhancements without breaking changes.
