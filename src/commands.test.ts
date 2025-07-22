@@ -3,7 +3,7 @@
  */
 
 import { SnowflakeCommands } from './commands';
-import { Plugin, Notice, Editor, MarkdownView, TFile, TFolder } from 'obsidian';
+import { Plugin, Notice, Editor, MarkdownView, MarkdownFileInfo, TFile, TFolder } from 'obsidian';
 import { SnowflakeSettings } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { FolderSuggestModal } from './ui/folder-modal';
@@ -51,7 +51,7 @@ describe('SnowflakeCommands', () => {
     // Default settings
     settings = {
       templateMappings: {
-        'Projects': 'Templates/project.md'
+        Projects: 'Templates/project.md'
       },
       defaultTemplate: 'Templates/default.md',
       enableAutoTemplating: false, // Disabled to test REQ-025
@@ -62,9 +62,8 @@ describe('SnowflakeCommands', () => {
     commands = new SnowflakeCommands(mockPlugin, settings);
 
     // Get mocked TemplateApplicator
-    mockTemplateApplicator = (TemplateApplicator as jest.MockedClass<
-      typeof TemplateApplicator
-    >).mock.instances[0] as jest.Mocked<TemplateApplicator>;
+    mockTemplateApplicator = (TemplateApplicator as jest.MockedClass<typeof TemplateApplicator>)
+      .mock.instances[0] as jest.Mocked<TemplateApplicator>;
   });
 
   afterEach(() => {
@@ -94,15 +93,14 @@ describe('SnowflakeCommands', () => {
   });
 
   describe('Apply template to current note command', () => {
-    let editorCallback: (editor: Editor, view: MarkdownView) => void;
+    let editorCallback: (editor: Editor, view: MarkdownView | MarkdownFileInfo) => void;
     let mockEditor: Editor;
-    let mockView: MarkdownView;
+    let mockView: MarkdownView | MarkdownFileInfo;
 
     beforeEach(() => {
       commands.registerCommands();
       // Get the registered callback
-      editorCallback = (mockPlugin.addCommand as jest.Mock).mock.calls[0][0]
-        .editorCallback;
+      editorCallback = (mockPlugin.addCommand as jest.Mock).mock.calls[0][0].editorCallback;
 
       mockEditor = {} as Editor;
       mockView = {
@@ -111,7 +109,9 @@ describe('SnowflakeCommands', () => {
     });
 
     test('Should show notice when no active file', async () => {
-      mockView.file = null;
+      mockView = {
+        file: null
+      } as any;
 
       await editorCallback(mockEditor, mockView);
 
@@ -120,9 +120,11 @@ describe('SnowflakeCommands', () => {
     });
 
     test('Should show notice for non-markdown files', async () => {
-      mockView.file = {
-        extension: 'txt',
-        basename: 'test'
+      mockView = {
+        file: {
+          extension: 'txt',
+          basename: 'test'
+        } as any
       } as any;
 
       await editorCallback(mockEditor, mockView);
@@ -137,7 +139,9 @@ describe('SnowflakeCommands', () => {
         basename: 'test',
         parent: { path: 'Projects' }
       } as any;
-      mockView.file = mockFile;
+      mockView = {
+        file: mockFile
+      } as any;
 
       mockTemplateApplicator.applyTemplate.mockResolvedValue({
         success: true,
@@ -161,7 +165,9 @@ describe('SnowflakeCommands', () => {
         basename: 'test',
         parent: { path: 'Projects' }
       } as any;
-      mockView.file = mockFile;
+      mockView = {
+        file: mockFile
+      } as any;
 
       mockTemplateApplicator.applyTemplate.mockResolvedValue({
         success: false,
@@ -179,7 +185,9 @@ describe('SnowflakeCommands', () => {
         basename: 'test',
         parent: { path: 'Projects' }
       } as any;
-      mockView.file = mockFile;
+      mockView = {
+        file: mockFile
+      } as any;
 
       const error = new Error('Template error');
       mockTemplateApplicator.applyTemplate.mockRejectedValue(error);
@@ -196,17 +204,13 @@ describe('SnowflakeCommands', () => {
     beforeEach(() => {
       commands.registerCommands();
       // Get the registered callback
-      folderCallback = (mockPlugin.addCommand as jest.Mock).mock.calls[1][0]
-        .callback;
+      folderCallback = (mockPlugin.addCommand as jest.Mock).mock.calls[1][0].callback;
     });
 
     test('REQ-019: Should show folder selection modal', () => {
       folderCallback();
 
-      expect(FolderSuggestModal).toHaveBeenCalledWith(
-        mockPlugin.app,
-        expect.any(Function)
-      );
+      expect(FolderSuggestModal).toHaveBeenCalledWith(mockPlugin.app, expect.any(Function));
       expect(mockFolderModal.open).toHaveBeenCalled();
     });
   });
@@ -218,8 +222,7 @@ describe('SnowflakeCommands', () => {
       commands.registerCommands();
 
       // Trigger the folder command to register the callback
-      const folderCallback = (mockPlugin.addCommand as jest.Mock).mock.calls[1][0]
-        .callback;
+      const folderCallback = (mockPlugin.addCommand as jest.Mock).mock.calls[1][0].callback;
       folderCallback();
 
       // Get the folder selection callback
@@ -237,14 +240,16 @@ describe('SnowflakeCommands', () => {
     });
 
     test('REQ-020/REQ-021: Should process all markdown files asynchronously', async () => {
-      const mockFiles = Array(25).fill(null).map((_, i) =>
-        Object.assign(new TFile(), {
-          extension: 'md',
-          basename: `file${i}`,
-          path: `folder/file${i}.md`,
-          parent: { path: 'folder' }
-        })
-      );
+      const mockFiles = Array(25)
+        .fill(null)
+        .map((_, i) =>
+          Object.assign(new TFile(), {
+            extension: 'md',
+            basename: `file${i}`,
+            path: `folder/file${i}.md`,
+            parent: { path: 'folder' }
+          })
+        );
 
       const mockFolder = Object.assign(new TFolder(), {
         children: mockFiles
@@ -257,6 +262,9 @@ describe('SnowflakeCommands', () => {
 
       await processFolderBatch(mockFolder);
 
+      // Wait for all batches to complete (3 batches with 10ms delay between each)
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
       // Should process all files
       expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledTimes(25);
 
@@ -266,14 +274,16 @@ describe('SnowflakeCommands', () => {
     });
 
     test('Should handle partial success', async () => {
-      const mockFiles = Array(10).fill(null).map((_, i) =>
-        Object.assign(new TFile(), {
-          extension: 'md',
-          basename: `file${i}`,
-          path: `folder/file${i}.md`,
-          parent: { path: 'folder' }
-        })
-      );
+      const mockFiles = Array(10)
+        .fill(null)
+        .map((_, i) =>
+          Object.assign(new TFile(), {
+            extension: 'md',
+            basename: `file${i}`,
+            path: `folder/file${i}.md`,
+            parent: { path: 'folder' }
+          })
+        );
 
       const mockFolder = Object.assign(new TFolder(), {
         children: mockFiles
@@ -289,6 +299,9 @@ describe('SnowflakeCommands', () => {
         .mockResolvedValue({ success: false, message: 'Failed' });
 
       await processFolderBatch(mockFolder);
+
+      // Wait for batch processing to complete
+      await new Promise((resolve) => setTimeout(resolve, 20));
 
       expect(Notice).toHaveBeenCalledWith('Templates applied to 5 of 10 notes');
     });
@@ -344,10 +357,7 @@ describe('SnowflakeCommands', () => {
 
       commands.updateSettings(newSettings);
 
-      expect(mockTemplateApplicator.updateSettings).toHaveBeenCalledWith(
-        newSettings
-      );
+      expect(mockTemplateApplicator.updateSettings).toHaveBeenCalledWith(newSettings);
     });
   });
 });
-

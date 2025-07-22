@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Mock for Obsidian module in tests
  */
@@ -26,16 +27,20 @@ export const moment = (date?: any) => {
 };
 
 // Mock other Obsidian classes as needed
-export class TFile {
-  basename: string;
-  extension: string;
-  path: string;
-  name: string;
-  parent: any;
-  vault: any;
-  stat: any;
+export abstract class TAbstractFile {
+  vault: any = null;
+  path: string = '';
+  name: string = '';
+  parent: any = null;
+}
+
+export class TFile extends TAbstractFile {
+  basename: string = '';
+  extension: string = '';
+  stat: any = null;
 
   constructor(data: Partial<TFile> = {}) {
+    super();
     Object.assign(this, data);
   }
 }
@@ -98,9 +103,14 @@ export class FuzzySuggestModal<T> {
   close() {}
 }
 
-export class TFolder {
+export class TFolder extends TAbstractFile {
   children: any[] = [];
-  path: string = '';
+  isRoot: boolean = false;
+
+  constructor(data: Partial<TFolder> = {}) {
+    super();
+    Object.assign(this, data);
+  }
 }
 
 export class App {
@@ -109,4 +119,16 @@ export class App {
 
 export class MarkdownView {
   file: TFile | null = null;
+}
+
+export interface MarkdownFileInfo {
+  file: TFile;
+}
+
+export interface FuzzyMatch<T> {
+  item: T;
+  match: {
+    score: number;
+    matches: number[][];
+  };
 }

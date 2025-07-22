@@ -2,7 +2,7 @@
  * Configuration constants for the Snowflake plugin
  */
 
-import { SnowflakeSettings } from './types';
+import type { SnowflakeSettings } from './types';
 
 /**
  * Default settings for the plugin
@@ -14,33 +14,31 @@ import { SnowflakeSettings } from './types';
  * - templatesFolder: Where to look for template files
  */
 export const DEFAULT_SETTINGS: SnowflakeSettings = {
-    // Folder-specific template assignments (REQ-002)
-    templateMappings: {},
+  // Folder-specific template assignments (REQ-002)
+  templateMappings: {},
 
-    // Fallback template for unmapped folders (REQ-003)
-    // Empty string means no default template
-    defaultTemplate: "",
+  // Fallback template for unmapped folders (REQ-003)
+  // Empty string means no default template
+  defaultTemplate: '',
 
-    // Master switch for automatic template application (REQ-005)
-    enableAutoTemplating: true,
+  // Master switch for automatic template application (REQ-005)
+  enableAutoTemplating: true,
 
-    // Base directory where templates are stored
-    templatesFolder: "Templates",
+  // Base directory where templates are stored
+  templatesFolder: 'Templates'
 };
 
 /**
  * ID generation configuration
  */
 export const ID_CONFIG = {
-    // Length of generated IDs
-    LENGTH: 10,
+  // Length of generated IDs
+  length: 10,
 
-    // Alphabet of 62 alphanumeric characters
-    // Includes: lowercase, uppercase, numbers
-    // Excludes: Special characters (no dashes or underscores)
-    ALPHABET: "0123456789" +
-        "abcdefghijklmnopqrstuvwxyz" +
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  // Alphabet of 62 alphanumeric characters
+  // Includes: lowercase, uppercase, numbers
+  // Excludes: Special characters (no dashes or underscores)
+  alphabet: '0123456789' + 'abcdefghijklmnopqrstuvwxyz' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 } as const;
 
 /**

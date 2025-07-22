@@ -5,7 +5,7 @@
  * comprehensive auto-templating system for Obsidian notes.
  */
 
-import { TFile } from "obsidian";
+import type { TFile } from 'obsidian';
 
 /**
  * TemplateMapping: Core configuration type for folder-to-template
@@ -75,7 +75,7 @@ export interface TemplateVariableContext {
   title: string; // filename without extension (REQ-011)
   date: string; // formatted date (REQ-012, REQ-014)
   time: string; // formatted time (REQ-013, REQ-014)
-  snowflake_id?: string; // 10-character alphanumeric ID (REQ-015)
+  snowflakeId?: string; // 10-character alphanumeric ID (REQ-015)
   // only set if template contains {{snowflake_id}}
 }
 
@@ -137,7 +137,7 @@ export interface FrontmatterMergeResult {
  *
  * Pattern: Intersection type that adds a type constraint to Obsidian's TFile
  */
-export type MarkdownFile = TFile & { extension: "md" };
+export type MarkdownFile = TFile & { extension: 'md' };
 
 /**
  * isMarkdownFile: Type guard for safe markdown file operations
@@ -152,7 +152,7 @@ export type MarkdownFile = TFile & { extension: "md" };
  * Critical for: Ensuring templates are never applied to .pdf, .png, etc.
  */
 export function isMarkdownFile(file: TFile): file is MarkdownFile {
-  return file.extension === "md";
+  return file.extension === 'md';
 }
 
 /**
@@ -206,7 +206,7 @@ export interface BatchResult {
  * template.
  */
 export interface ErrorContext {
-  operation: "load_template" | "apply_template" | "merge_frontmatter";
+  operation: 'load_template' | 'apply_template' | 'merge_frontmatter';
   templatePath?: string;
   filePath?: string;
   error?: Error;
@@ -240,7 +240,7 @@ export interface SettingsUpdateContext {
  */
 export interface FutureTemplateInheritance {
   enableInheritance?: boolean;
-  inheritanceStrategy?: "merge" | "override";
+  inheritanceStrategy?: 'merge' | 'override';
 }
 
 /**
@@ -262,17 +262,6 @@ export type ValidSettings = SnowflakeSettings & {
  * Content merge strategy for REQ-006 and REQ-007
  */
 export interface ContentMergeStrategy {
-  frontmatterStrategy: "preserve-existing"; // REQ-009
-  bodyStrategy: "insert-at-cursor" | "append" | "prepend"; // REQ-007
+  frontmatterStrategy: 'preserve-existing'; // REQ-009
+  bodyStrategy: 'insert-at-cursor' | 'append' | 'prepend'; // REQ-007
 }
-
-/**
- * Default settings constant type
- * Used to ensure DEFAULT_SETTINGS in constants.ts matches our interface
- */
-export const DEFAULT_SETTINGS: SnowflakeSettings = {
-  templateMappings: {},
-  defaultTemplate: "",
-  enableAutoTemplating: true,
-  templatesFolder: "Templates",
-};

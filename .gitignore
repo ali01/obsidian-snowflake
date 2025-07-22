@@ -16,6 +16,7 @@ lib/
 # IDE
 .vscode/
 .idea/
+.zed/
 
 # OS files
 .DS_Store

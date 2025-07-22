@@ -11,8 +11,9 @@
  * create the new file empty and show a notice.
  */
 
-import { Vault, TFile, Notice } from 'obsidian';
-import { SnowflakeSettings, MarkdownFile, ErrorContext } from './types';
+import { TFile, TFolder } from 'obsidian';
+import type { TAbstractFile, Vault } from 'obsidian';
+import type { SnowflakeSettings, MarkdownFile, ErrorContext } from './types';
 import { ErrorHandler } from './error-handler';
 
 /**
@@ -22,9 +23,9 @@ import { ErrorHandler } from './error-handler';
  * handling and user feedback.
  */
 export class TemplateLoader {
-  private vault: Vault;
+  private readonly vault: Vault;
   private settings: SnowflakeSettings;
-  private errorHandler: ErrorHandler;
+  private readonly errorHandler: ErrorHandler;
 
   constructor(vault: Vault, settings: SnowflakeSettings) {
     this.vault = vault;
@@ -75,7 +76,7 @@ export class TemplateLoader {
    */
   getTemplateForFile(file: MarkdownFile): string | null {
     // Get the folder path
-    const folderPath = file.parent?.path || '';
+    const folderPath = file.parent?.path ?? '';
 
     // Check for exact folder match first
     if (this.settings.templateMappings[folderPath]) {
@@ -110,7 +111,7 @@ export class TemplateLoader {
    * @param templatePath - Path to validate
    * @returns True if template exists
    */
-  async templateExists(templatePath: string): Promise<boolean> {
+  templateExists(templatePath: string): boolean {
     const file = this.vault.getAbstractFileByPath(templatePath);
     return file instanceof TFile;
   }
@@ -120,28 +121,34 @@ export class TemplateLoader {
    *
    * @returns Array of template file paths
    */
-  async getAvailableTemplates(): Promise<string[]> {
+  getAvailableTemplates(): string[] {
     const templates: string[] = [];
     const templatesFolder = this.settings.templatesFolder;
 
     // Get the folder
     const folder = this.vault.getAbstractFileByPath(templatesFolder);
-    if (!folder || !(folder as any).children) {
+    if (!folder) {
+      return templates;
+    }
+
+    // Check if it's a TFolder (has children property)
+    if (!('children' in folder)) {
       return templates;
     }
 
     // Recursively collect markdown files
-    const collectTemplates = (abstractFile: any) => {
+    const collectTemplates = (abstractFile: TAbstractFile): void => {
       if (abstractFile instanceof TFile && abstractFile.extension === 'md') {
         templates.push(abstractFile.path);
-      } else if (abstractFile.children) {
+      } else if (abstractFile instanceof TFolder) {
         for (const child of abstractFile.children) {
           collectTemplates(child);
         }
       }
     };
 
-    collectTemplates(folder);
+    const abstractFolder = folder as TAbstractFile;
+    collectTemplates(abstractFolder);
     return templates;
   }
 

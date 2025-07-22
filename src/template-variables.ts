@@ -14,13 +14,9 @@
  * plugin shall replace ALL instances with the SAME ID value.
  */
 
-import {
-  TemplateVariableContext,
-  TemplateProcessResult,
-  MarkdownFile,
-} from "./types";
-import { generateNanoID } from "./nanoid";
-import { moment } from "obsidian";
+import type { TemplateVariableContext, TemplateProcessResult, MarkdownFile } from './types';
+import { generateNanoID } from './nanoid';
+import { moment } from 'obsidian';
 
 /**
  * Regular expression to match template variables
@@ -31,22 +27,17 @@ const VARIABLE_REGEX = /\{\{(\w+)\}\}/g;
 /**
  * Default date and time formats
  */
-const DEFAULT_DATE_FORMAT = "YYYY-MM-DD";
-const DEFAULT_TIME_FORMAT = "HH:mm";
-
-/**
- * Variable handler function type
- */
-type VariableHandler = (context: TemplateVariableContext) => string | undefined;
+const DEFAULT_DATE_FORMAT = 'YYYY-MM-DD';
+const DEFAULT_TIME_FORMAT = 'HH:mm';
 
 /**
  * Registry of available template variables and their handlers
  */
-const VARIABLE_HANDLERS: Record<string, VariableHandler> = {
-  title: (context) => context.title,
-  date: (context) => context.date,
-  time: (context) => context.time,
-  snowflake_id: (context) => context.snowflake_id,
+const VARIABLE_HANDLERS = {
+  title: (context: TemplateVariableContext): string => context.title,
+  date: (context: TemplateVariableContext): string => context.date,
+  time: (context: TemplateVariableContext): string => context.time,
+  snowflakeId: (context: TemplateVariableContext): string | undefined => context.snowflakeId
 };
 
 /**
@@ -60,10 +51,7 @@ export class TemplateVariableProcessor {
   private dateFormat: string;
   private timeFormat: string;
 
-  constructor(
-    dateFormat: string = DEFAULT_DATE_FORMAT,
-    timeFormat: string = DEFAULT_TIME_FORMAT,
-  ) {
+  constructor(dateFormat: string = DEFAULT_DATE_FORMAT, timeFormat: string = DEFAULT_TIME_FORMAT) {
     this.dateFormat = dateFormat;
     this.timeFormat = timeFormat;
   }
@@ -78,12 +66,9 @@ export class TemplateVariableProcessor {
    * @param file - The markdown file being created
    * @returns Processed content with variables replaced
    */
-  async processTemplate(
-    templateContent: string,
-    file: MarkdownFile,
-  ): Promise<TemplateProcessResult> {
+  processTemplate(templateContent: string, file: MarkdownFile): TemplateProcessResult {
     // Check if template contains snowflake_id variable
-    const hasSnowflakeId = templateContent.includes("{{snowflake_id}}");
+    const hasSnowflakeId = templateContent.includes('{{snowflake_id}}');
 
     // Build variable context
     const context = this.buildContext(file, hasSnowflakeId);
@@ -94,7 +79,7 @@ export class TemplateVariableProcessor {
     return {
       content: processedContent,
       hasSnowflakeId,
-      variables: context,
+      variables: context
     };
   }
 
@@ -110,21 +95,19 @@ export class TemplateVariableProcessor {
    * @param generateId - Whether to generate a snowflake_id
    * @returns Variable context
    */
-  private buildContext(
-    file: MarkdownFile,
-    generateId: boolean,
-  ): TemplateVariableContext {
-    const now = moment();
+  private buildContext(file: MarkdownFile, generateId: boolean): TemplateVariableContext {
+    // Use type assertion for moment as Obsidian's types are incomplete
+    const now = (moment as unknown as () => { format: (fmt: string) => string })();
 
     const context: TemplateVariableContext = {
       title: file.basename, // filename without .md extension
       date: now.format(this.dateFormat),
-      time: now.format(this.timeFormat),
+      time: now.format(this.timeFormat)
     };
 
     // Only generate ID if template contains {{snowflake_id}}
     if (generateId) {
-      context.snowflake_id = generateNanoID();
+      context.snowflakeId = generateNanoID();
     }
 
     return context;
@@ -140,24 +123,25 @@ export class TemplateVariableProcessor {
    * @param context - The variable context
    * @returns Content with variables replaced
    */
-  private replaceVariables(
-    content: string,
-    context: TemplateVariableContext,
-  ): string {
-    return content.replace(VARIABLE_REGEX, (match, varName) => {
+  private replaceVariables(content: string, context: TemplateVariableContext): string {
+    return content.replace(VARIABLE_REGEX, (match, varName: string) => {
       // Get handler for this variable
-      const handler = VARIABLE_HANDLERS[varName];
+      // Check if variable name is known
+      // Special handling for snowflake_id alias
+      const handlerKey = varName === 'snowflake_id' ? 'snowflakeId' : varName;
 
-      if (!handler) {
+      if (!(handlerKey in VARIABLE_HANDLERS)) {
         // REQ-027: Leave malformed/unknown variables unchanged
         return match;
       }
+
+      const handler = VARIABLE_HANDLERS[handlerKey as keyof typeof VARIABLE_HANDLERS];
 
       // Get value from context
       const value = handler(context);
 
       // If no value available, leave unchanged
-      return value !== undefined ? value : match;
+      return value ?? match;
     });
   }
 
@@ -169,7 +153,7 @@ export class TemplateVariableProcessor {
    * @param format - New date format
    */
   setDateFormat(format: string): void {
-    this.dateFormat = format || DEFAULT_DATE_FORMAT;
+    this.dateFormat = format !== '' ? format : DEFAULT_DATE_FORMAT;
   }
 
   /**
@@ -180,7 +164,7 @@ export class TemplateVariableProcessor {
    * @param format - New time format
    */
   setTimeFormat(format: string): void {
-    this.timeFormat = format || DEFAULT_TIME_FORMAT;
+    this.timeFormat = format !== '' ? format : DEFAULT_TIME_FORMAT;
   }
 
   /**
@@ -198,7 +182,8 @@ export class TemplateVariableProcessor {
 
     for (const match of matches) {
       const varName = match[1];
-      if (!VARIABLE_HANDLERS[varName]) {
+      // Check for both original name and alias
+      if (!(varName in VARIABLE_HANDLERS) && varName !== 'snowflake_id') {
         invalidVars.push(varName);
       }
     }
@@ -222,14 +207,14 @@ export class TemplateVariableProcessor {
  * This pattern allows plugins or future versions to register custom
  * variables without modifying the core processor.
  */
-export interface VariableHandler {
+export interface VariableHandlerDef {
   name: string; // Variable name without braces (e.g., "weather")
-  process: (context: any) => string; // Function to compute value
+  process: (context: unknown) => string; // Function to compute value
 }
 
 export interface VariableRegistry {
-  register(handler: VariableHandler): void;
-  process(varName: string, context: any): string | undefined;
+  register(handler: VariableHandlerDef): void;
+  process(varName: string, context: unknown): string | undefined;
 }
 
 /**
@@ -242,42 +227,58 @@ export interface VariableRegistry {
  * - Custom user-defined variables
  */
 export class ExtensibleVariableRegistry implements VariableRegistry {
-  private handlers: Map<string, VariableHandler> = new Map();
+  private readonly handlers: Map<string, VariableHandlerDef> = new Map();
 
   constructor() {
     // Register built-in handlers
     this.registerBuiltins();
   }
 
-  register(handler: VariableHandler): void {
+  register(handler: VariableHandlerDef): void {
     this.handlers.set(handler.name, handler);
   }
 
-  process(varName: string, context: any): string | undefined {
+  process(varName: string, context: unknown): string | undefined {
     const handler = this.handlers.get(varName);
-    return handler ? handler.process(context) : undefined;
+    if (handler === undefined) {
+      return undefined;
+    }
+    // Handler is guaranteed to exist and return string based on interface
+    return handler.process(context);
   }
 
   private registerBuiltins(): void {
     // Register standard variables
     this.register({
-      name: "title",
-      process: (ctx: TemplateVariableContext) => ctx.title,
+      name: 'title',
+      process: (ctx): string => {
+        const context = ctx as TemplateVariableContext;
+        return context.title;
+      }
     });
 
     this.register({
-      name: "date",
-      process: (ctx: TemplateVariableContext) => ctx.date,
+      name: 'date',
+      process: (ctx): string => {
+        const context = ctx as TemplateVariableContext;
+        return context.date;
+      }
     });
 
     this.register({
-      name: "time",
-      process: (ctx: TemplateVariableContext) => ctx.time,
+      name: 'time',
+      process: (ctx): string => {
+        const context = ctx as TemplateVariableContext;
+        return context.time;
+      }
     });
 
     this.register({
-      name: "snowflake_id",
-      process: (ctx: TemplateVariableContext) => ctx.snowflake_id || "",
+      name: 'snowflake_id',
+      process: (ctx): string => {
+        const context = ctx as TemplateVariableContext;
+        return context.snowflakeId ?? '';
+      }
     });
   }
 }
@@ -291,7 +292,7 @@ export class ExtensibleVariableRegistry implements VariableRegistry {
  */
 export function createTemplateProcessor(
   dateFormat?: string,
-  timeFormat?: string,
+  timeFormat?: string
 ): TemplateVariableProcessor {
   return new TemplateVariableProcessor(dateFormat, timeFormat);
 }

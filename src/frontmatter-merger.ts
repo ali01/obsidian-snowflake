@@ -11,7 +11,7 @@
  * the template that don't exist in the file.
  */
 
-import { FrontmatterMergeResult } from './types';
+import type { FrontmatterMergeResult } from './types';
 
 /**
  * Regular expression to match YAML frontmatter
@@ -24,7 +24,7 @@ const FRONTMATTER_REGEX = /^---\s*\n([\s\S]*?)\n---\s*$/m;
 interface ParsedFrontmatter {
   exists: boolean;
   content: string;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   endPosition?: number;
 }
 
@@ -120,7 +120,15 @@ export class FrontmatterMerger {
     }
 
     const frontmatterContent = match[1];
-    const endPosition = match.index! + match[0].length;
+    const matchIndex = match.index;
+    if (matchIndex === undefined) {
+      return {
+        exists: false,
+        content: '',
+        data: {}
+      };
+    }
+    const endPosition = matchIndex + match[0].length;
 
     return {
       exists: true,
@@ -139,55 +147,75 @@ export class FrontmatterMerger {
    * @param yaml - YAML content
    * @returns Parsed data object
    */
-  private parseYaml(yaml: string): Record<string, any> {
-    const data: Record<string, any> = {};
+  private parseYaml(yaml: string): Record<string, unknown> {
+    const data: Record<string, unknown> = {};
     const lines = yaml.split('\n');
-
-    let currentKey: string | null = null;
-    let currentValue: string[] = [];
+    const state = this.createParserState();
 
     for (const line of lines) {
-      // Skip empty lines and comments
-      if (!line.trim() || line.trim().startsWith('#')) {
-        continue;
-      }
-
-      // Check if this is a key-value pair
-      const keyMatch = line.match(/^(\w+):\s*(.*)$/);
-
-      if (keyMatch) {
-        // Save previous multi-line value if exists
-        if (currentKey && currentValue.length > 0) {
-          data[currentKey] = currentValue.join('\n').trim();
-        }
-
-        currentKey = keyMatch[1];
-        const value = keyMatch[2].trim();
-
-        if (value === '|') {
-          // Multi-line literal block
-          currentValue = [];
-        } else if (value) {
-          // Single-line value
-          data[currentKey] = this.parseValue(value);
-          currentKey = null;
-          currentValue = [];
-        } else {
-          // Start of multi-line value (other format)
-          currentValue = [];
-        }
-      } else if (currentKey && line.startsWith('  ')) {
-        // Continuation of multi-line value
-        currentValue.push(line.slice(2));
-      }
+      this.processYamlLine(line, data, state);
     }
 
     // Save final multi-line value if exists
-    if (currentKey && currentValue.length > 0) {
-      data[currentKey] = currentValue.join('\n').trim();
+    this.savePendingValue(data, state);
+    return data;
+  }
+
+  private createParserState(): { currentKey: string | null; currentValue: string[] } {
+    return { currentKey: null, currentValue: [] };
+  }
+
+  private processYamlLine(
+    line: string,
+    data: Record<string, unknown>,
+    state: { currentKey: string | null; currentValue: string[] }
+  ): void {
+    // Skip empty lines and comments
+    if (!line.trim() || line.trim().startsWith('#')) {
+      return;
     }
 
-    return data;
+    const keyMatch = line.match(/^(\w+):\s*(.*)$/);
+    if (keyMatch) {
+      this.handleKeyValueLine(keyMatch, data, state);
+    } else if (state.currentKey !== null && line.startsWith('  ')) {
+      // Continuation of multi-line value
+      state.currentValue.push(line.slice(2));
+    }
+  }
+
+  private handleKeyValueLine(
+    keyMatch: RegExpMatchArray,
+    data: Record<string, unknown>,
+    state: { currentKey: string | null; currentValue: string[] }
+  ): void {
+    // Save previous multi-line value if exists
+    this.savePendingValue(data, state);
+
+    state.currentKey = keyMatch[1];
+    const value = keyMatch[2].trim();
+
+    if (value === '|') {
+      // Multi-line literal block
+      state.currentValue = [];
+    } else if (value !== '') {
+      // Single-line value
+      data[state.currentKey] = this.parseValue(value);
+      state.currentKey = null;
+      state.currentValue = [];
+    } else {
+      // Start of multi-line value (other format)
+      state.currentValue = [];
+    }
+  }
+
+  private savePendingValue(
+    data: Record<string, unknown>,
+    state: { currentKey: string | null; currentValue: string[] }
+  ): void {
+    if (state.currentKey !== null && state.currentValue.length > 0) {
+      data[state.currentKey] = state.currentValue.join('\n').trim();
+    }
   }
 
   /**
@@ -196,34 +224,55 @@ export class FrontmatterMerger {
    * @param value - String value to parse
    * @returns Parsed value (string, number, boolean, or array)
    */
-  private parseValue(value: string): any {
-    // Remove quotes if present
-    if ((value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))) {
-      return value.slice(1, -1);
-    }
+  private parseValue(value: string): unknown {
+    const unquoted = this.tryUnquote(value);
+    if (unquoted !== value) return unquoted;
 
-    // Boolean values
-    if (value === 'true') return true;
-    if (value === 'false') return false;
+    const booleanValue = this.tryParseBoolean(value);
+    if (booleanValue !== undefined) return booleanValue;
 
-    // Null values
     if (value === 'null' || value === '~') return null;
 
-    // Numbers
+    const numberValue = this.tryParseNumber(value);
+    if (numberValue !== undefined) return numberValue;
+
+    const arrayValue = this.tryParseArray(value);
+    if (arrayValue !== undefined) return arrayValue;
+
+    return value;
+  }
+
+  private tryUnquote(value: string): string {
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      return value.slice(1, -1);
+    }
+    return value;
+  }
+
+  private tryParseBoolean(value: string): boolean | undefined {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return undefined;
+  }
+
+  private tryParseNumber(value: string): number | undefined {
     if (/^-?\d+(\.\d+)?$/.test(value)) {
       return parseFloat(value);
     }
+    return undefined;
+  }
 
-    // Arrays (simple format)
+  private tryParseArray(value: string): unknown[] | undefined {
     if (value.startsWith('[') && value.endsWith(']')) {
-      return value.slice(1, -1)
+      return value
+        .slice(1, -1)
         .split(',')
-        .map(item => this.parseValue(item.trim()));
+        .map((item) => this.parseValue(item.trim()));
     }
-
-    // Default to string
-    return value;
+    return undefined;
   }
 
   /**
@@ -232,40 +281,62 @@ export class FrontmatterMerger {
    * @param data - Data object to convert
    * @returns YAML string
    */
-  private dataToYaml(data: Record<string, any>): string {
+  private dataToYaml(data: Record<string, unknown>): string {
     const lines: string[] = [];
 
     for (const [key, value] of Object.entries(data)) {
-      if (value === null || value === undefined) {
-        lines.push(`${key}: null`);
-      } else if (typeof value === 'boolean') {
-        lines.push(`${key}: ${value}`);
-      } else if (typeof value === 'number') {
-        lines.push(`${key}: ${value}`);
-      } else if (Array.isArray(value)) {
-        lines.push(`${key}: [${value.map(v => this.formatValue(v)).join(', ')}]`);
-      } else if (typeof value === 'string') {
-        if (value.includes('\n')) {
-          // Multi-line string - check if already formatted with |
-          if (value.trim() === '|') {
-            lines.push(`${key}: |`);
-          } else {
-            lines.push(`${key}: |`);
-            value.split('\n').forEach(line => {
-              lines.push(`  ${line}`);
-            });
-          }
-        } else {
-          // Single-line string
-          lines.push(`${key}: ${this.formatValue(value)}`);
-        }
-      } else if (typeof value === 'object') {
-        // Nested object (simplified handling)
-        lines.push(`${key}: ${JSON.stringify(value)}`);
+      const yamlLine = this.formatYamlLine(key, value);
+      if (Array.isArray(yamlLine)) {
+        lines.push(...yamlLine);
+      } else {
+        lines.push(yamlLine);
       }
     }
 
     return lines.join('\n') + '\n';
+  }
+
+  private formatYamlLine(key: string, value: unknown): string | string[] {
+    if (value === null || value === undefined) {
+      return `${key}: null`;
+    }
+
+    if (typeof value === 'boolean' || typeof value === 'number') {
+      return `${key}: ${String(value)}`;
+    }
+
+    if (Array.isArray(value)) {
+      return `${key}: [${value.map((v) => this.formatValue(v)).join(', ')}]`;
+    }
+
+    if (typeof value === 'string') {
+      return this.formatStringValue(key, value);
+    }
+
+    if (typeof value === 'object') {
+      return `${key}: ${JSON.stringify(value)}`;
+    }
+
+    // Fallback for other types
+    return `${key}: ${JSON.stringify(value)}`;
+  }
+
+  private formatStringValue(key: string, value: string): string | string[] {
+    if (!value.includes('\n')) {
+      return `${key}: ${this.formatValue(value)}`;
+    }
+
+    // Multi-line string
+    if (value.trim() === '|') {
+      return `${key}: |`;
+    }
+
+    const lines = [`${key}: |`];
+    const valueLines = value.split('\n');
+    for (const line of valueLines) {
+      lines.push(`  ${line}`);
+    }
+    return lines;
   }
 
   /**
@@ -274,10 +345,10 @@ export class FrontmatterMerger {
    * @param value - Value to format
    * @returns Formatted string
    */
-  private formatValue(value: any): string {
+  private formatValue(value: unknown): string {
     if (typeof value === 'string') {
       // Quote if contains special characters
-      if (value.match(/[:\[\]{},>|]/)) {
+      if (/[:[\]{},>|]/.test(value)) {
         return `"${value.replace(/"/g, '\\"')}"`;
       }
       return value;
@@ -295,7 +366,7 @@ export class FrontmatterMerger {
     try {
       const parsed = this.parseYaml(yaml);
       // Basic validation - should have parsed at least something
-      return typeof parsed === 'object' && parsed !== null;
+      return typeof parsed === 'object';
     } catch {
       return false;
     }

@@ -12,13 +12,10 @@
  * NOT automatically apply templates to any new files.
  */
 
-import { TFile, Vault, Plugin } from 'obsidian';
-import {
-  SnowflakeSettings,
-  isMarkdownFile,
-  CommandContext,
-  ErrorContext
-} from './types';
+import { TFile } from 'obsidian';
+import type { TAbstractFile, Vault, Plugin, EventRef } from 'obsidian';
+import { isMarkdownFile } from './types';
+import type { SnowflakeSettings, CommandContext, ErrorContext, MarkdownFile } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { ErrorHandler } from './error-handler';
 
@@ -29,19 +26,15 @@ import { ErrorHandler } from './error-handler';
  * markdown files based on their location and plugin settings.
  */
 export class FileCreationHandler {
-  private plugin: Plugin;
-  private vault: Vault;
+  private readonly plugin: Plugin;
+  private readonly vault: Vault;
   private settings: SnowflakeSettings;
-  private templateApplicator: TemplateApplicator;
-  private processingQueue: Set<string> = new Set();
-  private eventRef: any;
-  private errorHandler: ErrorHandler;
+  private readonly templateApplicator: TemplateApplicator;
+  private readonly processingQueue: Set<string> = new Set();
+  private eventRef: EventRef | null = null;
+  private readonly errorHandler: ErrorHandler;
 
-  constructor(
-    plugin: Plugin,
-    vault: Vault,
-    settings: SnowflakeSettings
-  ) {
+  constructor(plugin: Plugin, vault: Vault, settings: SnowflakeSettings) {
     this.plugin = plugin;
     this.vault = vault;
     this.settings = settings;
@@ -54,7 +47,13 @@ export class FileCreationHandler {
    */
   start(): void {
     // Register the event handler
-    this.eventRef = this.vault.on('create', this.handleFileCreation.bind(this));
+    this.eventRef = this.vault.on('create', (file: TAbstractFile) => {
+      if (file instanceof TFile) {
+        this.handleFileCreation(file).catch(() => {
+          // Errors are handled inside handleFileCreation
+        });
+      }
+    });
     this.plugin.registerEvent(this.eventRef);
   }
 
@@ -62,7 +61,7 @@ export class FileCreationHandler {
    * Stop listening for file creation events
    */
   stop(): void {
-    if (this.eventRef) {
+    if (this.eventRef !== null) {
       this.vault.offref(this.eventRef);
       this.eventRef = null;
     }
@@ -78,49 +77,63 @@ export class FileCreationHandler {
    * @param file - The newly created file
    */
   private async handleFileCreation(file: TFile): Promise<void> {
+    if (!this.shouldProcessFile(file)) {
+      return;
+    }
+
+    if (!this.addToProcessingQueue(file.path)) {
+      return;
+    }
+
+    try {
+      await this.processFileWithTemplate(file);
+    } finally {
+      this.processingQueue.delete(file.path);
+    }
+  }
+
+  private shouldProcessFile(file: TFile): boolean {
     // REQ-004: Only process markdown files
     if (!isMarkdownFile(file)) {
-      return;
+      return false;
     }
 
     // REQ-005: Check if auto-templating is enabled
     if (!this.settings.enableAutoTemplating) {
-      return;
+      return false;
     }
 
+    return true;
+  }
+
+  private addToProcessingQueue(filePath: string): boolean {
     // Prevent double processing using queue
-    if (this.processingQueue.has(file.path)) {
-      return;
+    if (this.processingQueue.has(filePath)) {
+      return false;
     }
 
-    // Add to processing queue
-    this.processingQueue.add(file.path);
+    this.processingQueue.add(filePath);
+    return true;
+  }
+
+  private async processFileWithTemplate(file: TFile): Promise<void> {
+    // Check if file still exists (could have been deleted/renamed)
+    const stillExists = this.vault.getAbstractFileByPath(file.path);
+    if (!stillExists) {
+      return;
+    }
 
     try {
-      // Check if file still exists (could have been deleted/renamed)
-      const stillExists = this.vault.getAbstractFileByPath(file.path);
-      if (!stillExists) {
-        return;
-      }
-
-      // Apply template
       const context: CommandContext = { isManualCommand: false };
-      await this.templateApplicator.applyTemplate(file, context);
-
+      await this.templateApplicator.applyTemplate(file as MarkdownFile, context);
     } catch (error) {
       const errorContext: ErrorContext = {
         operation: 'apply_template',
         filePath: file.path
       };
-
-      // Use silent error handling since template applicator already shows notices
       this.errorHandler.handleErrorSilently(error, errorContext);
-    } finally {
-      // Remove from processing queue
-      this.processingQueue.delete(file.path);
     }
   }
-
 
   /**
    * Update settings reference

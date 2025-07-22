@@ -13,10 +13,8 @@
  * Author: Ali Yahya
  */
 
-import { Plugin, TFile, Notice } from 'obsidian';
-import { SnowflakeSettings } from './types';
-import { DEFAULT_SETTINGS } from './constants';
-import { FolderSuggestModal } from './ui/folder-modal';
+import { Plugin } from 'obsidian';
+import type { SnowflakeSettings } from './types';
 import { SnowflakeSettingTab } from './ui/settings-tab';
 import { mergeWithDefaults } from './settings-utils';
 import { FileCreationHandler } from './file-creation-handler';
@@ -26,95 +24,89 @@ import { SnowflakeCommands } from './commands';
  * Main plugin class for Snowflake
  */
 export default class SnowflakePlugin extends Plugin {
-    settings!: SnowflakeSettings;
-    private fileCreationHandler?: FileCreationHandler;
-    private commands?: SnowflakeCommands;
+  settings!: SnowflakeSettings;
+  private fileCreationHandler?: FileCreationHandler;
+  private commands?: SnowflakeCommands;
 
-    async onload() {
-        console.log("Loading Snowflake plugin");
+  async onload(): Promise<void> {
+    // Load saved settings or use defaults
+    await this.loadSettings();
 
-        // Load saved settings or use defaults
-        await this.loadSettings();
+    // Add settings tab to Obsidian settings
+    this.addSettingTab(new SnowflakeSettingTab(this.app, this));
 
-        // Add settings tab to Obsidian settings
-        this.addSettingTab(new SnowflakeSettingTab(this.app, this));
+    // Initialize file creation handler
+    this.fileCreationHandler = new FileCreationHandler(this, this.app.vault, this.settings);
+    this.fileCreationHandler.start();
 
-        // Initialize file creation handler
-        this.fileCreationHandler = new FileCreationHandler(
-            this,
-            this.app.vault,
-            this.settings
-        );
-        this.fileCreationHandler.start();
+    // Initialize and register commands
+    this.commands = new SnowflakeCommands(this, this.settings);
+    this.commands.registerCommands();
+  }
 
-        // Initialize and register commands
-        this.commands = new SnowflakeCommands(this, this.settings);
-        this.commands.registerCommands();
+  onunload(): void {
+    // Stop file creation handler
+    if (this.fileCreationHandler !== undefined) {
+      this.fileCreationHandler.stop();
+    }
+  }
+
+  async loadSettings(): Promise<void> {
+    const data = (await this.loadData()) as SnowflakeSettings | null;
+
+    // Use the settings utilities to properly merge with defaults
+    this.settings = mergeWithDefaults(data ?? {});
+
+    // Validate settings to ensure they're properly formed
+    this.validateSettings();
+  }
+
+  async saveSettings(): Promise<void> {
+    // Validate before saving
+    this.validateSettings();
+    await this.saveData(this.settings);
+
+    // Update file creation handler with new settings
+    if (this.fileCreationHandler !== undefined) {
+      this.fileCreationHandler.updateSettings(this.settings);
     }
 
-    onunload() {
-        console.log("Unloading Snowflake plugin");
+    // Update commands with new settings
+    if (this.commands !== undefined) {
+      this.commands.updateSettings(this.settings);
+    }
+  }
 
-        // Stop file creation handler
-        if (this.fileCreationHandler) {
-            this.fileCreationHandler.stop();
-        }
+  /**
+   * Validates and fixes settings to ensure they're properly formed
+   *
+   * REQ-023: Ensures all required settings exist with valid values
+   */
+  validateSettings(): void {
+    // Ensure templateMappings is an object (not null or array)
+    if (
+      typeof this.settings.templateMappings !== 'object' ||
+      Array.isArray(this.settings.templateMappings)
+    ) {
+      this.settings.templateMappings = {};
     }
 
-    async loadSettings() {
-        const data = await this.loadData();
-
-        // Use the settings utilities to properly merge with defaults
-        this.settings = mergeWithDefaults(data || {});
-
-        // Validate settings to ensure they're properly formed
-        this.validateSettings();
+    // Ensure defaultTemplate is a string
+    if (typeof this.settings.defaultTemplate !== 'string') {
+      this.settings.defaultTemplate = '';
     }
 
-    async saveSettings() {
-        // Validate before saving
-        this.validateSettings();
-        await this.saveData(this.settings);
-
-        // Update file creation handler with new settings
-        if (this.fileCreationHandler) {
-            this.fileCreationHandler.updateSettings(this.settings);
-        }
-
-        // Update commands with new settings
-        if (this.commands) {
-            this.commands.updateSettings(this.settings);
-        }
+    // Ensure enableAutoTemplating is a boolean
+    if (typeof this.settings.enableAutoTemplating !== 'boolean') {
+      this.settings.enableAutoTemplating = true;
     }
 
-    /**
-     * Validates and fixes settings to ensure they're properly formed
-     *
-     * REQ-023: Ensures all required settings exist with valid values
-     */
-    validateSettings() {
-        // Ensure templateMappings is an object (not null or array)
-        if (!this.settings.templateMappings ||
-            typeof this.settings.templateMappings !== 'object' ||
-            Array.isArray(this.settings.templateMappings)) {
-            this.settings.templateMappings = {};
-        }
-
-        // Ensure defaultTemplate is a string
-        if (typeof this.settings.defaultTemplate !== 'string') {
-            this.settings.defaultTemplate = "";
-        }
-
-        // Ensure enableAutoTemplating is a boolean
-        if (typeof this.settings.enableAutoTemplating !== 'boolean') {
-            this.settings.enableAutoTemplating = true;
-        }
-
-        // Ensure templatesFolder is a non-empty string
-        if (typeof this.settings.templatesFolder !== 'string' ||
-            this.settings.templatesFolder.trim() === '') {
-            this.settings.templatesFolder = "Templates";
-        }
+    // Ensure templatesFolder is a non-empty string
+    if (
+      typeof this.settings.templatesFolder !== 'string' ||
+      this.settings.templatesFolder.trim() === ''
+    ) {
+      this.settings.templatesFolder = 'Templates';
     }
-
+  }
 }

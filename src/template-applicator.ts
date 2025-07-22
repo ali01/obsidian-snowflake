@@ -14,17 +14,13 @@
  * the plugin shall still apply the template.
  */
 
-import { Vault, Notice, Editor } from 'obsidian';
-import {
-  MarkdownFile,
-  SnowflakeSettings,
-  CommandContext,
-  ErrorContext
-} from './types';
+import { Notice } from 'obsidian';
+import type { Vault, Editor } from 'obsidian';
+import type { MarkdownFile, SnowflakeSettings, CommandContext, ErrorContext } from './types';
 import { TemplateLoader } from './template-loader';
 import { TemplateVariableProcessor } from './template-variables';
 import { FrontmatterMerger } from './frontmatter-merger';
-import { ErrorHandler, ErrorType } from './error-handler';
+import { ErrorHandler } from './error-handler';
 
 /**
  * Template application result
@@ -42,12 +38,12 @@ interface ApplyResult {
  * to apply templates to files according to the requirements.
  */
 export class TemplateApplicator {
-  private vault: Vault;
+  private readonly vault: Vault;
   private settings: SnowflakeSettings;
-  private loader: TemplateLoader;
-  private variableProcessor: TemplateVariableProcessor;
-  private frontmatterMerger: FrontmatterMerger;
-  private errorHandler: ErrorHandler;
+  private readonly loader: TemplateLoader;
+  private readonly variableProcessor: TemplateVariableProcessor;
+  private readonly frontmatterMerger: FrontmatterMerger;
+  private readonly errorHandler: ErrorHandler;
 
   constructor(vault: Vault, settings: SnowflakeSettings) {
     this.vault = vault;
@@ -74,70 +70,56 @@ export class TemplateApplicator {
     context: CommandContext = { isManualCommand: false },
     editor?: Editor
   ): Promise<ApplyResult> {
+    // REQ-005/REQ-025: Check if we should apply template
+    if (!this.shouldApplyTemplate(context)) {
+      return { success: false, message: 'Auto-templating is disabled' };
+    }
+
+    const templatePath = this.loader.getTemplateForFile(file);
+    if (templatePath === null) {
+      return { success: false, message: 'No template configured for this location' };
+    }
+
+    return this.loadAndApplyTemplate(file, templatePath, editor);
+  }
+
+  private shouldApplyTemplate(context: CommandContext): boolean {
+    return context.isManualCommand || this.settings.enableAutoTemplating;
+  }
+
+  private async loadAndApplyTemplate(
+    file: MarkdownFile,
+    templatePath: string,
+    editor?: Editor
+  ): Promise<ApplyResult> {
     try {
-      // REQ-005/REQ-025: Check if we should apply template
-      if (!context.isManualCommand && !this.settings.enableAutoTemplating) {
-        return {
-          success: false,
-          message: 'Auto-templating is disabled'
-        };
-      }
-
-      // Get template path for this file
-      const templatePath = this.loader.getTemplateForFile(file);
-      if (!templatePath) {
-        return {
-          success: false,
-          message: 'No template configured for this location'
-        };
-      }
-
-      // Load the template
       const templateContent = await this.loader.loadTemplate(templatePath);
       if (templateContent === null) {
-        // REQ-026: Template doesn't exist
         new Notice(`Template not found: ${templatePath}`);
-        return {
-          success: false,
-          message: `Template not found: ${templatePath}`
-        };
+        return { success: false, message: `Template not found: ${templatePath}` };
       }
 
-      // Process template variables
-      const processedTemplate = await this.variableProcessor.processTemplate(
-        templateContent,
-        file
-      );
-
-      // Apply the processed template
-      const result = await this.applyProcessedTemplate(
-        file,
-        processedTemplate.content,
-        editor
-      );
+      const processedTemplate = this.variableProcessor.processTemplate(templateContent, file);
+      const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
 
       if (result.success) {
         new Notice(`Template applied to ${file.basename}`);
       }
 
-      return {
-        ...result,
-        hadSnowflakeId: processedTemplate.hasSnowflakeId
-      };
+      return { ...result, hadSnowflakeId: processedTemplate.hasSnowflakeId };
     } catch (error) {
-      const errorContext: ErrorContext = {
-        operation: 'apply_template',
-        filePath: file.path,
-        templatePath: templatePath
-      };
-
-      const errorMessage = this.errorHandler.handleError(error, errorContext);
-
-      return {
-        success: false,
-        message: errorMessage
-      };
+      return this.handleTemplateError(error, file.path, templatePath);
     }
+  }
+
+  private handleTemplateError(error: unknown, filePath: string, templatePath: string): ApplyResult {
+    const errorContext: ErrorContext = {
+      operation: 'apply_template',
+      filePath,
+      templatePath
+    };
+    const errorMessage = this.errorHandler.handleError(error, errorContext);
+    return { success: false, message: errorMessage };
   }
 
   /**
@@ -165,17 +147,10 @@ export class TemplateApplicator {
       }
 
       // Process template variables
-      const processedTemplate = await this.variableProcessor.processTemplate(
-        templateContent,
-        file
-      );
+      const processedTemplate = this.variableProcessor.processTemplate(templateContent, file);
 
       // Apply the processed template
-      const result = await this.applyProcessedTemplate(
-        file,
-        processedTemplate.content,
-        editor
-      );
+      const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
 
       if (result.success) {
         new Notice(`Template applied to ${file.basename}`);
@@ -217,74 +192,83 @@ export class TemplateApplicator {
     processedContent: string,
     editor?: Editor
   ): Promise<ApplyResult> {
-    // Read current file content
     const currentContent = await this.vault.read(file);
-
-    // Split template into frontmatter and body
     const templateParts = this.splitContent(processedContent);
     const currentParts = this.splitContent(currentContent);
 
-    let finalContent: string;
+    // Process frontmatter
+    const { content: contentAfterFrontmatter, updatedBody } = this.processFrontmatter(
+      currentContent,
+      templateParts,
+      currentParts
+    );
 
-    // Handle frontmatter merging
-    if (templateParts.frontmatter || currentParts.frontmatter) {
-      const mergeResult = this.frontmatterMerger.merge(
-        currentContent,
-        templateParts.frontmatter || ''
-      );
+    // Process body content
+    const finalContent = this.processBodyContent(
+      contentAfterFrontmatter,
+      templateParts.body,
+      updatedBody,
+      editor
+    );
 
-      // Apply merged frontmatter
-      finalContent = this.frontmatterMerger.applyToFile(
-        currentContent,
-        mergeResult.merged
-      );
-
-      // Update body content reference after frontmatter change
-      const newParts = this.splitContent(finalContent);
-      currentParts.body = newParts.body;
-    } else {
-      finalContent = currentContent;
-    }
-
-    // Handle body content
-    if (templateParts.body) {
-      if (currentParts.body) {
-        // REQ-007: Insert at cursor position if available
-        if (editor) {
-          const cursor = editor.getCursor();
-          const lines = currentParts.body.split('\n');
-
-          // Insert at cursor position
-          if (cursor.line < lines.length) {
-            lines[cursor.line] =
-              lines[cursor.line].slice(0, cursor.ch) +
-              templateParts.body +
-              lines[cursor.line].slice(cursor.ch);
-          } else {
-            // Cursor beyond content, append
-            lines.push(templateParts.body);
-          }
-
-          // Reconstruct with merged body
-          const finalParts = this.splitContent(finalContent);
-          finalContent = finalParts.frontmatterBlock + lines.join('\n');
-        } else {
-          // No cursor, append to end
-          finalContent = finalContent.trimEnd() + '\n\n' + templateParts.body;
-        }
-      } else {
-        // No existing body, just add template body
-        finalContent = finalContent.trimEnd() + '\n\n' + templateParts.body;
-      }
-    }
-
-    // Write the final content
     await this.vault.modify(file, finalContent);
+    return { success: true, message: 'Template applied successfully' };
+  }
 
-    return {
-      success: true,
-      message: 'Template applied successfully'
-    };
+  private processFrontmatter(
+    currentContent: string,
+    templateParts: ReturnType<typeof this.splitContent>,
+    currentParts: ReturnType<typeof this.splitContent>
+  ): { content: string; updatedBody: string } {
+    if (templateParts.frontmatter === null || templateParts.frontmatter === '') {
+      return { content: currentContent, updatedBody: currentParts.body };
+    }
+
+    const mergeResult = this.frontmatterMerger.merge(currentContent, templateParts.frontmatter);
+    const contentWithMergedFrontmatter = this.frontmatterMerger.applyToFile(
+      currentContent,
+      mergeResult.merged
+    );
+    const newParts = this.splitContent(contentWithMergedFrontmatter);
+
+    return { content: contentWithMergedFrontmatter, updatedBody: newParts.body };
+  }
+
+  private processBodyContent(
+    currentContent: string,
+    templateBody: string,
+    currentBody: string,
+    editor?: Editor
+  ): string {
+    if (templateBody === '') {
+      return currentContent;
+    }
+
+    if (currentBody === '' || editor === undefined) {
+      return currentContent.trimEnd() + '\n\n' + templateBody;
+    }
+
+    return this.insertAtCursor(currentContent, templateBody, currentBody, editor);
+  }
+
+  private insertAtCursor(
+    currentContent: string,
+    templateBody: string,
+    currentBody: string,
+    editor: Editor
+  ): string {
+    const cursor = editor.getCursor();
+    const lines = currentBody.split('\n');
+
+    if (cursor.line < lines.length) {
+      lines[cursor.line] =
+        lines[cursor.line].slice(0, cursor.ch) + templateBody + lines[cursor.line].slice(cursor.ch);
+    } else {
+      lines.push(templateBody);
+    }
+
+    const parts = this.splitContent(currentContent);
+    return parts.frontmatterBlock + lines.join('\n');
   }
 
   /**

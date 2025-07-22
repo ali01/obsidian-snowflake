@@ -114,13 +114,66 @@ new Setting(containerEl)
 
 ## Testing Approach
 
-Manual testing within Obsidian is the primary approach. Key test scenarios:
+### Automated Testing
 
-1. Create new note → Should auto-add ID if folder is configured
-2. Run "Add ID to current note" command → Should add ID to active note
-3. Run "Add IDs to all notes in folder" → Should process all notes recursively
-4. Settings changes → Should persist after plugin reload
-5. Edge cases: Files with existing IDs, malformed frontmatter, non-markdown files
+The project uses Jest for unit testing with comprehensive test coverage:
+
+```bash
+# Run all tests
+npm test
+
+# Run tests in watch mode during development
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
+```
+
+**Test Structure:**
+- Test files are located alongside source files with `.test.ts` extension
+- Mock Obsidian API using `src/__mocks__/obsidian.ts`
+- Tests cover all major functionality including:
+  - Command execution
+  - Template loading and application
+  - Error handling
+  - File creation handling
+  - Frontmatter merging
+  - Variable processing
+
+**Writing Tests:**
+- Use descriptive test names that explain the expected behavior
+- Group related tests using `describe` blocks
+- Mock external dependencies (Obsidian API, file system)
+- Test both success and failure cases
+- Verify requirement compliance (REQ-XXX comments)
+
+### Manual Testing
+
+After automated tests pass, perform manual testing within Obsidian:
+
+1. **Template Application**
+   - Create new note in mapped folder → Template should apply automatically
+   - Create note in unmapped folder → Default template or no template
+   - Use manual commands on existing notes
+
+2. **Settings Configuration**
+   - Add/remove folder mappings
+   - Change default template
+   - Toggle auto-templating on/off
+   - Verify settings persist after reload
+
+3. **Edge Cases**
+   - Files with existing frontmatter
+   - Malformed YAML frontmatter
+   - Non-markdown files (.txt, .pdf)
+   - Missing template files
+   - Large batch operations (100+ files)
+
+4. **Error Scenarios**
+   - Invalid template syntax
+   - Permission errors
+   - Concurrent file operations
+   - Plugin conflicts
 
 ## Code Style Guidelines
 
@@ -132,6 +185,27 @@ Manual testing within Obsidian is the primary approach. Key test scenarios:
 - Add descriptive comments for complex logic
 - Follow TypeScript strict mode requirements
 - **Enforce Line Length Limits**: Make sure all TypeScript lines of code are under 100 characters in length
+
+## Quality Assurance
+
+**IMPORTANT**: On completing any changes to TypeScript code ALWAYS run:
+
+```bash
+npm run check
+```
+
+This command will:
+1. Run ESLint with strict configuration (`npm run lint`)
+2. Check code formatting with Prettier (`npm run prettier`)
+3. Run all tests (`npm run test`)
+
+If any issues are found:
+1. Fix all linting errors
+2. Fix all formatting issues
+3. Ensure all tests pass
+4. Run `npm run check` again to verify
+
+Only return control to the user when `npm run check` completes successfully with no errors or warnings.
 
 ## Common Tasks
 

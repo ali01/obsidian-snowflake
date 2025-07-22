@@ -5,7 +5,7 @@
  * including validation and type checking.
  */
 
-import { SnowflakeSettings, TemplateMapping } from './types';
+import type { SnowflakeSettings, TemplateMapping } from './types';
 import { DEFAULT_SETTINGS } from './constants';
 
 /**
@@ -16,21 +16,24 @@ import { DEFAULT_SETTINGS } from './constants';
  * @param mapping - The template mapping to validate
  * @returns true if valid, false otherwise
  */
-export function isValidTemplateMapping(
-    mapping: unknown
-): mapping is TemplateMapping {
-    if (!mapping || typeof mapping !== 'object' || Array.isArray(mapping)) {
-        return false;
-    }
+export function isValidTemplateMapping(mapping: unknown): mapping is TemplateMapping {
+  if (
+    mapping === null ||
+    mapping === undefined ||
+    typeof mapping !== 'object' ||
+    Array.isArray(mapping)
+  ) {
+    return false;
+  }
 
-    // Check that all keys and values are strings
-    for (const [key, value] of Object.entries(mapping)) {
-        if (typeof key !== 'string' || typeof value !== 'string') {
-            return false;
-        }
+  // Check that all keys and values are strings
+  for (const [key, value] of Object.entries(mapping)) {
+    if (typeof key !== 'string' || typeof value !== 'string') {
+      return false;
     }
+  }
 
-    return true;
+  return true;
 }
 
 /**
@@ -42,22 +45,25 @@ export function isValidTemplateMapping(
  * @param settings - The settings object to validate
  * @returns true if all properties are valid
  */
-export function areSettingsValid(
-    settings: unknown
-): settings is SnowflakeSettings {
-    if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
-        return false;
-    }
+export function areSettingsValid(settings: unknown): settings is SnowflakeSettings {
+  if (
+    settings === null ||
+    settings === undefined ||
+    typeof settings !== 'object' ||
+    Array.isArray(settings)
+  ) {
+    return false;
+  }
 
-    const s = settings as Record<string, unknown>;
+  const s = settings as Record<string, unknown>;
 
-    return (
-        isValidTemplateMapping(s.templateMappings) &&
-        typeof s.defaultTemplate === 'string' &&
-        typeof s.enableAutoTemplating === 'boolean' &&
-        typeof s.templatesFolder === 'string' &&
-        s.templatesFolder.trim() !== ''
-    );
+  return (
+    isValidTemplateMapping(s.templateMappings) &&
+    typeof s.defaultTemplate === 'string' &&
+    typeof s.enableAutoTemplating === 'boolean' &&
+    typeof s.templatesFolder === 'string' &&
+    s.templatesFolder.trim() !== ''
+  );
 }
 
 /**
@@ -66,15 +72,13 @@ export function areSettingsValid(
  * @param settings - The settings to copy
  * @returns A deep copy of the settings
  */
-export function cloneSettings(
-    settings: SnowflakeSettings
-): SnowflakeSettings {
-    return {
-        templateMappings: { ...settings.templateMappings },
-        defaultTemplate: settings.defaultTemplate,
-        enableAutoTemplating: settings.enableAutoTemplating,
-        templatesFolder: settings.templatesFolder,
-    };
+export function cloneSettings(settings: SnowflakeSettings): SnowflakeSettings {
+  return {
+    templateMappings: { ...settings.templateMappings },
+    defaultTemplate: settings.defaultTemplate,
+    enableAutoTemplating: settings.enableAutoTemplating,
+    templatesFolder: settings.templatesFolder
+  };
 }
 
 /**
@@ -83,18 +87,16 @@ export function cloneSettings(
  * @param partial - Partial settings to merge
  * @returns Complete settings object
  */
-export function mergeWithDefaults(
-    partial: Partial<SnowflakeSettings>
-): SnowflakeSettings {
-    const merged: SnowflakeSettings = {
-        ...DEFAULT_SETTINGS,
-        ...partial,
-    };
+export function mergeWithDefaults(partial: Partial<SnowflakeSettings>): SnowflakeSettings {
+  const merged: SnowflakeSettings = {
+    ...DEFAULT_SETTINGS,
+    ...partial
+  };
 
-    // Ensure nested objects are properly merged
-    if (partial.templateMappings) {
-        merged.templateMappings = { ...partial.templateMappings };
-    }
+  // Ensure nested objects are properly merged
+  if (partial.templateMappings) {
+    merged.templateMappings = { ...partial.templateMappings };
+  }
 
-    return merged;
+  return merged;
 }

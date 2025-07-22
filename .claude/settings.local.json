@@ -6,7 +6,14 @@
       "Bash(npm test)",
       "Bash(npm test:*)",
       "Bash(npm run build:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run prettier:fix:*)",
+      "Bash(grep:*)",
+      "Bash(npx prettier:*)",
+      "Bash(awk:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run typecheck:*)"
     ],
     "deny": []
   }

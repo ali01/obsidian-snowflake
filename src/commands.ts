@@ -23,21 +23,15 @@
  * the plugin shall still apply the template.
  */
 
-import {
-  Plugin,
-  Command,
-  Notice,
-  TFile,
-  TFolder,
-  Editor,
-  MarkdownView
-} from 'obsidian';
-import {
+import { Notice, TFile, TFolder } from 'obsidian';
+import type { Plugin, Editor, MarkdownView, MarkdownFileInfo } from 'obsidian';
+import { isMarkdownFile } from './types';
+import type {
   SnowflakeSettings,
-  isMarkdownFile,
   CommandContext,
   BatchResult,
-  ErrorContext
+  ErrorContext,
+  MarkdownFile
 } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { FolderSuggestModal } from './ui/folder-modal';
@@ -50,18 +44,15 @@ import { ErrorHandler } from './error-handler';
  * regardless of auto-templating settings.
  */
 export class SnowflakeCommands {
-  private plugin: Plugin;
+  private readonly plugin: Plugin;
   private settings: SnowflakeSettings;
-  private templateApplicator: TemplateApplicator;
-  private errorHandler: ErrorHandler;
+  private readonly templateApplicator: TemplateApplicator;
+  private readonly errorHandler: ErrorHandler;
 
   constructor(plugin: Plugin, settings: SnowflakeSettings) {
     this.plugin = plugin;
     this.settings = settings;
-    this.templateApplicator = new TemplateApplicator(
-      plugin.app.vault,
-      settings
-    );
+    this.templateApplicator = new TemplateApplicator(plugin.app.vault, settings);
     this.errorHandler = ErrorHandler.getInstance();
   }
 
@@ -73,8 +64,10 @@ export class SnowflakeCommands {
     this.plugin.addCommand({
       id: 'apply-template-to-current-note',
       name: 'Apply template to current note',
-      editorCallback: (editor: Editor, view: MarkdownView) => {
-        this.applyTemplateToCurrentNote(editor, view);
+      editorCallback: (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+        this.applyTemplateToCurrentNote(editor, view).catch(() => {
+          // Error is handled in the method
+        });
       }
     });
 
@@ -97,9 +90,9 @@ export class SnowflakeCommands {
    */
   private async applyTemplateToCurrentNote(
     editor: Editor,
-    view: MarkdownView
+    view: MarkdownView | MarkdownFileInfo
   ): Promise<void> {
-    const file = view.file;
+    const file = 'file' in view ? view.file : view;
 
     if (!file) {
       new Notice('No active file');
@@ -115,11 +108,7 @@ export class SnowflakeCommands {
     const context: CommandContext = { isManualCommand: true };
 
     try {
-      const result = await this.templateApplicator.applyTemplate(
-        file,
-        context,
-        editor
-      );
+      const result = await this.templateApplicator.applyTemplate(file, context, editor);
 
       if (!result.success) {
         new Notice(result.message);
@@ -141,14 +130,13 @@ export class SnowflakeCommands {
    * REQ-021: Process asynchronously
    * REQ-022: Show completion notice
    */
-  private async applyTemplateToFolder(): Promise<void> {
+  private applyTemplateToFolder(): void {
     // REQ-019: Show folder selection dialog
-    new FolderSuggestModal(
-      this.plugin.app,
-      async (folder: TFolder) => {
-        await this.processFolderBatch(folder);
-      }
-    ).open();
+    new FolderSuggestModal(this.plugin.app, (folder: TFolder) => {
+      this.processFolderBatch(folder).catch(() => {
+        // Error is handled in the method
+      });
+    }).open();
   }
 
   /**
@@ -159,61 +147,65 @@ export class SnowflakeCommands {
    * REQ-022: Show progress and completion
    */
   private async processFolderBatch(folder: TFolder): Promise<void> {
-    // Collect all markdown files recursively
-    const markdownFiles: TFile[] = [];
-    this.collectMarkdownFiles(folder, markdownFiles);
+    const markdownFiles = this.getMarkdownFiles(folder);
 
     if (markdownFiles.length === 0) {
       new Notice('No markdown files found in selected folder');
       return;
     }
 
-    // Show starting notice
-    new Notice(`Processing ${markdownFiles.length} files...`);
+    new Notice(`Processing ${String(markdownFiles.length)} files...`);
+    const result = await this.processFilesInBatches(markdownFiles);
+    this.showCompletionNotice(result);
+  }
 
-    // Process files in batches for better performance
+  private getMarkdownFiles(folder: TFolder): TFile[] {
+    const markdownFiles: TFile[] = [];
+    this.collectMarkdownFiles(folder, markdownFiles);
+    return markdownFiles;
+  }
+
+  private async processFilesInBatches(files: TFile[]): Promise<BatchResult> {
     const batchSize = 10;
     const context: CommandContext = { isManualCommand: true };
     let successCount = 0;
 
-    // REQ-021: Process asynchronously
-    for (let i = 0; i < markdownFiles.length; i += batchSize) {
-      const batch = markdownFiles.slice(i, i + batchSize);
-
-      // Process batch in parallel
-      const results = await Promise.all(
-        batch.map(file =>
-          this.templateApplicator.applyTemplate(file, context)
-            .then(result => result.success ? 1 : 0)
-            .catch(error => {
-              const errorContext: ErrorContext = {
-                operation: 'apply_template',
-                filePath: file.path
-              };
-              this.errorHandler.handleErrorSilently(error, errorContext);
-              return 0;
-            })
-        )
-      );
-
+    for (let i = 0; i < files.length; i += batchSize) {
+      const batch = files.slice(i, i + batchSize);
+      const results = await this.processBatch(batch, context);
       successCount += results.reduce((sum, val) => sum + val, 0);
-
-      // Allow UI to update between batches
       await this.sleep(10);
     }
 
-    // REQ-022: Show completion notice
-    const result: BatchResult = {
+    return {
       success: successCount,
-      total: markdownFiles.length
+      total: files.length
     };
+  }
 
+  private async processBatch(batch: TFile[], context: CommandContext): Promise<number[]> {
+    return Promise.all(
+      batch.map((file) =>
+        this.templateApplicator
+          .applyTemplate(file as MarkdownFile, context)
+          .then((result) => (result.success ? 1 : 0))
+          .catch((error: unknown) => {
+            const errorContext: ErrorContext = {
+              operation: 'apply_template',
+              filePath: file.path
+            };
+            this.errorHandler.handleErrorSilently(error, errorContext);
+            return 0;
+          })
+      )
+    );
+  }
+
+  private showCompletionNotice(result: BatchResult): void {
     if (result.success === result.total) {
-      new Notice(`Templates applied to ${result.success} notes`);
+      new Notice(`Templates applied to ${String(result.success)} notes`);
     } else {
-      new Notice(
-        `Templates applied to ${result.success} of ${result.total} notes`
-      );
+      new Notice(`Templates applied to ${String(result.success)} of ${String(result.total)} notes`);
     }
   }
 
@@ -239,7 +231,9 @@ export class SnowflakeCommands {
    * @param ms - Milliseconds to sleep
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
   }
 
   /**

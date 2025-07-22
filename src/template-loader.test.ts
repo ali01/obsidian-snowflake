@@ -3,7 +3,7 @@
  */
 
 import { TemplateLoader } from './template-loader';
-import { Vault, TFile } from 'obsidian';
+import { Vault, TFile, TFolder } from 'obsidian';
 import { SnowflakeSettings, MarkdownFile } from './types';
 
 // Mock the TFile class from obsidian
@@ -36,7 +36,7 @@ class MockVault implements Partial<Vault> {
     file.path = path;
     file.basename = path.split('/').pop()?.replace('.md', '') || '';
     file.extension = 'md';
-    file.parent = { path: path.substring(0, path.lastIndexOf('/')) };
+    file.parent = Object.assign(new TFolder(), { path: path.substring(0, path.lastIndexOf('/')) });
 
     this.files.set(path, { content, file });
   }
@@ -64,13 +64,17 @@ describe('TemplateLoader', () => {
   let mockVault: MockVault;
   let settings: SnowflakeSettings;
   let loader: TemplateLoader;
+  let consoleWarnSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    // Mock console.warn to suppress expected warnings in tests
+    consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
     mockVault = new MockVault();
     settings = {
       templateMappings: {
-        'Projects': 'Templates/project.md',
-        'Daily': 'Templates/daily.md',
+        Projects: 'Templates/project.md',
+        Daily: 'Templates/daily.md',
         '': 'Templates/root.md' // Root folder mapping
       },
       defaultTemplate: 'Templates/default.md',
@@ -84,6 +88,11 @@ describe('TemplateLoader', () => {
     mockVault.addFile('Templates/daily.md', '# Daily Template');
     mockVault.addFile('Templates/default.md', '# Default Template');
     mockVault.addFile('Templates/root.md', '# Root Template');
+  });
+
+  afterEach(() => {
+    // Restore console.warn
+    consoleWarnSpy.mockRestore();
   });
 
   describe('loadTemplate', () => {

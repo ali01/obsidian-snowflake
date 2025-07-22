@@ -16,28 +16,28 @@
  */
 
 import { Notice } from 'obsidian';
-import { ErrorContext } from './types';
+import type { ErrorContext } from './types';
 
 /**
  * Error types that can occur in the plugin
  */
 export enum ErrorType {
-    TEMPLATE_NOT_FOUND = 'TEMPLATE_NOT_FOUND',
-    FILE_NOT_FOUND = 'FILE_NOT_FOUND',
-    PERMISSION_DENIED = 'PERMISSION_DENIED',
-    INVALID_TEMPLATE_SYNTAX = 'INVALID_TEMPLATE_SYNTAX',
-    INVALID_VARIABLE = 'INVALID_VARIABLE',
-    MERGE_CONFLICT = 'MERGE_CONFLICT',
-    UNKNOWN = 'UNKNOWN'
+  TEMPLATE_NOT_FOUND = 'TEMPLATE_NOT_FOUND',
+  FILE_NOT_FOUND = 'FILE_NOT_FOUND',
+  PERMISSION_DENIED = 'PERMISSION_DENIED',
+  INVALID_TEMPLATE_SYNTAX = 'INVALID_TEMPLATE_SYNTAX',
+  INVALID_VARIABLE = 'INVALID_VARIABLE',
+  MERGE_CONFLICT = 'MERGE_CONFLICT',
+  UNKNOWN = 'UNKNOWN'
 }
 
 /**
  * Extended error information
  */
 export interface ExtendedError extends Error {
-    type: ErrorType;
-    context: ErrorContext;
-    originalError?: Error;
+  type: ErrorType;
+  context: ErrorContext;
+  originalError?: Error;
 }
 
 /**
@@ -47,210 +47,241 @@ export interface ExtendedError extends Error {
  * and debugging information throughout the plugin.
  */
 export class ErrorHandler {
-    private static instance: ErrorHandler;
-    private debugMode: boolean = false;
+  private static instance: ErrorHandler;
+  private debugMode: boolean = false;
 
-    /**
-     * Get singleton instance
-     */
-    static getInstance(): ErrorHandler {
-        if (!ErrorHandler.instance) {
-            ErrorHandler.instance = new ErrorHandler();
-        }
-        return ErrorHandler.instance;
+  /**
+   * Get singleton instance
+   */
+  static getInstance(): ErrorHandler {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    ErrorHandler.instance ??= new ErrorHandler();
+    return ErrorHandler.instance;
+  }
+
+  /**
+   * Enable/disable debug mode
+   */
+  setDebugMode(enabled: boolean): void {
+    this.debugMode = enabled;
+  }
+
+  /**
+   * Handle an error with appropriate user feedback
+   *
+   * @param error - The error to handle
+   * @param context - Context about where the error occurred
+   * @returns User-friendly error message
+   */
+  handleError(error: unknown, context: ErrorContext): string {
+    const errorType = this.categorizeError(error);
+    const userMessage = this.getUserMessage(errorType, context, error);
+
+    // Log for debugging
+    this.logError(error, context, errorType);
+
+    // Show user notice
+    new Notice(userMessage);
+
+    return userMessage;
+  }
+
+  /**
+   * Handle error without showing notice (for cases where caller handles UI)
+   */
+  handleErrorSilently(error: unknown, context: ErrorContext): string {
+    const errorType = this.categorizeError(error);
+    const userMessage = this.getUserMessage(errorType, context, error);
+
+    // Log for debugging
+    this.logError(error, context, errorType);
+
+    return userMessage;
+  }
+
+  /**
+   * Categorize the error type
+   */
+  private categorizeError(error: unknown): ErrorType {
+    if (error === null || error === undefined) return ErrorType.UNKNOWN;
+
+    const errorMessage = this.getErrorMessage(error).toLowerCase();
+
+    if (this.isFileNotFoundError(errorMessage)) {
+      return ErrorType.FILE_NOT_FOUND;
     }
 
-    /**
-     * Enable/disable debug mode
-     */
-    setDebugMode(enabled: boolean): void {
-        this.debugMode = enabled;
+    if (this.isPermissionError(errorMessage)) {
+      return ErrorType.PERMISSION_DENIED;
     }
 
-    /**
-     * Handle an error with appropriate user feedback
-     *
-     * @param error - The error to handle
-     * @param context - Context about where the error occurred
-     * @returns User-friendly error message
-     */
-    handleError(error: Error | unknown, context: ErrorContext): string {
-        const errorType = this.categorizeError(error);
-        const userMessage = this.getUserMessage(errorType, context, error);
-
-        // Log for debugging
-        this.logError(error, context, errorType);
-
-        // Show user notice
-        new Notice(userMessage);
-
-        return userMessage;
+    if (this.isTemplateSyntaxError(errorMessage)) {
+      return ErrorType.INVALID_TEMPLATE_SYNTAX;
     }
 
-    /**
-     * Handle error without showing notice (for cases where caller handles UI)
-     */
-    handleErrorSilently(error: Error | unknown, context: ErrorContext): string {
-        const errorType = this.categorizeError(error);
-        const userMessage = this.getUserMessage(errorType, context, error);
-
-        // Log for debugging
-        this.logError(error, context, errorType);
-
-        return userMessage;
+    if (this.isVariableError(errorMessage)) {
+      return ErrorType.INVALID_VARIABLE;
     }
 
-    /**
-     * Categorize the error type
-     */
-    private categorizeError(error: Error | unknown): ErrorType {
-        if (!error) return ErrorType.UNKNOWN;
+    return ErrorType.UNKNOWN;
+  }
 
-        const errorMessage = error instanceof Error ?
-            error.message.toLowerCase() : String(error).toLowerCase();
-
-        // File not found errors
-        if (errorMessage.includes('file not found') ||
-            errorMessage.includes('enoent') ||
-            errorMessage.includes('no such file')) {
-            return ErrorType.FILE_NOT_FOUND;
-        }
-
-        // Permission errors
-        if (errorMessage.includes('permission') ||
-            errorMessage.includes('eacces') ||
-            errorMessage.includes('access denied')) {
-            return ErrorType.PERMISSION_DENIED;
-        }
-
-        // Template syntax errors
-        if (errorMessage.includes('invalid template') ||
-            errorMessage.includes('template syntax')) {
-            return ErrorType.INVALID_TEMPLATE_SYNTAX;
-        }
-
-        // Variable errors
-        if (errorMessage.includes('invalid variable') ||
-            errorMessage.includes('unknown variable')) {
-            return ErrorType.INVALID_VARIABLE;
-        }
-
-        return ErrorType.UNKNOWN;
+  private getErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
     }
+    return String(error);
+  }
 
-    /**
-     * Get user-friendly error message based on error type and context
-     */
-    private getUserMessage(
-        errorType: ErrorType,
-        context: ErrorContext,
-        error: Error | unknown
-    ): string {
-        switch (errorType) {
-            case ErrorType.TEMPLATE_NOT_FOUND:
-                // REQ-026: Specific message for missing template
-                return `Template not found: ${context.templatePath || 'unknown'}. ` +
-                    'Creating file without template.';
+  private isFileNotFoundError(message: string): boolean {
+    return (
+      message.includes('file not found') ||
+      message.includes('enoent') ||
+      message.includes('no such file')
+    );
+  }
 
-            case ErrorType.FILE_NOT_FOUND:
-                if (context.operation === 'load_template') {
-                    return `Template file not found: ${context.templatePath || 'unknown'}`;
-                }
-                return `File not found: ${context.filePath || 'unknown'}`;
+  private isPermissionError(message: string): boolean {
+    return (
+      message.includes('permission') ||
+      message.includes('eacces') ||
+      message.includes('access denied')
+    );
+  }
 
-            case ErrorType.PERMISSION_DENIED:
-                // REQ-029: User-friendly message for permission errors
-                if (context.operation === 'load_template') {
-                    return `Cannot read template (permission denied): ` +
-                        `${context.templatePath || 'unknown'}. Creating file without template.`;
-                }
-                return `Permission denied accessing: ` +
-                    `${context.filePath || context.templatePath || 'unknown'}`;
+  private isTemplateSyntaxError(message: string): boolean {
+    return message.includes('invalid template') || message.includes('template syntax');
+  }
 
-            case ErrorType.INVALID_TEMPLATE_SYNTAX:
-                // REQ-027: Inform about malformed syntax
-                return `Template contains invalid syntax and will be used as-is: ` +
-                    `${context.templatePath || 'unknown'}`;
+  private isVariableError(message: string): boolean {
+    return message.includes('invalid variable') || message.includes('unknown variable');
+  }
 
-            case ErrorType.INVALID_VARIABLE:
-                // REQ-028: Warning for invalid variables
-                return `Template contains invalid variables that will be left unchanged: ` +
-                    `${context.templatePath || 'unknown'}`;
-
-            case ErrorType.MERGE_CONFLICT:
-                return `Error merging frontmatter. Using existing content.`;
-
-            default:
-                // Generic error message with operation context
-                const operation = this.getOperationDescription(context.operation);
-                return `Error ${operation}: ` +
-                    `${error instanceof Error ? error.message : 'Unknown error'}`;
-        }
+  /**
+   * Get user-friendly error message based on error type and context
+   */
+  private getUserMessage(errorType: ErrorType, context: ErrorContext, error: unknown): string {
+    switch (errorType) {
+      case ErrorType.TEMPLATE_NOT_FOUND:
+        return this.getTemplateNotFoundMessage(context);
+      case ErrorType.FILE_NOT_FOUND:
+        return this.getFileNotFoundMessage(context);
+      case ErrorType.PERMISSION_DENIED:
+        return this.getPermissionDeniedMessage(context);
+      case ErrorType.INVALID_TEMPLATE_SYNTAX:
+        return this.getInvalidSyntaxMessage(context);
+      case ErrorType.INVALID_VARIABLE:
+        return this.getInvalidVariableMessage(context);
+      case ErrorType.MERGE_CONFLICT:
+        return 'Error merging frontmatter. Using existing content.';
+      default:
+        return this.getGenericErrorMessage(context, error);
     }
+  }
 
-    /**
-     * Get human-readable operation description
-     */
-    private getOperationDescription(operation: string): string {
-        switch (operation) {
-            case 'load_template':
-                return 'loading template';
-            case 'apply_template':
-                return 'applying template';
-            case 'merge_frontmatter':
-                return 'merging frontmatter';
-            default:
-                return 'processing';
-        }
+  private getTemplateNotFoundMessage(context: ErrorContext): string {
+    const path = context.templatePath ?? 'unknown';
+    return `Template not found: ${path}. Creating file without template.`;
+  }
+
+  private getFileNotFoundMessage(context: ErrorContext): string {
+    if (context.operation === 'load_template') {
+      return `Template file not found: ${context.templatePath ?? 'unknown'}`;
     }
+    return `File not found: ${context.filePath ?? 'unknown'}`;
+  }
 
-    /**
-     * Log error for debugging
-     */
-    private logError(error: Error | unknown, context: ErrorContext, errorType: ErrorType): void {
-        const logMessage = {
-            timestamp: new Date().toISOString(),
-            errorType,
-            context,
-            error: error instanceof Error ? {
-                message: error.message,
-                stack: error.stack,
-                name: error.name
-            } : String(error)
-        };
-
-        // Always log errors to console
-        console.error('[Snowflake Plugin Error]', logMessage);
-
-        // In debug mode, show more details
-        if (this.debugMode) {
-            console.error('[Snowflake Debug] Full error details:', error);
-        }
+  private getPermissionDeniedMessage(context: ErrorContext): string {
+    if (context.operation === 'load_template') {
+      const path = context.templatePath ?? 'unknown';
+      return `Cannot read template (permission denied): ${path}. Creating file without template.`;
     }
+    const path = context.filePath ?? context.templatePath ?? 'unknown';
+    return `Permission denied accessing: ${path}`;
+  }
 
-    /**
-     * Create an ExtendedError with context
-     */
-    createError(
-        message: string,
-        type: ErrorType,
-        context: ErrorContext,
-        originalError?: Error
-    ): ExtendedError {
-        const error = new Error(message) as ExtendedError;
-        error.type = type;
-        error.context = context;
-        error.originalError = originalError;
-        return error;
-    }
+  private getInvalidSyntaxMessage(context: ErrorContext): string {
+    const path = context.templatePath ?? 'unknown';
+    return `Template contains invalid syntax and will be used as-is: ${path}`;
+  }
 
-    /**
-     * Check if an error is a specific type
-     */
-    isErrorType(error: unknown, type: ErrorType): boolean {
-        if (error && typeof error === 'object' && 'type' in error) {
-            return (error as ExtendedError).type === type;
-        }
-        return false;
+  private getInvalidVariableMessage(context: ErrorContext): string {
+    const path = context.templatePath ?? 'unknown';
+    return `Template contains invalid variables that will be left unchanged: ${path}`;
+  }
+
+  private getGenericErrorMessage(context: ErrorContext, error: unknown): string {
+    const operation = this.getOperationDescription(context.operation);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return `Error ${operation}: ${errorMessage}`;
+  }
+
+  /**
+   * Get human-readable operation description
+   */
+  private getOperationDescription(operation: string): string {
+    switch (operation) {
+      case 'load_template':
+        return 'loading template';
+      case 'apply_template':
+        return 'applying template';
+      case 'merge_frontmatter':
+        return 'merging frontmatter';
+      default:
+        return 'processing';
     }
+  }
+
+  /**
+   * Log error for debugging
+   */
+  private logError(error: unknown, context: ErrorContext, errorType: ErrorType): void {
+    const logMessage = {
+      timestamp: new Date().toISOString(),
+      errorType,
+      context,
+      error:
+        error instanceof Error
+          ? {
+              message: error.message,
+              stack: error.stack,
+              name: error.name
+            }
+          : String(error)
+    };
+
+    // Always log errors to console
+    console.error('[Snowflake Plugin Error]', logMessage);
+
+    // In debug mode, show more details
+    if (this.debugMode) {
+      console.error('[Snowflake Debug] Full error details:', error);
+    }
+  }
+
+  /**
+   * Create an ExtendedError with context
+   */
+  createError(
+    message: string,
+    type: ErrorType,
+    context: ErrorContext,
+    originalError?: Error
+  ): ExtendedError {
+    const error = new Error(message) as ExtendedError;
+    error.type = type;
+    error.context = context;
+    error.originalError = originalError;
+    return error;
+  }
+
+  /**
+   * Check if an error is a specific type
+   */
+  isErrorType(error: unknown, type: ErrorType): boolean {
+    if (error !== null && error !== undefined && typeof error === 'object' && 'type' in error) {
+      return (error as ExtendedError).type === type;
+    }
+    return false;
+  }
 }
