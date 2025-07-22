@@ -1,8 +1,5 @@
 /**
  * Folder selection modal for the Snowflake plugin
- *
- * TODO(Stage 7): This file can potentially be reused for the new template system,
- * but may need enhancements for template file selection.
  */
 
 import { App, FuzzySuggestModal, TFolder } from 'obsidian';

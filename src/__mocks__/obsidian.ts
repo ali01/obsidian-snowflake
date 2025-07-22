@@ -89,3 +89,24 @@ export class Vault {
     return null;
   }
 }
+
+export class FuzzySuggestModal<T> {
+  constructor(app: any) {}
+
+  open() {}
+
+  close() {}
+}
+
+export class TFolder {
+  children: any[] = [];
+  path: string = '';
+}
+
+export class App {
+  vault: Vault = new Vault();
+}
+
+export class MarkdownView {
+  file: TFile | null = null;
+}
