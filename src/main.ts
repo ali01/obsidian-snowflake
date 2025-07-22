@@ -16,7 +16,7 @@
 import { Plugin } from 'obsidian';
 import type { SnowflakeSettings } from './types';
 import { SnowflakeSettingTab } from './ui/settings-tab';
-import { mergeWithDefaults } from './settings-utils';
+import { migrateSettings, areSettingsValid } from './settings-utils';
 import { FileCreationHandler } from './file-creation-handler';
 import { SnowflakeCommands } from './commands';
 
@@ -52,10 +52,16 @@ export default class SnowflakePlugin extends Plugin {
   }
 
   async loadSettings(): Promise<void> {
-    const data = (await this.loadData()) as SnowflakeSettings | null;
+    const data = (await this.loadData()) as unknown;
 
     // Use the settings utilities to properly merge with defaults
-    this.settings = mergeWithDefaults(data ?? {});
+    if (areSettingsValid(data)) {
+      // Data is already valid, use it directly
+      this.settings = data;
+    } else {
+      // Migrate settings if needed or use defaults
+      this.settings = migrateSettings(data);
+    }
 
     // Validate settings to ensure they're properly formed
     this.validateSettings();
@@ -110,3 +116,6 @@ export default class SnowflakePlugin extends Plugin {
     }
   }
 }
+
+// Export for testing
+export { SnowflakePlugin };
