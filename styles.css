@@ -1,0 +1,58 @@
+/* Snowflake Plugin Styles */
+
+/* Template file suggester */
+.template-file-suggester-path {
+    color: var(--text-muted);
+    font-size: 0.85em;
+}
+
+/* Template preview modal */
+.template-preview-content {
+    font-family: var(--font-monospace);
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+/* Settings tab enhancements */
+.snowflake-settings .setting-item {
+    padding: 0.75em 0;
+}
+
+.snowflake-settings h2 {
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+.snowflake-settings h1 {
+    margin-bottom: 0.5em;
+}
+
+/* Warning text for empty states */
+.setting-item-description.mod-warning {
+    color: var(--text-warning);
+    font-style: italic;
+}
+
+/* Button styling */
+.snowflake-settings .setting-item-control button {
+    margin-left: 0.5em;
+}
+
+/* Modal button container */
+.modal-button-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1em;
+    padding-top: 1em;
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Help section list styling */
+.snowflake-settings ul {
+    margin-left: 1.5em;
+    margin-top: 0.5em;
+}
+
+.snowflake-settings li {
+    margin-bottom: 0.25em;
+}
