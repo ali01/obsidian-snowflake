@@ -15,16 +15,20 @@ import { App, PluginSettingTab, Setting, Notice, TFile, Modal } from 'obsidian';
 import SnowflakePlugin from '../main';
 import { FolderSuggestModal } from './folder-modal';
 import { TemplateFileSuggestModal } from './template-file-modal';
+import { ErrorHandler } from '../error-handler';
+import { ErrorContext } from '../types';
 
 /**
  * Settings tab for configuring the Snowflake plugin
  */
 export class SnowflakeSettingTab extends PluginSettingTab {
     plugin: SnowflakePlugin;
+    private errorHandler: ErrorHandler;
 
     constructor(app: App, plugin: SnowflakePlugin) {
         super(app, plugin);
         this.plugin = plugin;
+        this.errorHandler = ErrorHandler.getInstance();
     }
 
     display(): void {
@@ -45,7 +49,8 @@ export class SnowflakeSettingTab extends PluginSettingTab {
         new Setting(containerEl)
             .setName("Enable automatic templating")
             .setDesc(
-                "When enabled, new notes will automatically have templates applied based on their folder location"
+                "When enabled, new notes will automatically have templates applied " +
+                "based on their folder location"
             )
             .addToggle((toggle) =>
                 toggle
@@ -225,7 +230,11 @@ export class SnowflakeSettingTab extends PluginSettingTab {
             const content = await this.app.vault.read(file);
             new TemplatePreviewModal(this.app, templatePath, content).open();
         } catch (error) {
-            new Notice(`Failed to read template: ${error.message}`);
+            const errorContext: ErrorContext = {
+                operation: 'load_template',
+                templatePath: templatePath
+            };
+            this.errorHandler.handleError(error, errorContext);
         }
     }
 }

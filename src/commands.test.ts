@@ -22,10 +22,14 @@ describe('SnowflakeCommands', () => {
   let settings: SnowflakeSettings;
   let mockTemplateApplicator: jest.Mocked<TemplateApplicator>;
   let mockFolderModal: any;
+  let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
     // Clear all mocks
     jest.clearAllMocks();
+
+    // Mock console.error to prevent noise in tests
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
     // Mock FolderSuggestModal constructor
     mockFolderModal = {
@@ -61,6 +65,10 @@ describe('SnowflakeCommands', () => {
     mockTemplateApplicator = (TemplateApplicator as jest.MockedClass<
       typeof TemplateApplicator
     >).mock.instances[0] as jest.Mocked<TemplateApplicator>;
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   describe('registerCommands', () => {
@@ -178,7 +186,7 @@ describe('SnowflakeCommands', () => {
 
       await editorCallback(mockEditor, mockView);
 
-      expect(Notice).toHaveBeenCalledWith('Failed to apply template: Template error');
+      expect(Notice).toHaveBeenCalledWith('Error applying template: Template error');
     });
   });
 

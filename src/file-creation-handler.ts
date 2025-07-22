@@ -16,9 +16,11 @@ import { TFile, Vault, Plugin } from 'obsidian';
 import {
   SnowflakeSettings,
   isMarkdownFile,
-  CommandContext
+  CommandContext,
+  ErrorContext
 } from './types';
 import { TemplateApplicator } from './template-applicator';
+import { ErrorHandler } from './error-handler';
 
 /**
  * FileCreationHandler: Handles new file creation events
@@ -33,6 +35,7 @@ export class FileCreationHandler {
   private templateApplicator: TemplateApplicator;
   private processingQueue: Set<string> = new Set();
   private eventRef: any;
+  private errorHandler: ErrorHandler;
 
   constructor(
     plugin: Plugin,
@@ -43,6 +46,7 @@ export class FileCreationHandler {
     this.vault = vault;
     this.settings = settings;
     this.templateApplicator = new TemplateApplicator(vault, settings);
+    this.errorHandler = ErrorHandler.getInstance();
   }
 
   /**
@@ -104,7 +108,13 @@ export class FileCreationHandler {
       await this.templateApplicator.applyTemplate(file, context);
 
     } catch (error) {
-      console.error('Error handling file creation:', error);
+      const errorContext: ErrorContext = {
+        operation: 'apply_template',
+        filePath: file.path
+      };
+
+      // Use silent error handling since template applicator already shows notices
+      this.errorHandler.handleErrorSilently(error, errorContext);
     } finally {
       // Remove from processing queue
       this.processingQueue.delete(file.path);

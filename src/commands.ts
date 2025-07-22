@@ -36,10 +36,12 @@ import {
   SnowflakeSettings,
   isMarkdownFile,
   CommandContext,
-  BatchResult
+  BatchResult,
+  ErrorContext
 } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { FolderSuggestModal } from './ui/folder-modal';
+import { ErrorHandler } from './error-handler';
 
 /**
  * SnowflakeCommands: Manages all user-invokable commands
@@ -51,6 +53,7 @@ export class SnowflakeCommands {
   private plugin: Plugin;
   private settings: SnowflakeSettings;
   private templateApplicator: TemplateApplicator;
+  private errorHandler: ErrorHandler;
 
   constructor(plugin: Plugin, settings: SnowflakeSettings) {
     this.plugin = plugin;
@@ -59,6 +62,7 @@ export class SnowflakeCommands {
       plugin.app.vault,
       settings
     );
+    this.errorHandler = ErrorHandler.getInstance();
   }
 
   /**
@@ -121,8 +125,11 @@ export class SnowflakeCommands {
         new Notice(result.message);
       }
     } catch (error) {
-      console.error('Error applying template:', error);
-      new Notice(`Failed to apply template: ${(error as Error).message}`);
+      const errorContext: ErrorContext = {
+        operation: 'apply_template',
+        filePath: file.path
+      };
+      this.errorHandler.handleError(error, errorContext);
     }
   }
 
@@ -179,7 +186,11 @@ export class SnowflakeCommands {
           this.templateApplicator.applyTemplate(file, context)
             .then(result => result.success ? 1 : 0)
             .catch(error => {
-              console.error(`Error processing ${file.path}:`, error);
+              const errorContext: ErrorContext = {
+                operation: 'apply_template',
+                filePath: file.path
+              };
+              this.errorHandler.handleErrorSilently(error, errorContext);
               return 0;
             })
         )

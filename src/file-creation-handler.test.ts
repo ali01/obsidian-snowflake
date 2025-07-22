@@ -16,10 +16,14 @@ describe('FileCreationHandler', () => {
   let mockVault: Vault;
   let settings: SnowflakeSettings;
   let mockTemplateApplicator: jest.Mocked<TemplateApplicator>;
+  let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
     // Clear all mocks
     jest.clearAllMocks();
+
+    // Mock console.error to prevent noise in tests
+    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
     // Mock plugin
     mockPlugin = {
@@ -51,6 +55,10 @@ describe('FileCreationHandler', () => {
     mockTemplateApplicator = (TemplateApplicator as jest.MockedClass<
       typeof TemplateApplicator
     >).mock.instances[0] as jest.Mocked<TemplateApplicator>;
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   describe('start/stop', () => {

@@ -131,6 +131,7 @@ Manual testing within Obsidian is the primary approach. Key test scenarios:
 - Use async/await for all file operations
 - Add descriptive comments for complex logic
 - Follow TypeScript strict mode requirements
+- **Enforce Line Length Limits**: Make sure all TypeScript lines of code are under 100 characters in length
 
 ## Common Tasks
 

@@ -24,6 +24,7 @@ import {
 import { TemplateLoader } from './template-loader';
 import { TemplateVariableProcessor } from './template-variables';
 import { FrontmatterMerger } from './frontmatter-merger';
+import { ErrorHandler, ErrorType } from './error-handler';
 
 /**
  * Template application result
@@ -46,6 +47,7 @@ export class TemplateApplicator {
   private loader: TemplateLoader;
   private variableProcessor: TemplateVariableProcessor;
   private frontmatterMerger: FrontmatterMerger;
+  private errorHandler: ErrorHandler;
 
   constructor(vault: Vault, settings: SnowflakeSettings) {
     this.vault = vault;
@@ -53,6 +55,7 @@ export class TemplateApplicator {
     this.loader = new TemplateLoader(vault, settings);
     this.variableProcessor = new TemplateVariableProcessor();
     this.frontmatterMerger = new FrontmatterMerger();
+    this.errorHandler = ErrorHandler.getInstance();
   }
 
   /**
@@ -125,15 +128,14 @@ export class TemplateApplicator {
       const errorContext: ErrorContext = {
         operation: 'apply_template',
         filePath: file.path,
-        error: error as Error
+        templatePath: templatePath
       };
 
-      console.error('Error applying template:', errorContext);
-      new Notice(`Failed to apply template: ${(error as Error).message}`);
+      const errorMessage = this.errorHandler.handleError(error, errorContext);
 
       return {
         success: false,
-        message: `Error: ${(error as Error).message}`
+        message: errorMessage
       };
     }
   }
@@ -184,12 +186,17 @@ export class TemplateApplicator {
         hadSnowflakeId: processedTemplate.hasSnowflakeId
       };
     } catch (error) {
-      console.error('Error applying specific template:', error);
-      new Notice(`Failed to apply template: ${(error as Error).message}`);
+      const errorContext: ErrorContext = {
+        operation: 'apply_template',
+        filePath: file.path,
+        templatePath: templatePath
+      };
+
+      const errorMessage = this.errorHandler.handleError(error, errorContext);
 
       return {
         success: false,
-        message: `Error: ${(error as Error).message}`
+        message: errorMessage
       };
     }
   }

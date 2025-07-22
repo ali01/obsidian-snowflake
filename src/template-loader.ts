@@ -12,7 +12,8 @@
  */
 
 import { Vault, TFile, Notice } from 'obsidian';
-import { SnowflakeSettings, MarkdownFile } from './types';
+import { SnowflakeSettings, MarkdownFile, ErrorContext } from './types';
+import { ErrorHandler } from './error-handler';
 
 /**
  * TemplateLoader: Responsible for loading template files from the vault
@@ -23,10 +24,12 @@ import { SnowflakeSettings, MarkdownFile } from './types';
 export class TemplateLoader {
   private vault: Vault;
   private settings: SnowflakeSettings;
+  private errorHandler: ErrorHandler;
 
   constructor(vault: Vault, settings: SnowflakeSettings) {
     this.vault = vault;
     this.settings = settings;
+    this.errorHandler = ErrorHandler.getInstance();
   }
 
   /**
@@ -52,7 +55,11 @@ export class TemplateLoader {
       const content = await this.vault.read(templateFile);
       return content;
     } catch (error) {
-      console.error(`Error loading template ${templatePath}:`, error);
+      const errorContext: ErrorContext = {
+        operation: 'load_template',
+        templatePath: templatePath
+      };
+      this.errorHandler.handleErrorSilently(error, errorContext);
       return null;
     }
   }
