@@ -21,12 +21,14 @@ import { processFile, processFolder } from './file-processor'; // TODO(Stage 5):
 import { FolderSuggestModal } from './ui/folder-modal';
 import { SnowflakeSettingTab } from './ui/settings-tab';
 import { mergeWithDefaults } from './settings-utils';
+import { FileCreationHandler } from './file-creation-handler';
 
 /**
  * Main plugin class for Snowflake
  */
 export default class SnowflakePlugin extends Plugin {
     settings!: SnowflakeSettings;
+    private fileCreationHandler?: FileCreationHandler;
 
     async onload() {
         console.log("Loading Snowflake plugin");
@@ -36,6 +38,14 @@ export default class SnowflakePlugin extends Plugin {
 
         // Add settings tab to Obsidian settings
         this.addSettingTab(new SnowflakeSettingTab(this.app, this));
+
+        // Initialize file creation handler
+        this.fileCreationHandler = new FileCreationHandler(
+            this,
+            this.app.vault,
+            this.settings
+        );
+        this.fileCreationHandler.start();
 
         // Register command: Add ID to current note
         this.addCommand({
@@ -51,19 +61,25 @@ export default class SnowflakePlugin extends Plugin {
             callback: () => this.addIDsToFolder(),
         });
 
+        // TODO(Stage 6): Remove old event handler after testing
         // Event handler: Automatically add ID when creating new files
-        this.registerEvent(
-            this.app.vault.on("create", (file) => {
-                // Only process markdown files
-                if (file instanceof TFile && file.extension === "md") {
-                    this.handleFileCreate(file);
-                }
-            }),
-        );
+        // this.registerEvent(
+        //     this.app.vault.on("create", (file) => {
+        //         // Only process markdown files
+        //         if (file instanceof TFile && file.extension === "md") {
+        //             this.handleFileCreate(file);
+        //         }
+        //     }),
+        // );
     }
 
     onunload() {
         console.log("Unloading Snowflake plugin");
+
+        // Stop file creation handler
+        if (this.fileCreationHandler) {
+            this.fileCreationHandler.stop();
+        }
     }
 
     async loadSettings() {
@@ -80,6 +96,11 @@ export default class SnowflakePlugin extends Plugin {
         // Validate before saving
         this.validateSettings();
         await this.saveData(this.settings);
+
+        // Update file creation handler with new settings
+        if (this.fileCreationHandler) {
+            this.fileCreationHandler.updateSettings(this.settings);
+        }
     }
 
     /**

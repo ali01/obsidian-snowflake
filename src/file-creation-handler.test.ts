@@ -1,0 +1,227 @@
+/**
+ * Tests for File Creation Handler
+ */
+
+import { FileCreationHandler } from './file-creation-handler';
+import { TFile, Vault, Plugin } from 'obsidian';
+import { SnowflakeSettings } from './types';
+import { TemplateApplicator } from './template-applicator';
+
+// Mock the TemplateApplicator
+jest.mock('./template-applicator');
+
+describe('FileCreationHandler', () => {
+  let handler: FileCreationHandler;
+  let mockPlugin: Plugin;
+  let mockVault: Vault;
+  let settings: SnowflakeSettings;
+  let mockTemplateApplicator: jest.Mocked<TemplateApplicator>;
+
+  beforeEach(() => {
+    // Clear all mocks
+    jest.clearAllMocks();
+
+    // Mock plugin
+    mockPlugin = {
+      registerEvent: jest.fn()
+    } as any;
+
+    // Mock vault
+    mockVault = {
+      on: jest.fn().mockReturnValue('event-ref'),
+      offref: jest.fn(),
+      read: jest.fn().mockResolvedValue(''),
+      getAbstractFileByPath: jest.fn()
+    } as any;
+
+    // Default settings
+    settings = {
+      templateMappings: {
+        'Projects': 'Templates/project.md'
+      },
+      defaultTemplate: 'Templates/default.md',
+      enableAutoTemplating: true,
+      templatesFolder: 'Templates'
+    };
+
+    // Create handler
+    handler = new FileCreationHandler(mockPlugin, mockVault, settings);
+
+    // Get mocked TemplateApplicator
+    mockTemplateApplicator = (TemplateApplicator as jest.MockedClass<
+      typeof TemplateApplicator
+    >).mock.instances[0] as jest.Mocked<TemplateApplicator>;
+  });
+
+  describe('start/stop', () => {
+    test('Should register event handler on start', () => {
+      handler.start();
+
+      expect(mockVault.on).toHaveBeenCalledWith(
+        'create',
+        expect.any(Function)
+      );
+      expect(mockPlugin.registerEvent).toHaveBeenCalledWith('event-ref');
+    });
+
+    test('Should unregister event handler on stop', () => {
+      handler.start();
+      handler.stop();
+
+      expect(mockVault.offref).toHaveBeenCalledWith('event-ref');
+    });
+
+    test('Should clear processing queue on stop', () => {
+      // Add something to queue
+      const file = createMockFile('test.md', 'Projects');
+      handler.start();
+
+      // Manually add to queue to test clearing
+      (handler as any).processingQueue.add(file.path);
+      expect(handler.isProcessing(file.path)).toBe(true);
+
+      handler.stop();
+      expect(handler.isProcessing(file.path)).toBe(false);
+    });
+  });
+
+  describe('handleFileCreation', () => {
+    let handleFileCreation: (file: TFile) => Promise<void>;
+
+    beforeEach(() => {
+      handler.start();
+      // Get the registered handler function
+      handleFileCreation = (mockVault.on as jest.Mock).mock.calls[0][1];
+    });
+
+    test('REQ-004: Should skip non-markdown files', async () => {
+      const file = createMockFile('test.txt', 'Projects');
+      file.extension = 'txt';
+
+      await handleFileCreation(file);
+
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+    });
+
+    test('REQ-005: Should skip when auto-templating is disabled', async () => {
+      settings.enableAutoTemplating = false;
+      handler.updateSettings(settings);
+
+      const file = createMockFile('test.md', 'Projects');
+
+      await handleFileCreation(file);
+
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+    });
+
+    test('Should process markdown files when enabled', async () => {
+      const file = createMockFile('test.md', 'Projects');
+      mockVault.getAbstractFileByPath.mockReturnValue(file);
+
+      await handleFileCreation(file);
+
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(
+        file,
+        { isManualCommand: false }
+      );
+    });
+
+
+    test('Should skip if file was deleted during processing', async () => {
+      const file = createMockFile('test.md', 'Projects');
+      mockVault.getAbstractFileByPath.mockReturnValue(null);
+
+      await handleFileCreation(file);
+
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+    });
+
+    test('Should prevent double processing of same file', async () => {
+      const file = createMockFile('test.md', 'Projects');
+      mockVault.getAbstractFileByPath.mockReturnValue(file);
+
+      // Start two concurrent processes
+      const promise1 = handleFileCreation(file);
+      const promise2 = handleFileCreation(file);
+
+      await Promise.all([promise1, promise2]);
+
+      // Should only process once
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledTimes(1);
+    });
+
+    test('Should handle errors gracefully', async () => {
+      const file = createMockFile('test.md', 'Projects');
+      mockVault.getAbstractFileByPath.mockReturnValue(file);
+      mockTemplateApplicator.applyTemplate.mockRejectedValue(new Error('Apply error'));
+
+      // Should not throw
+      await expect(handleFileCreation(file)).resolves.not.toThrow();
+
+      // Should still remove from queue
+      expect(handler.isProcessing(file.path)).toBe(false);
+    });
+  });
+
+  describe('updateSettings', () => {
+    test('Should update internal settings and applicator', () => {
+      const newSettings: SnowflakeSettings = {
+        ...settings,
+        enableAutoTemplating: false
+      };
+
+      handler.updateSettings(newSettings);
+
+      expect(mockTemplateApplicator.updateSettings).toHaveBeenCalledWith(
+        newSettings
+      );
+
+      // Verify settings were updated by testing behavior
+      const file = createMockFile('test.md', 'Projects');
+      handler.start();
+      const handleFileCreation = (mockVault.on as jest.Mock).mock.calls[0][1];
+
+      handleFileCreation(file);
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('processing queue management', () => {
+    test('Should track processing state', async () => {
+      const file = createMockFile('test.md', 'Projects');
+
+      expect(handler.isProcessing(file.path)).toBe(false);
+      expect(handler.getProcessingCount()).toBe(0);
+
+      // Start processing
+      mockVault.getAbstractFileByPath.mockReturnValue(file);
+      handler.start();
+      const handleFileCreation = (mockVault.on as jest.Mock).mock.calls[0][1];
+
+      const processPromise = handleFileCreation(file);
+
+      // Should be processing now
+      expect(handler.isProcessing(file.path)).toBe(true);
+      expect(handler.getProcessingCount()).toBe(1);
+
+      await processPromise;
+
+      // Should be done processing
+      expect(handler.isProcessing(file.path)).toBe(false);
+      expect(handler.getProcessingCount()).toBe(0);
+    });
+  });
+});
+
+/**
+ * Helper to create mock TFile
+ */
+function createMockFile(name: string, parentPath: string): TFile {
+  const file = new TFile();
+  file.name = name;
+  file.basename = name.replace('.md', '');
+  file.extension = 'md';
+  file.path = parentPath ? `${parentPath}/${name}` : name;
+  file.parent = parentPath ? { path: parentPath } : null;
+  return file;
+}
