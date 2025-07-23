@@ -303,7 +303,6 @@ describe('SnowflakeCommands', () => {
       expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledTimes(25);
 
       // REQ-022: Should show completion notice
-      expect(Notice).toHaveBeenCalledWith('Processing 25 files...');
       expect(Notice).toHaveBeenCalledWith('Templates applied to 25 notes');
     });
 

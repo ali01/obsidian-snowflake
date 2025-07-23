@@ -104,7 +104,7 @@ export class TemplateApplicator {
     // Process variables and apply
     const result = await this.applyProcessedTemplateContent(file, finalTemplateContent, editor);
 
-    if (result.success) {
+    if (result.success && context.isBatchOperation !== true) {
       new Notice(`Template applied to ${file.basename}`);
     }
 

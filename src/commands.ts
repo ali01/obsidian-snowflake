@@ -134,7 +134,6 @@ export class SnowflakeCommands {
       return;
     }
 
-    new Notice(`Processing ${String(markdownFiles.length)} files...`);
     const result = await this.processFilesInBatches(markdownFiles);
     this.showCompletionNotice(result);
   }
@@ -165,7 +164,7 @@ export class SnowflakeCommands {
 
   private async processFilesInBatches(files: TFile[]): Promise<BatchResult> {
     const batchSize = 10;
-    const context: CommandContext = { isManualCommand: true };
+    const context: CommandContext = { isManualCommand: true, isBatchOperation: true };
     let successCount = 0;
 
     for (let i = 0; i < files.length; i += batchSize) {

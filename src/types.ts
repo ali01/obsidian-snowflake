@@ -173,6 +173,7 @@ export function isMarkdownFile(file: TFile): file is MarkdownFile {
  */
 export interface CommandContext {
   isManualCommand: boolean; // True when user runs a command (REQ-025)
+  isBatchOperation?: boolean; // True when processing multiple files
 }
 
 /**
