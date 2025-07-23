@@ -15,10 +15,9 @@ import { PluginSettingTab, Setting, Notice, TFile, Modal } from 'obsidian';
 import type { App } from 'obsidian';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import type SnowflakePlugin from '../main';
-import { FolderSuggestModal } from './folder-modal';
-import { TemplateFileSuggestModal } from './template-file-modal';
 import { FolderInputSuggest } from './folder-input-suggest';
 import { FileInputSuggest } from './file-input-suggest';
+import { AddMappingModal } from './add-mapping-modal';
 import { ErrorHandler } from '../error-handler';
 import type { ErrorContext } from '../types';
 import type { SnowflakeCommands } from '../commands';
@@ -222,31 +221,25 @@ export class SnowflakeSettingTab extends PluginSettingTab {
    * Show dialog to add a new folder mapping
    */
   private showAddMappingDialog(): void {
-    // First, select the folder
-    new FolderSuggestModal(this.app, (folder) => {
-      const folderPath = folder.path;
-
-      // Check if already mapped
-      if (folderPath in this.plugin.settings.templateMappings) {
-        new Notice('This folder already has a template mapping');
-        return;
-      }
-
-      // Then, select the template
-      new TemplateFileSuggestModal(
-        this.app,
-        this.plugin.settings.templatesFolder,
-        (templateFile) => {
-          // Add the mapping
-          this.plugin.settings.templateMappings[folderPath] = templateFile.path;
-          // eslint-disable-next-line no-void
-          void this.plugin.saveSettings();
-          this.display();
-
-          new Notice(`Mapped ${folderPath || 'root folder'} to ${templateFile.path}`);
+    new AddMappingModal(
+      this.app,
+      this.plugin.settings.templatesFolder,
+      (folderPath: string, templatePath: string) => {
+        // Check if already mapped
+        if (folderPath in this.plugin.settings.templateMappings) {
+          new Notice('This folder already has a template mapping');
+          return;
         }
-      ).open();
-    }).open();
+
+        // Add the mapping
+        this.plugin.settings.templateMappings[folderPath] = templatePath;
+        // eslint-disable-next-line no-void
+        void this.plugin.saveSettings();
+        this.display();
+
+        new Notice(`Mapped ${folderPath || 'root folder'} to ${templatePath}`);
+      }
+    ).open();
   }
 
   /**
