@@ -206,8 +206,9 @@ export class TemplateApplicator {
       editor
     );
 
-    // Ensure we don't have trailing newlines
-    await this.vault.modify(file, finalContent.trimEnd());
+    // Ensure file ends with exactly one newline
+    const normalizedContent = finalContent.trimEnd() + '\n';
+    await this.vault.modify(file, normalizedContent);
     return { success: true, message: 'Template applied successfully' };
   }
 

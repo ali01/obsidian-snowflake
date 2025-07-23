@@ -217,9 +217,85 @@ id: abc123
 
       expect(result.success).toBe(true);
       expect(mockVault.modify).toHaveBeenCalledWith(mockFile, expect.any(String));
+      const modifiedContent = mockVault.modify.mock.calls[0][1];
+      expect(modifiedContent).toMatch(/\n$/);
       expect(mockFrontmatterMerger.mergeWithFile).toHaveBeenCalledWith(
         existingContent,
         'title: test\ntags: [template]\ndate: 2024-01-01\nid: abc123'
+      );
+    });
+
+    test('Should ensure file ends with exactly one newline', async () => {
+      const existingContent = '# Test\n\nContent without trailing newline';
+      mockVault.read.mockResolvedValue(existingContent);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/test.md', folderPath: 'Test', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/test.md',
+            content: '# Template Content',
+            folderPath: 'Test',
+            depth: 0
+          }
+        ],
+        hasInheritance: false
+      });
+      // No frontmatter in template, so no merging needed
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: '',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation((content) => content);
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: '# Template Content',
+        variables: {},
+        hasSnowflakeId: false
+      });
+
+      const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
+
+      expect(result.success).toBe(true);
+      // Should append template content and ensure single trailing newline
+      expect(mockVault.modify).toHaveBeenCalledWith(
+        mockFile,
+        '# Test\n\nContent without trailing newline\n# Template Content\n'
+      );
+    });
+
+    test('Should normalize multiple trailing newlines to exactly one', async () => {
+      const existingContent = '# Test\n\nContent with multiple trailing newlines\n\n\n';
+      mockVault.read.mockResolvedValue(existingContent);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/test.md', folderPath: 'Test', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/test.md',
+            content: '', // Empty template
+            folderPath: 'Test',
+            depth: 0
+          }
+        ],
+        hasInheritance: false
+      });
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: '',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation((content) => content);
+
+      const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
+
+      expect(result.success).toBe(true);
+      // Should normalize multiple newlines to single newline
+      expect(mockVault.modify).toHaveBeenCalledWith(
+        mockFile,
+        '# Test\n\nContent with multiple trailing newlines\n'
       );
     });
 
@@ -322,6 +398,8 @@ title: test
 
       expect(result.success).toBe(true);
       expect(mockVault.modify).toHaveBeenCalledWith(mockFile, expect.any(String));
+      const modifiedContent = mockVault.modify.mock.calls[0][1];
+      expect(modifiedContent).toMatch(/\n$/);
     });
 
     test('Should handle editor cursor position when provided', async () => {
@@ -574,7 +652,7 @@ Template`;
       const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
 
       expect(result.success).toBe(true);
-      expect(mockVault.modify).toHaveBeenCalledWith(mockFile, '# Test\n\nContent');
+      expect(mockVault.modify).toHaveBeenCalledWith(mockFile, '# Test\n\nContent\n');
 
       // Test case 2: File with frontmatter
       mockVault.read.mockResolvedValue('---\ntitle: Test\n---\n');
@@ -586,7 +664,7 @@ Template`;
 
       expect(result2.success).toBe(true);
       const finalContent = mockVault.modify.mock.calls[mockVault.modify.mock.calls.length - 1][1];
-      expect(finalContent).toBe('---\ntitle: Test\n---\n# Test\n\nContent');
+      expect(finalContent).toBe('---\ntitle: Test\n---\n# Test\n\nContent\n');
       expect(finalContent).not.toMatch(/\n{3,}/);
     });
   });
