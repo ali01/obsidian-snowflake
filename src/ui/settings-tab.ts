@@ -48,7 +48,7 @@ export class SnowflakeSettingTab extends PluginSettingTab {
   }
 
   private addHeader(containerEl: HTMLElement): void {
-    containerEl.createEl('h1', { text: 'Snowflake Template Settings' });
+    containerEl.createEl('h1', { text: 'Snowflake Settings' });
     containerEl.createEl('p', {
       text: 'Configure automatic template application for new notes.',
       cls: 'setting-item-description'
