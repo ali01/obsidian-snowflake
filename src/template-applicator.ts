@@ -109,8 +109,6 @@ export class TemplateApplicator {
   /**
    * Apply a specific template to a file (for manual commands)
    *
-   * TODO(alive): no one calls this? should be removed?
-   *
    * @param file - The file to apply template to
    * @param templatePath - Specific template to apply
    * @param editor - Optional editor for cursor position

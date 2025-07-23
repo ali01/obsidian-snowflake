@@ -7,10 +7,12 @@ import { Plugin, Notice, Editor, MarkdownView, MarkdownFileInfo, TFile, TFolder 
 import { SnowflakeSettings } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { ConfirmationModal } from './ui/confirmation-modal';
+import { TemplateSelectionModal } from './ui/template-selection-modal';
 
 // Mock the dependencies
 jest.mock('./template-applicator');
 jest.mock('./ui/confirmation-modal');
+jest.mock('./ui/template-selection-modal');
 jest.mock('obsidian', () => ({
   ...jest.requireActual('obsidian'),
   Notice: jest.fn()
@@ -88,7 +90,7 @@ describe('SnowflakeCommands', () => {
     test('Should register all commands', () => {
       commands.registerCommands();
 
-      expect(mockPlugin.addCommand).toHaveBeenCalledTimes(3);
+      expect(mockPlugin.addCommand).toHaveBeenCalledTimes(4);
 
       // Check the commands
       expect(mockPlugin.addCommand).toHaveBeenCalledWith({
@@ -106,6 +108,12 @@ describe('SnowflakeCommands', () => {
       expect(mockPlugin.addCommand).toHaveBeenCalledWith({
         id: 'insert-time',
         name: 'Insert current time',
+        editorCallback: expect.any(Function)
+      });
+
+      expect(mockPlugin.addCommand).toHaveBeenCalledWith({
+        id: 'apply-specific-template',
+        name: 'Apply specific template',
         editorCallback: expect.any(Function)
       });
     });
@@ -600,6 +608,171 @@ describe('SnowflakeCommands', () => {
       timeCommand[0].editorCallback(mockEditor);
 
       expect(mockEditor.replaceSelection).toHaveBeenCalledWith('14:30');
+    });
+  });
+
+  describe('Apply specific template command', () => {
+    let editorCallback: (editor: Editor, view: MarkdownView | MarkdownFileInfo) => void;
+    let mockEditor: Editor;
+    let mockView: MarkdownView | MarkdownFileInfo;
+    let mockTemplateSelectionModal: any;
+
+    beforeEach(() => {
+      commands.registerCommands();
+      // Get the registered callback for the new command
+      editorCallback = (mockPlugin.addCommand as jest.Mock).mock.calls.find(
+        (call: any[]) => call[0].id === 'apply-specific-template'
+      )[0].editorCallback;
+
+      mockEditor = {} as Editor;
+      mockView = {
+        file: null
+      } as any;
+
+      // Mock TemplateSelectionModal
+      mockTemplateSelectionModal = {
+        open: jest.fn()
+      };
+      (TemplateSelectionModal as jest.Mock).mockImplementation((app, templatesFolder, onChoose) => {
+        mockTemplateSelectionModal.onChoose = onChoose;
+        return mockTemplateSelectionModal;
+      });
+    });
+
+    test('Should show notice when no active file', () => {
+      mockView = {
+        file: null
+      } as any;
+
+      editorCallback(mockEditor, mockView);
+
+      expect(Notice).toHaveBeenCalledWith('No active file');
+      expect(TemplateSelectionModal).not.toHaveBeenCalled();
+    });
+
+    test('Should show notice for non-markdown files', () => {
+      mockView = {
+        file: {
+          extension: 'txt',
+          basename: 'test'
+        } as any
+      } as any;
+
+      editorCallback(mockEditor, mockView);
+
+      expect(Notice).toHaveBeenCalledWith('Current file is not a markdown file');
+      expect(TemplateSelectionModal).not.toHaveBeenCalled();
+    });
+
+    test('Should open template selection modal for markdown files', () => {
+      const mockFile = {
+        extension: 'md',
+        basename: 'test',
+        path: 'test.md'
+      } as any;
+      mockView = {
+        file: mockFile
+      } as any;
+
+      editorCallback(mockEditor, mockView);
+
+      expect(TemplateSelectionModal).toHaveBeenCalledWith(
+        mockPlugin.app,
+        settings.templatesFolder,
+        expect.any(Function)
+      );
+      expect(mockTemplateSelectionModal.open).toHaveBeenCalled();
+    });
+
+    test('Should apply selected template successfully', async () => {
+      const mockFile = {
+        extension: 'md',
+        basename: 'test',
+        path: 'test.md'
+      } as any;
+      mockView = {
+        file: mockFile
+      } as any;
+
+      const mockTemplateFile = {
+        path: 'Templates/project.md',
+        basename: 'project',
+        extension: 'md'
+      } as TFile;
+
+      mockTemplateApplicator.applySpecificTemplate.mockResolvedValue({
+        success: true,
+        message: 'Applied'
+      });
+
+      editorCallback(mockEditor, mockView);
+
+      // Simulate template selection
+      await mockTemplateSelectionModal.onChoose(mockTemplateFile);
+
+      expect(mockTemplateApplicator.applySpecificTemplate).toHaveBeenCalledWith(
+        mockFile,
+        'Templates/project.md',
+        mockEditor
+      );
+      // Should not show notice on success
+      expect(Notice).not.toHaveBeenCalled();
+    });
+
+    test('Should show notice on template application failure', async () => {
+      const mockFile = {
+        extension: 'md',
+        basename: 'test',
+        path: 'test.md'
+      } as any;
+      mockView = {
+        file: mockFile
+      } as any;
+
+      const mockTemplateFile = {
+        path: 'Templates/project.md',
+        basename: 'project',
+        extension: 'md'
+      } as TFile;
+
+      mockTemplateApplicator.applySpecificTemplate.mockResolvedValue({
+        success: false,
+        message: 'Template not found'
+      });
+
+      editorCallback(mockEditor, mockView);
+
+      // Simulate template selection
+      await mockTemplateSelectionModal.onChoose(mockTemplateFile);
+
+      expect(Notice).toHaveBeenCalledWith('Template not found');
+    });
+
+    test('Should handle errors during template application', async () => {
+      const mockFile = {
+        extension: 'md',
+        basename: 'test',
+        path: 'test.md'
+      } as any;
+      mockView = {
+        file: mockFile
+      } as any;
+
+      const mockTemplateFile = {
+        path: 'Templates/project.md',
+        basename: 'project',
+        extension: 'md'
+      } as TFile;
+
+      const error = new Error('Application error');
+      mockTemplateApplicator.applySpecificTemplate.mockRejectedValue(error);
+
+      editorCallback(mockEditor, mockView);
+
+      // Simulate template selection
+      await mockTemplateSelectionModal.onChoose(mockTemplateFile);
+
+      expect(Notice).toHaveBeenCalledWith('Error applying template: Application error');
     });
   });
 });

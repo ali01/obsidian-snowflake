@@ -35,6 +35,7 @@ import type {
 } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { ConfirmationModal } from './ui/confirmation-modal';
+import { TemplateSelectionModal } from './ui/template-selection-modal';
 import { ErrorHandler } from './error-handler';
 
 /**
@@ -86,6 +87,15 @@ export class SnowflakeCommands {
       name: 'Insert current time',
       editorCallback: (editor: Editor) => {
         this.insertTime(editor);
+      }
+    });
+
+    // Command to apply any template to current note
+    this.plugin.addCommand({
+      id: 'apply-specific-template',
+      name: 'Apply specific template',
+      editorCallback: (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
+        this.applyAnyTemplateToCurrentNote(editor, view);
       }
     });
   }
@@ -321,5 +331,74 @@ export class SnowflakeCommands {
   private insertTime(editor: Editor): void {
     const time = window.moment().format(this.settings.timeFormat);
     editor.replaceSelection(time);
+  }
+
+  /**
+   * Apply any template to the currently active note via template selection modal
+   *
+   * @param editor - The editor instance
+   * @param view - The markdown view or file info
+   */
+  private applyAnyTemplateToCurrentNote(
+    editor: Editor,
+    view: MarkdownView | MarkdownFileInfo
+  ): void {
+    const file = 'file' in view ? view.file : view;
+
+    if (!file) {
+      new Notice('No active file');
+      return;
+    }
+
+    if (!isMarkdownFile(file)) {
+      new Notice('Current file is not a markdown file');
+      return;
+    }
+
+    // Show template selection modal
+    const modal = new TemplateSelectionModal(
+      this.plugin.app,
+      this.settings.templatesFolder,
+      (templateFile: TFile) => {
+        // Apply the selected template asynchronously
+        this.applySelectedTemplate(file, templateFile, editor).catch(() => {
+          // Error is handled in the method
+        });
+      }
+    );
+
+    modal.open();
+  }
+
+  /**
+   * Apply a selected template to a file
+   *
+   * @param file - The file to apply template to
+   * @param templateFile - The template file to apply
+   * @param editor - The editor instance
+   */
+  private async applySelectedTemplate(
+    file: MarkdownFile,
+    templateFile: TFile,
+    editor: Editor
+  ): Promise<void> {
+    try {
+      const result = await this.templateApplicator.applySpecificTemplate(
+        file,
+        templateFile.path,
+        editor
+      );
+
+      if (!result.success) {
+        new Notice(result.message);
+      }
+    } catch (error) {
+      const errorContext: ErrorContext = {
+        operation: 'apply_template',
+        filePath: file.path,
+        templatePath: templateFile.path
+      };
+      this.errorHandler.handleError(error, errorContext);
+    }
   }
 }
