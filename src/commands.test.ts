@@ -28,6 +28,17 @@ describe('SnowflakeCommands', () => {
     // Clear all mocks
     jest.clearAllMocks();
 
+    // Mock window.moment
+    (global as any).window = {
+      moment: jest.fn(() => ({
+        format: jest.fn((format: string) => {
+          if (format === 'YYYY-MM-DD') return '2024-01-15';
+          if (format === 'HH:mm') return '14:30';
+          return 'formatted-date-time';
+        })
+      }))
+    };
+
     // Mock console.error to prevent noise in tests
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -74,15 +85,27 @@ describe('SnowflakeCommands', () => {
   });
 
   describe('registerCommands', () => {
-    test('Should register one command', () => {
+    test('Should register all commands', () => {
       commands.registerCommands();
 
-      expect(mockPlugin.addCommand).toHaveBeenCalledTimes(1);
+      expect(mockPlugin.addCommand).toHaveBeenCalledTimes(3);
 
-      // Check the command
+      // Check the commands
       expect(mockPlugin.addCommand).toHaveBeenCalledWith({
         id: 'apply-template-to-current-note',
         name: 'Apply mapped templates',
+        editorCallback: expect.any(Function)
+      });
+
+      expect(mockPlugin.addCommand).toHaveBeenCalledWith({
+        id: 'insert-date',
+        name: 'Insert current date',
+        editorCallback: expect.any(Function)
+      });
+
+      expect(mockPlugin.addCommand).toHaveBeenCalledWith({
+        id: 'insert-time',
+        name: 'Insert current time',
         editorCallback: expect.any(Function)
       });
     });
@@ -519,6 +542,64 @@ describe('SnowflakeCommands', () => {
       commands.updateSettings(newSettings);
 
       expect(mockTemplateApplicator.updateSettings).toHaveBeenCalledWith(newSettings);
+    });
+  });
+
+  describe('Insert Date/Time Commands', () => {
+    let mockEditor: Editor;
+
+    beforeEach(() => {
+      mockEditor = {
+        replaceSelection: jest.fn()
+      } as any;
+    });
+
+    test('Should register insert-date command', () => {
+      commands.registerCommands();
+
+      const dateCommand = (mockPlugin.addCommand as jest.Mock).mock.calls.find(
+        (call: any[]) => call[0].id === 'insert-date'
+      );
+
+      expect(dateCommand).toBeDefined();
+      expect(dateCommand[0].name).toBe('Insert current date');
+    });
+
+    test('Should register insert-time command', () => {
+      commands.registerCommands();
+
+      const timeCommand = (mockPlugin.addCommand as jest.Mock).mock.calls.find(
+        (call: any[]) => call[0].id === 'insert-time'
+      );
+
+      expect(timeCommand).toBeDefined();
+      expect(timeCommand[0].name).toBe('Insert current time');
+    });
+
+    test('Should insert date with custom format', () => {
+      commands.registerCommands();
+
+      const dateCommand = (mockPlugin.addCommand as jest.Mock).mock.calls.find(
+        (call: any[]) => call[0].id === 'insert-date'
+      );
+
+      // Execute the command
+      dateCommand[0].editorCallback(mockEditor);
+
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith('2024-01-15');
+    });
+
+    test('Should insert time with custom format', () => {
+      commands.registerCommands();
+
+      const timeCommand = (mockPlugin.addCommand as jest.Mock).mock.calls.find(
+        (call: any[]) => call[0].id === 'insert-time'
+      );
+
+      // Execute the command
+      timeCommand[0].editorCallback(mockEditor);
+
+      expect(mockEditor.replaceSelection).toHaveBeenCalledWith('14:30');
     });
   });
 });

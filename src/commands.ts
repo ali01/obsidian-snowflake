@@ -70,6 +70,24 @@ export class SnowflakeCommands {
         });
       }
     });
+
+    // Command to insert current date
+    this.plugin.addCommand({
+      id: 'insert-date',
+      name: 'Insert current date',
+      editorCallback: (editor: Editor) => {
+        this.insertDate(editor);
+      }
+    });
+
+    // Command to insert current time
+    this.plugin.addCommand({
+      id: 'insert-time',
+      name: 'Insert current time',
+      editorCallback: (editor: Editor) => {
+        this.insertTime(editor);
+      }
+    });
   }
 
   /**
@@ -283,5 +301,25 @@ export class SnowflakeCommands {
   updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
     this.templateApplicator.updateSettings(settings);
+  }
+
+  /**
+   * Insert current date at cursor position
+   *
+   * @param editor - The editor instance
+   */
+  private insertDate(editor: Editor): void {
+    const date = window.moment().format(this.settings.dateFormat);
+    editor.replaceSelection(date);
+  }
+
+  /**
+   * Insert current time at cursor position
+   *
+   * @param editor - The editor instance
+   */
+  private insertTime(editor: Editor): void {
+    const time = window.moment().format(this.settings.timeFormat);
+    editor.replaceSelection(time);
   }
 }
