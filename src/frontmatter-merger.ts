@@ -70,10 +70,15 @@ export class FrontmatterMerger {
         const isIncomingEmpty = value === '' || value === null || value === undefined;
 
         if ((isBaseArray || isBaseEmpty) && (isIncomingArray || isIncomingEmpty)) {
-          // Treat empty values as empty arrays for list concatenation
-          const baseArray = isBaseArray ? (baseVal as unknown[]) : [];
-          const incomingArray = isIncomingArray ? (value as unknown[]) : [];
-          mergedData[key] = this.concatenateArrays(baseArray, incomingArray);
+          // Special case: if both are empty (not arrays), preserve empty string
+          if (isBaseEmpty && isIncomingEmpty && !isBaseArray && !isIncomingArray) {
+            mergedData[key] = '';
+          } else {
+            // Treat empty values as empty arrays for list concatenation
+            const baseArray = isBaseArray ? (baseVal as unknown[]) : [];
+            const incomingArray = isIncomingArray ? (value as unknown[]) : [];
+            mergedData[key] = this.concatenateArrays(baseArray, incomingArray);
+          }
           conflicts.push(key); // Still track as conflict for transparency
         } else {
           // REQ-009: Key exists in both - incoming value takes precedence

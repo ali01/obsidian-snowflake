@@ -466,6 +466,29 @@ related:
         'related:\n  - "[[Template Page]]"\n  - "[[~AI Software Engineering]]"\n  - "[[Another Page]]"'
       );
     });
+
+    test('Should preserve empty fields as empty strings, not empty arrays', () => {
+      // When both file and template have empty fields, they should remain as empty strings
+      const fileContent = '---\ntags:\nreferences:\n---\nContent';
+      const templateFrontmatter = 'tags:\nreferences:';
+
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
+
+      // Should preserve empty fields as "key:" not "key: []"
+      expect(result.merged).toBe('tags: \nreferences: \n');
+      expect(result.merged).not.toContain('[]');
+    });
+
+    test('Should still merge arrays correctly when one side has array and other has empty', () => {
+      // Test that the fix doesn't break array merging
+      const fileContent = '---\ntags:\n---\nContent';
+      const templateFrontmatter = 'tags: [tag1, tag2]';
+
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
+
+      // Empty field should inherit array from template
+      expect(result.merged).toBe('tags:\n  - tag1\n  - tag2\n');
+    });
   });
 
   describe('New Methods', () => {
