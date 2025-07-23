@@ -69,6 +69,27 @@ Each requirement has a unique ID (like REQ-001) for easy reference.
 
 *Result: Union of both frontmatters, with file values winning conflicts.*
 
+**REQ-010a**: When merging frontmatter fields that are of list type (like arrays or tags), the Snowflake plugin shall concatenate the values from both the template and the existing file rather than overwriting them.
+
+*Example: If file has `tags: [project, urgent]` and template has `tags: [template-tag, default]`, the result should be `tags: [project, urgent, template-tag, default]`*
+*Rationale: List-type fields often represent accumulative data where both sets of values are meaningful.*
+
+### Simple Template Inheritance
+
+**REQ-032**: When a file is created in a nested folder, the Snowflake plugin shall check parent folders for template mappings and apply them in order from root to leaf.
+
+*Example: If "Projects" uses base-template.md and "Projects/Web" uses web-template.md, files in Projects/Web get both templates applied.*
+
+**REQ-033**: When multiple templates apply due to folder nesting, the Snowflake plugin shall merge them with the same rules as REQ-008/009/010 (child folder templates override parent folder templates).
+
+*Just like existing merge behavior - predictable and simple.*
+
+**REQ-033a**: When merging list-type fields (arrays/tags) across multiple templates in an inheritance chain, the Snowflake plugin shall concatenate values from all templates in the chain, maintaining order from parent to child.
+
+*Example: If root template has `tags: [base]`, Projects template has `tags: [project]`, and Projects/Web template has `tags: [web, frontend]`, a file in Projects/Web gets `tags: [base, project, web, frontend]`*
+*Rationale: Template inheritance for lists should be additive, allowing each level to contribute its own values.*
+
+
 ---
 
 ## 🔤 Template Variables
@@ -181,20 +202,6 @@ Each requirement has a unique ID (like REQ-001) for easy reference.
 **REQ-029**: If the plugin cannot read a template due to permissions, then the Snowflake plugin shall show a user-friendly error and create the file without a template.
 
 *Graceful degradation - always let the user keep working.*
-
----
-
-## 🚀 Future Enhancements
-
-**REQ-032**: [FUTURE] Where template inheritance is implemented, the Snowflake plugin shall apply BOTH parent and child templates when a file is created in a nested folder.
-
-*Example: Folder A has template X, subfolder A/B has template Y → Files in A/B get both X and Y applied*
-
-**REQ-033**: [FUTURE] When applying multiple inherited templates, the Snowflake plugin shall merge them with child templates taking precedence over parent templates.
-
-*Similar to CSS cascading - more specific wins.*
-
----
 
 ## 📋 Summary
 

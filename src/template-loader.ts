@@ -13,7 +13,13 @@
 
 import { TFile, TFolder } from 'obsidian';
 import type { TAbstractFile, Vault } from 'obsidian';
-import type { SnowflakeSettings, MarkdownFile, ErrorContext } from './types';
+import type {
+  SnowflakeSettings,
+  MarkdownFile,
+  ErrorContext,
+  TemplateChain,
+  TemplateChainItem
+} from './types';
 import { ErrorHandler } from './error-handler';
 
 /**
@@ -159,5 +165,110 @@ export class TemplateLoader {
    */
   updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
+  }
+
+  /**
+   * Get the template chain for a file based on its location
+   *
+   * REQ-032: Check parent folders for template mappings and apply them
+   * in order from root to leaf
+   *
+   * @param file - The file to get template chain for
+   * @returns Template chain with all applicable templates
+   */
+  getTemplateChain(file: MarkdownFile): TemplateChain {
+    const templates: TemplateChainItem[] = [];
+
+    // Get all folder paths from file location to root
+    const folderPaths = this.getFolderHierarchy(file);
+
+    // Check each folder for template mappings (root to leaf order)
+    for (let i = 0; i < folderPaths.length; i++) {
+      const folderPath = folderPaths[i];
+      const templatePath = this.settings.templateMappings[folderPath];
+
+      if (templatePath) {
+        templates.push({
+          path: templatePath,
+          folderPath: folderPath,
+          depth: i
+        });
+      }
+    }
+
+    // If no folder mappings found, use default template if configured
+    if (templates.length === 0 && this.settings.defaultTemplate) {
+      templates.push({
+        path: this.settings.defaultTemplate,
+        folderPath: '',
+        depth: 0
+      });
+    }
+
+    return {
+      templates,
+      hasInheritance: templates.length > 1
+    };
+  }
+
+  /**
+   * Load content for all templates in a chain
+   *
+   * REQ-032: Handle missing templates gracefully
+   *
+   * @param chain - Template chain to load
+   * @returns Template chain with content populated
+   */
+  async loadTemplateChain(chain: TemplateChain): Promise<TemplateChain> {
+    const loadedTemplates: TemplateChainItem[] = [];
+
+    for (const template of chain.templates) {
+      const content = await this.loadTemplate(template.path);
+
+      // Skip templates that couldn't be loaded
+      if (content !== null) {
+        loadedTemplates.push({
+          ...template,
+          content
+        });
+      } else {
+        console.warn(`Skipping missing template in chain: ${template.path}`);
+      }
+    }
+
+    return {
+      templates: loadedTemplates,
+      hasInheritance: loadedTemplates.length > 1
+    };
+  }
+
+  /**
+   * Get folder hierarchy from a file's location
+   *
+   * @param file - File to get hierarchy for
+   * @returns Array of folder paths from root to immediate parent
+   */
+  private getFolderHierarchy(file: MarkdownFile): string[] {
+    const paths: string[] = [];
+
+    // Start with root
+    paths.push('');
+
+    // Get folder path
+    const folderPath = file.parent?.path;
+    if (folderPath === undefined || folderPath === '' || folderPath === '/') {
+      return paths;
+    }
+
+    // Build hierarchy from root to leaf
+    const parts = folderPath.split('/').filter((p) => p !== '');
+    let currentPath = '';
+
+    for (const part of parts) {
+      currentPath = currentPath ? `${currentPath}/${part}` : part;
+      paths.push(currentPath);
+    }
+
+    return paths;
   }
 }

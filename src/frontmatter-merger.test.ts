@@ -27,12 +27,13 @@ tags: [personal]
 author: John Doe
 tags: [template]`;
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('title: My Note');
       expect(result.merged).toContain('date: 2024-01-01');
       expect(result.merged).toContain('author: John Doe');
-      expect(result.merged).toContain('tags:\n  - personal'); // File value preserved
+      // REQ-010a: Arrays are concatenated (template first, then file)
+      expect(result.merged).toContain('tags:\n  - template\n  - personal');
     });
 
     test('REQ-009: Should preserve file values when keys conflict', () => {
@@ -45,7 +46,7 @@ author: Original Author
 author: Template Author
 category: Blog`;
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('title: Original Title');
       expect(result.merged).toContain('author: Original Author');
@@ -62,12 +63,12 @@ title: My Note
 date: 2024-01-01
 author: John`;
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('tags:\n  - daily');
       expect(result.merged).toContain('date: 2024-01-01');
       expect(result.merged).toContain('author: John');
-      expect(result.added).toEqual(['tags', 'date', 'author']);
+      expect(result.added).toEqual(['title']);
     });
   });
 
@@ -82,7 +83,7 @@ id: L6P6XxLDv4
 ---`;
       const templateFrontmatter = 'newField: value';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('related: ');
       expect(result.merged).toContain('references: ');
@@ -99,7 +100,7 @@ tags:
 ---`;
       const templateFrontmatter = '';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('tags:\n  - tag1\n  - tag2');
     });
@@ -115,7 +116,7 @@ id: L6P6XxLDv4
 ---`;
       const templateFrontmatter = '';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       // Should preserve the original quoted value without double-escaping
       expect(result.merged).toContain('related:\n  - "[[~AI Software Engineering]]"');
@@ -128,11 +129,11 @@ id: L6P6XxLDv4
       const fileContent = '# Just content\nNo frontmatter here';
       const templateFrontmatter = 'title: New Note\ntags: [template]';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('title: New Note');
       expect(result.merged).toContain('tags:\n  - template');
-      expect(result.added).toEqual(['title', 'tags']);
+      expect(result.added).toEqual([]);
       expect(result.conflicts).toEqual([]);
     });
 
@@ -142,10 +143,10 @@ title: My Note
 ---`;
       const templateFrontmatter = '';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('title: My Note');
-      expect(result.added).toEqual([]);
+      expect(result.added).toEqual(['title']);
       expect(result.conflicts).toEqual([]);
     });
 
@@ -153,7 +154,7 @@ title: My Note
       const fileContent = 'No frontmatter';
       const templateFrontmatter = '';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged.trim()).toBe('');
       expect(result.added).toEqual([]);
@@ -168,7 +169,7 @@ published: false
 ---`;
       const templateFrontmatter = 'draft: true\npublished: true';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('published: false');
       expect(result.merged).toContain('draft: true');
@@ -180,7 +181,7 @@ version: 1.5
 ---`;
       const templateFrontmatter = 'revision: 3\nversion: 2.0';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('version: 1.5');
       expect(result.merged).toContain('revision: 3');
@@ -192,7 +193,7 @@ author: null
 ---`;
       const templateFrontmatter = 'reviewer: null\nauthor: John';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('author: null');
       expect(result.merged).toContain('reviewer: null');
@@ -204,9 +205,10 @@ tags: [one, two]
 ---`;
       const templateFrontmatter = 'categories: [blog, tech]\ntags: [three, four]';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
-      expect(result.merged).toContain('tags:\n  - one\n  - two');
+      // REQ-010a: Arrays are concatenated (template first, then file)
+      expect(result.merged).toContain('tags:\n  - three\n  - four\n  - one\n  - two');
       expect(result.merged).toContain('categories:\n  - blog\n  - tech');
     });
 
@@ -220,7 +222,7 @@ description: |
   Template
   abstract`;
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('description: |');
       expect(result.merged).toContain('  This is a');
@@ -289,7 +291,7 @@ time: "10:30"
 ---`;
       const templateFrontmatter = 'url: "https://example.com"';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('time: "10:30"');
       expect(result.merged).toContain('url: "https://example.com"');
@@ -301,7 +303,7 @@ title: "Title with: Special Characters"
 ---`;
       const templateFrontmatter = 'subtitle: "Another: Title"';
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       expect(result.merged).toContain('title: "Title with: Special Characters"');
       expect(result.merged).toContain('subtitle: "Another: Title"');
@@ -328,12 +330,11 @@ template: project-template
 status: draft
 priority: medium`;
 
-      const result = merger.merge(fileContent, templateFrontmatter);
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
 
       // File values should be preserved
       expect(result.merged).toContain('title: My Project Note');
       expect(result.merged).toContain('author: John Doe');
-      expect(result.merged).toContain('tags:\n  - project\n  - important');
       expect(result.merged).toContain('status: in-progress');
 
       // Template-only values should be added
@@ -341,9 +342,158 @@ priority: medium`;
       expect(result.merged).toContain('template: project-template');
       expect(result.merged).toContain('priority: medium');
 
+      // REQ-010a: Lists should be concatenated (template first, then file)
+      expect(result.merged).toContain(
+        'tags:\n  - template\n  - default\n  - project\n  - important'
+      );
+
       // Check tracking
       expect(result.conflicts.sort()).toEqual(['author', 'status', 'tags', 'title']);
-      expect(result.added.sort()).toEqual(['category', 'priority', 'template']);
+      expect(result.added.sort()).toEqual(['created']);
+    });
+  });
+
+  describe('List Concatenation (REQ-010a)', () => {
+    test('Should concatenate arrays when both have the same key', () => {
+      const baseFrontmatter = 'tags: [project, important]';
+      const incomingFrontmatter = 'tags: [template, default]';
+
+      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+
+      expect(result.merged).toContain(
+        'tags:\n  - project\n  - important\n  - template\n  - default'
+      );
+      expect(result.conflicts).toContain('tags');
+    });
+
+    test('Should remove duplicate values when concatenating', () => {
+      const baseFrontmatter = 'tags: [project, shared, important]';
+      const incomingFrontmatter = 'tags: [template, shared, project]';
+
+      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+
+      // Should maintain order: base first, then unique incoming
+      expect(result.merged).toContain(
+        'tags:\n  - project\n  - shared\n  - important\n  - template'
+      );
+    });
+
+    test('Should handle arrays with different value types', () => {
+      const baseFrontmatter = 'mixed: [string, 123, true]';
+      const incomingFrontmatter = 'mixed: [456, false, string]';
+
+      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+
+      expect(result.merged).toContain('mixed:\n  - string\n  - 123\n  - true\n  - 456\n  - false');
+    });
+
+    test('Should handle dash notation arrays', () => {
+      const fileContent = `---
+tags:
+  - project
+  - important
+---`;
+      const templateFrontmatter = `tags:
+  - template
+  - default
+  - project`;
+
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
+
+      expect(result.merged).toContain(
+        'tags:\n  - template\n  - default\n  - project\n  - important'
+      );
+    });
+
+    test('Should not concatenate non-array values', () => {
+      const baseFrontmatter = 'title: Base Title\ntags: not-an-array';
+      const incomingFrontmatter = 'title: Incoming Title\ntags: [array]';
+
+      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+
+      // Non-array conflicts should use incoming value
+      expect(result.merged).toContain('title: Incoming Title');
+      expect(result.merged).toContain('tags:\n  - array');
+    });
+
+    test('Should handle empty arrays', () => {
+      const baseFrontmatter = 'tags: []';
+      const incomingFrontmatter = 'tags: [template, default]';
+
+      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+
+      // Empty arrays might have an empty item, so be more flexible
+      expect(result.merged).toMatch(/tags:\n(  - \n)?  - template\n  - default/);
+    });
+
+    test('Should inherit template values when file has empty arrays', () => {
+      // This is the bug case - when a file has empty arrays, it should still
+      // inherit values from the template chain
+      const fileContent = '---\ntags: []\naliases: []\n---\nContent';
+      const templateFrontmatter = 'tags: [base, template]\naliases: [doc]';
+
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
+
+      // The file's empty arrays should NOT override template values
+      // and should not have empty items
+      expect(result.merged).toBe('tags:\n  - base\n  - template\naliases:\n  - doc\n');
+    });
+
+    test('Should treat empty string fields as empty arrays when merging with arrays', () => {
+      // This is the actual Obsidian behavior - empty list fields are just "key:"
+      const fileContent = '---\nreferences:\ntags:\n---\nContent';
+      const templateFrontmatter = 'references: [ref1, ref2]\ntags: [tag1, tag2]';
+
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
+
+      // Empty string fields should inherit array values from template
+      expect(result.merged).toBe('references:\n  - ref1\n  - ref2\ntags:\n  - tag1\n  - tag2\n');
+    });
+
+    test('Should handle array concatenation with quoted strings', () => {
+      const fileContent = `---
+related:
+  - "[[~AI Software Engineering]]"
+  - "[[Another Page]]"
+---`;
+      const templateFrontmatter = `related:
+  - "[[Template Page]]"
+  - "[[~AI Software Engineering]]"`;
+
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
+
+      expect(result.merged).toContain(
+        'related:\n  - "[[Template Page]]"\n  - "[[~AI Software Engineering]]"\n  - "[[Another Page]]"'
+      );
+    });
+  });
+
+  describe('New Methods', () => {
+    test('mergeFrontmatter should work with pure frontmatter strings', () => {
+      const baseFm = 'title: Base\ndate: 2024-01-01';
+      const incomingFm = 'author: John\ndate: 2024-02-01';
+
+      const result = merger.mergeFrontmatter(baseFm, incomingFm);
+
+      expect(result.merged).toContain('title: Base');
+      expect(result.merged).toContain('date: 2024-02-01'); // Incoming value used
+      expect(result.merged).toContain('author: John');
+      expect(result.conflicts).toEqual(['date']);
+      expect(result.added).toEqual(['author']);
+    });
+
+    test('mergeWithFile should extract frontmatter from file content', () => {
+      const fileContent = `---
+title: File Title
+---
+Content`;
+      const templateFm = 'author: Template Author';
+
+      const result = merger.mergeWithFile(fileContent, templateFm);
+
+      expect(result.merged).toContain('title: File Title');
+      expect(result.merged).toContain('author: Template Author');
+      expect(result.added).toEqual(['title']);
     });
   });
 });

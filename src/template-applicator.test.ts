@@ -34,7 +34,9 @@ describe('TemplateApplicator', () => {
     getTemplateForFile: jest.fn(),
     loadTemplate: jest.fn(),
     templateExists: jest.fn(),
-    updateSettings: jest.fn()
+    updateSettings: jest.fn(),
+    getTemplateChain: jest.fn(),
+    loadTemplateChain: jest.fn()
   };
 
   const mockVariableProcessor = {
@@ -43,7 +45,9 @@ describe('TemplateApplicator', () => {
 
   const mockFrontmatterMerger = {
     merge: jest.fn(),
-    applyToFile: jest.fn()
+    mergeWithFile: jest.fn(),
+    applyToFile: jest.fn(),
+    mergeFrontmatter: jest.fn()
   };
 
   const mockErrorHandler = {
@@ -88,6 +92,14 @@ describe('TemplateApplicator', () => {
     mockTemplateLoader.getTemplateForFile.mockReturnValue(null);
     mockTemplateLoader.loadTemplate.mockResolvedValue(null);
     mockTemplateLoader.templateExists.mockResolvedValue(false);
+    mockTemplateLoader.getTemplateChain.mockReturnValue({
+      templates: [],
+      hasInheritance: false
+    });
+    mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+      templates: [],
+      hasInheritance: false
+    });
 
     mockVariableProcessor.processTemplate.mockReturnValue({
       content: '',
@@ -95,7 +107,7 @@ describe('TemplateApplicator', () => {
       hasSnowflakeId: false
     });
 
-    mockFrontmatterMerger.merge.mockReturnValue({
+    mockFrontmatterMerger.mergeWithFile.mockReturnValue({
       merged: '',
       hasSnowflakeId: false
     });
@@ -162,8 +174,21 @@ id: abc123
 
       // Setup mocks
       mockVault.read.mockResolvedValue(existingContent);
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/project.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue(templateContent);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/project.md', folderPath: 'Projects', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/project.md',
+            folderPath: 'Projects',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
       mockVariableProcessor.processTemplate.mockReturnValue({
         content: processedTemplate,
         variables: {
@@ -173,7 +198,7 @@ id: abc123
         },
         hasSnowflakeId: true
       });
-      mockFrontmatterMerger.merge.mockReturnValue({
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
         merged: 'title: Existing Title\ntags: [existing, template]\ndate: 2024-01-01\nid: abc123',
         hasSnowflakeId: true
       });
@@ -192,7 +217,7 @@ id: abc123
 
       expect(result.success).toBe(true);
       expect(mockVault.modify).toHaveBeenCalledWith(mockFile, expect.any(String));
-      expect(mockFrontmatterMerger.merge).toHaveBeenCalledWith(
+      expect(mockFrontmatterMerger.mergeWithFile).toHaveBeenCalledWith(
         existingContent,
         'title: test\ntags: [template]\ndate: 2024-01-01\nid: abc123'
       );
@@ -200,14 +225,19 @@ id: abc123
 
     test('Should show error when template not found', async () => {
       mockVault.read.mockResolvedValue('');
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/missing.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue(null);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/missing.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [],
+        hasInheritance: false
+      });
 
       const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
 
       expect(result.success).toBe(false);
-      expect(result.message).toContain('Template not found');
-      expect(Notice).toHaveBeenCalledWith(expect.stringContaining('not found'));
+      expect(result.message).toContain('No templates could be loaded');
       expect(mockVault.modify).not.toHaveBeenCalled();
     });
 
@@ -218,14 +248,27 @@ id: existing123
 Content`;
 
       mockVault.read.mockResolvedValue(contentWithId);
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/default.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue('Template content');
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: 'Template content'
+          }
+        ],
+        hasInheritance: false
+      });
       mockVariableProcessor.processTemplate.mockReturnValue({
         content: 'Template content',
         variables: {},
         hasSnowflakeId: false
       });
-      mockFrontmatterMerger.merge.mockReturnValue({
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
         merged: 'id: existing123',
         hasSnowflakeId: true
       });
@@ -249,14 +292,27 @@ title: test
 # test`;
 
       mockVault.read.mockResolvedValue('');
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/default.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue(templateContent);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
       mockVariableProcessor.processTemplate.mockReturnValue({
         content: processedContent,
         variables: { title: 'test' },
         hasSnowflakeId: false
       });
-      mockFrontmatterMerger.merge.mockReturnValue({
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
         merged: 'title: test',
         hasSnowflakeId: false
       });
@@ -277,8 +333,21 @@ title: test
       const templateContent = 'Template content';
 
       mockVault.read.mockResolvedValue(existingContent);
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/default.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue(templateContent);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
       mockVariableProcessor.processTemplate.mockReturnValue({
         content: templateContent,
         variables: {},
@@ -294,7 +363,7 @@ title: test
 
       expect(result.success).toBe(true);
       // Merge should not be called since template has no frontmatter
-      expect(mockFrontmatterMerger.merge).not.toHaveBeenCalled();
+      expect(mockFrontmatterMerger.mergeWithFile).not.toHaveBeenCalled();
       // Verify that the editor cursor was used
       expect(mockEditor.getCursor).toHaveBeenCalled();
       expect(mockVault.modify).toHaveBeenCalled();
@@ -302,8 +371,21 @@ title: test
 
     test('Should handle template processing errors', async () => {
       mockVault.read.mockResolvedValue('');
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/default.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue('{{invalid}}');
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: '{{invalid}}'
+          }
+        ],
+        hasInheritance: false
+      });
       mockVariableProcessor.processTemplate.mockImplementation(() => {
         throw new Error('Invalid variable');
       });
@@ -336,14 +418,27 @@ title: {{title}}
 Template`;
 
       mockVault.read.mockResolvedValue('');
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/default.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue(templateContent);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
       mockVariableProcessor.processTemplate.mockReturnValue({
         content: '---\ntitle: test\n---\nTemplate',
         variables: { title: 'test' },
         hasSnowflakeId: false
       });
-      mockFrontmatterMerger.merge.mockReturnValue({
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
         merged: 'title: test',
         hasSnowflakeId: false
       });
@@ -357,14 +452,27 @@ Template`;
 
     test('Should show notice when template applied successfully', async () => {
       mockVault.read.mockResolvedValue('');
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/default.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue('Template');
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: 'Template'
+          }
+        ],
+        hasInheritance: false
+      });
       mockVariableProcessor.processTemplate.mockReturnValue({
         content: 'Template',
         variables: {},
         hasSnowflakeId: false
       });
-      mockFrontmatterMerger.merge.mockReturnValue({
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
         merged: '',
         hasSnowflakeId: false
       });
@@ -387,14 +495,27 @@ Template`;
 
     test('Should handle vault modify errors gracefully', async () => {
       mockVault.read.mockResolvedValue('');
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/default.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue('Template');
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: 'Template'
+          }
+        ],
+        hasInheritance: false
+      });
       mockVariableProcessor.processTemplate.mockReturnValue({
         content: 'Template',
         variables: {},
         hasSnowflakeId: false
       });
-      mockFrontmatterMerger.merge.mockReturnValue({
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
         merged: '',
         hasSnowflakeId: false
       });
@@ -409,7 +530,10 @@ Template`;
 
     test('Should not apply template when no template is configured', async () => {
       mockVault.read.mockResolvedValue('');
-      mockTemplateLoader.getTemplateForFile.mockReturnValue(null);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [],
+        hasInheritance: false
+      });
 
       const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
 
@@ -421,14 +545,27 @@ Template`;
     test('Should not add extra newlines when applying template', async () => {
       // Test case 1: Empty file with template
       mockVault.read.mockResolvedValue('');
-      mockTemplateLoader.getTemplateForFile.mockReturnValue('Templates/test.md');
-      mockTemplateLoader.loadTemplate.mockResolvedValue('# Test\n\nContent\n');
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/test.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/test.md',
+            folderPath: '',
+            depth: 0,
+            content: '# Test\n\nContent\n'
+          }
+        ],
+        hasInheritance: false
+      });
       mockVariableProcessor.processTemplate.mockReturnValue({
         content: '# Test\n\nContent\n',
         variables: {},
         hasSnowflakeId: false
       });
-      mockFrontmatterMerger.merge.mockReturnValue({
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
         merged: '',
         hasSnowflakeId: false
       });
@@ -487,7 +624,7 @@ title: test
         variables: { title: 'test' },
         hasSnowflakeId: false
       });
-      mockFrontmatterMerger.merge.mockReturnValue({
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
         merged: 'title: test',
         hasSnowflakeId: false
       });
@@ -532,6 +669,395 @@ title: test
 
       // Only TemplateLoader has updateSettings method
       expect(mockTemplateLoader.updateSettings).toHaveBeenCalledWith(newSettings);
+    });
+  });
+
+  describe('multi-template application (REQ-033, REQ-033a)', () => {
+    const mockFile: MarkdownFile = {
+      basename: 'test',
+      extension: 'md' as const,
+      path: 'Projects/Dev/test.md',
+      name: 'test.md',
+      parent: { path: 'Projects/Dev' },
+      vault: {} as any,
+      stat: {
+        ctime: Date.now(),
+        mtime: Date.now(),
+        size: 0
+      }
+    } as MarkdownFile;
+
+    test('REQ-033: Should apply single template without inheritance', async () => {
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/project.md', folderPath: 'Projects', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/project.md',
+            folderPath: 'Projects',
+            depth: 0,
+            content: '---\ntags: [project]\n---\nProject template'
+          }
+        ],
+        hasInheritance: false
+      });
+
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: '---\ntags: [project]\n---\nProject template',
+        variables: {},
+        hasSnowflakeId: false
+      });
+
+      mockVault.read.mockResolvedValue('');
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'tags: [project]',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockReturnValue(
+        '---\ntags: [project]\n---\nProject template'
+      );
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+      expect(mockFrontmatterMerger.mergeFrontmatter).not.toHaveBeenCalled();
+    });
+
+    test('REQ-033: Should merge multiple templates with child precedence', async () => {
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 }
+        ],
+        hasInheritance: true
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/base.md',
+            folderPath: '/',
+            depth: 0,
+            content: '---\nauthor: John\ntags: [base]\n---\nBase content'
+          },
+          {
+            path: 'Templates/project.md',
+            folderPath: 'Projects',
+            depth: 1,
+            content: '---\ntitle: Project\ntags: [project]\n---\nProject content'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      mockFrontmatterMerger.mergeFrontmatter.mockReturnValue({
+        merged: 'author: John\ntitle: Project\ntags: [base, project]'
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+
+      mockVault.read.mockResolvedValue('');
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'author: John\ntitle: Project\ntags: [base, project]',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---\n${fm}\n---\nBase content\n\nProject content`
+      );
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+      expect(mockFrontmatterMerger.mergeFrontmatter).toHaveBeenCalledWith(
+        'author: John\ntags: [base]',
+        'title: Project\ntags: [project]'
+      );
+    });
+
+    test('REQ-033a: Should concatenate lists across inheritance chain', async () => {
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 },
+          { path: 'Templates/dev.md', folderPath: 'Projects/Dev', depth: 2 }
+        ],
+        hasInheritance: true
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/base.md',
+            folderPath: '/',
+            depth: 0,
+            content: '---\ntags: [base, global]\naliases: [doc]\n---\nBase'
+          },
+          {
+            path: 'Templates/project.md',
+            folderPath: 'Projects',
+            depth: 1,
+            content: '---\ntags: [project]\naliases: [proj]\nstatus: active\n---\nProject'
+          },
+          {
+            path: 'Templates/dev.md',
+            folderPath: 'Projects/Dev',
+            depth: 2,
+            content: '---\ntags: [dev, code]\naliases: [development]\n---\nDev'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      // First merge: base + project
+      mockFrontmatterMerger.mergeFrontmatter
+        .mockReturnValueOnce({
+          merged: 'tags: [base, global, project]\naliases: [doc, proj]\nstatus: active'
+        })
+        // Second merge: (base+project) + dev
+        .mockReturnValueOnce({
+          merged:
+            'tags: [base, global, project, dev, code]\naliases: [doc, proj, development]\nstatus: active'
+        });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+
+      mockVault.read.mockResolvedValue('');
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged:
+          'tags: [base, global, project, dev, code]\naliases: [doc, proj, development]\nstatus: active',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---\n${fm}\n---\nBase\n\nProject\n\nDev`
+      );
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+      expect(mockFrontmatterMerger.mergeFrontmatter).toHaveBeenCalledTimes(2);
+
+      // Verify final content includes all parts
+      const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
+      expect(processedArg).toContain('tags: [base, global, project, dev, code]');
+      expect(processedArg).toContain('aliases: [doc, proj, development]');
+      expect(processedArg).toContain('status: active');
+      expect(processedArg).toContain('Base');
+      expect(processedArg).toContain('Project');
+      expect(processedArg).toContain('Dev');
+    });
+
+    test('Should handle templates with only body content', async () => {
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/simple1.md', folderPath: 'Notes', depth: 0 },
+          { path: 'Templates/simple2.md', folderPath: 'Notes/Sub', depth: 1 }
+        ],
+        hasInheritance: true
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/simple1.md',
+            folderPath: 'Notes',
+            depth: 0,
+            content: 'First template content'
+          },
+          {
+            path: 'Templates/simple2.md',
+            folderPath: 'Notes/Sub',
+            depth: 1,
+            content: 'Second template content'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+
+      mockVault.read.mockResolvedValue('');
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+
+      // Verify merged content includes both body parts
+      const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
+      expect(processedArg).toBe('First template content\n\nSecond template content');
+    });
+
+    test('Should handle mix of templates with and without frontmatter', async () => {
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/with-fm.md', folderPath: 'Notes', depth: 0 },
+          { path: 'Templates/without-fm.md', folderPath: 'Notes/Sub', depth: 1 }
+        ],
+        hasInheritance: true
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/with-fm.md',
+            folderPath: 'Notes',
+            depth: 0,
+            content: '---\ntitle: Test\n---\nWith frontmatter'
+          },
+          {
+            path: 'Templates/without-fm.md',
+            folderPath: 'Notes/Sub',
+            depth: 1,
+            content: 'Without frontmatter'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+
+      mockVault.read.mockResolvedValue('');
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'title: Test',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---\n${fm}\n---\nWith frontmatter\n\nWithout frontmatter`
+      );
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+
+      // Verify merged content preserves frontmatter and combines bodies
+      const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
+      expect(processedArg).toContain('---\ntitle: Test\n---');
+      expect(processedArg).toContain('With frontmatter');
+      expect(processedArg).toContain('Without frontmatter');
+    });
+
+    test('Should handle empty templates in chain', async () => {
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/empty.md', folderPath: 'Notes', depth: 0 },
+          { path: 'Templates/content.md', folderPath: 'Notes/Sub', depth: 1 }
+        ],
+        hasInheritance: true
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/empty.md',
+            folderPath: 'Notes',
+            depth: 0,
+            content: ''
+          },
+          {
+            path: 'Templates/content.md',
+            folderPath: 'Notes/Sub',
+            depth: 1,
+            content: '---\ntitle: Content\n---\nSome content'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+
+      mockVault.read.mockResolvedValue('');
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'title: Content',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---\n${fm}\n---\nSome content`
+      );
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+      const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
+      expect(processedArg).toBe('---\ntitle: Content\n---\nSome content');
+    });
+
+    test('Should inherit list values from template chain when file has empty list', async () => {
+      // This tests the bug where empty lists in files prevent inheritance
+      const existingFileContent = '---\ntags: []\naliases: []\n---\nExisting content';
+
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 }
+        ],
+        hasInheritance: true
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/base.md',
+            folderPath: '/',
+            depth: 0,
+            content: '---\ntags: [base, global]\naliases: [doc]\n---\nBase'
+          },
+          {
+            path: 'Templates/project.md',
+            folderPath: 'Projects',
+            depth: 1,
+            content: '---\ntags: [project]\naliases: [proj]\n---\nProject'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      // First merge: base + project templates
+      mockFrontmatterMerger.mergeFrontmatter.mockReturnValue({
+        merged: 'tags: [base, global, project]\naliases: [doc, proj]'
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+
+      mockVault.read.mockResolvedValue(existingFileContent);
+
+      // Now that the bug is fixed, empty lists in file should inherit template values
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'tags: [base, global, project]\naliases: [doc, proj]',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---\n${fm}\n---\nExisting content\n\nBase\n\nProject`
+      );
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+
+      // The test should verify that template values are preserved
+      // Currently this will fail due to the bug
+      expect(mockFrontmatterMerger.mergeWithFile).toHaveBeenCalledWith(
+        existingFileContent,
+        'tags: [base, global, project]\naliases: [doc, proj]'
+      );
     });
   });
 });

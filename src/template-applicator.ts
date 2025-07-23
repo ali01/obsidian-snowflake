@@ -16,7 +16,13 @@
 
 import { Notice } from 'obsidian';
 import type { Vault, Editor } from 'obsidian';
-import type { MarkdownFile, SnowflakeSettings, CommandContext, ErrorContext } from './types';
+import type {
+  MarkdownFile,
+  SnowflakeSettings,
+  CommandContext,
+  ErrorContext,
+  TemplateChainItem
+} from './types';
 import { TemplateLoader } from './template-loader';
 import { TemplateVariableProcessor } from './template-variables';
 import { FrontmatterMerger } from './frontmatter-merger';
@@ -75,55 +81,44 @@ export class TemplateApplicator {
       return { success: false, message: 'Auto-templating is disabled' };
     }
 
-    const templatePath = this.loader.getTemplateForFile(file);
-    if (templatePath === null) {
+    // Get template chain for inheritance support
+    const chain = this.loader.getTemplateChain(file);
+    if (chain.templates.length === 0) {
       return { success: false, message: 'No template configured for this location' };
     }
 
-    return this.loadAndApplyTemplate(file, templatePath, editor);
+    // Load all templates in chain
+    const loadedChain = await this.loader.loadTemplateChain(chain);
+    if (loadedChain.templates.length === 0) {
+      return { success: false, message: 'No templates could be loaded' };
+    }
+
+    // If multiple templates, merge them first
+    let finalTemplateContent: string;
+    if (loadedChain.hasInheritance) {
+      finalTemplateContent = this.mergeTemplates(loadedChain.templates);
+    } else {
+      finalTemplateContent = loadedChain.templates[0].content ?? '';
+    }
+
+    // Process variables and apply
+    const result = await this.applyProcessedTemplateContent(file, finalTemplateContent, editor);
+
+    if (result.success) {
+      new Notice(`Template applied to ${file.basename}`);
+    }
+
+    return result;
   }
 
   private shouldApplyTemplate(context: CommandContext): boolean {
     return context.isManualCommand || this.settings.enableAutoTemplating;
   }
 
-  private async loadAndApplyTemplate(
-    file: MarkdownFile,
-    templatePath: string,
-    editor?: Editor
-  ): Promise<ApplyResult> {
-    try {
-      const templateContent = await this.loader.loadTemplate(templatePath);
-      if (templateContent === null) {
-        new Notice(`Template not found: ${templatePath}`);
-        return { success: false, message: `Template not found: ${templatePath}` };
-      }
-
-      const processedTemplate = this.variableProcessor.processTemplate(templateContent, file);
-      const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
-
-      if (result.success) {
-        new Notice(`Template applied to ${file.basename}`);
-      }
-
-      return { ...result, hadSnowflakeId: processedTemplate.hasSnowflakeId };
-    } catch (error) {
-      return this.handleTemplateError(error, file.path, templatePath);
-    }
-  }
-
-  private handleTemplateError(error: unknown, filePath: string, templatePath: string): ApplyResult {
-    const errorContext: ErrorContext = {
-      operation: 'apply_template',
-      filePath,
-      templatePath
-    };
-    const errorMessage = this.errorHandler.handleError(error, errorContext);
-    return { success: false, message: errorMessage };
-  }
-
   /**
    * Apply a specific template to a file (for manual commands)
+   *
+   * TODO(alive): no one calls this? should be removed?
    *
    * @param file - The file to apply template to
    * @param templatePath - Specific template to apply
@@ -225,7 +220,10 @@ export class TemplateApplicator {
       return { content: currentContent, updatedBody: currentParts.body };
     }
 
-    const mergeResult = this.frontmatterMerger.merge(currentContent, templateParts.frontmatter);
+    const mergeResult = this.frontmatterMerger.mergeWithFile(
+      currentContent,
+      templateParts.frontmatter
+    );
     const contentWithMergedFrontmatter = this.frontmatterMerger.applyToFile(
       currentContent,
       mergeResult.merged
@@ -314,6 +312,45 @@ export class TemplateApplicator {
   }
 
   /**
+   * Apply processed template content to a file (with variable processing)
+   *
+   * @param file - The file to apply to
+   * @param templateContent - The raw template content
+   * @param editor - Optional editor for cursor position
+   * @returns Application result
+   */
+  private async applyProcessedTemplateContent(
+    file: MarkdownFile,
+    templateContent: string,
+    editor?: Editor
+  ): Promise<ApplyResult> {
+    try {
+      // Process template variables
+      const processedTemplate = this.variableProcessor.processTemplate(templateContent, file);
+
+      // Apply the processed template
+      const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
+
+      return {
+        ...result,
+        hadSnowflakeId: processedTemplate.hasSnowflakeId
+      };
+    } catch (error) {
+      const errorContext: ErrorContext = {
+        operation: 'apply_template',
+        filePath: file.path
+      };
+
+      const errorMessage = this.errorHandler.handleError(error, errorContext);
+
+      return {
+        success: false,
+        message: errorMessage
+      };
+    }
+  }
+
+  /**
    * Update settings reference
    *
    * @param settings - New settings
@@ -321,5 +358,84 @@ export class TemplateApplicator {
   updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
     this.loader.updateSettings(settings);
+  }
+
+  /**
+   * Merge multiple templates into a single template
+   *
+   * REQ-033: Merge templates with child templates taking precedence
+   * REQ-033a: Concatenate list-type fields across inheritance chain
+   *
+   * @param templates - Templates to merge (ordered from root to leaf)
+   * @returns Merged template content
+   */
+  private mergeTemplates(templates: TemplateChainItem[]): string {
+    if (templates.length === 0) {
+      return '';
+    }
+
+    if (templates.length === 1 && templates[0].content !== undefined) {
+      return templates[0].content;
+    }
+
+    const { frontmatter, body } = this.accumulateTemplateContent(templates);
+    return this.formatMergedContent(frontmatter, body);
+  }
+
+  /**
+   * Accumulate frontmatter and body content from templates
+   */
+  private accumulateTemplateContent(templates: TemplateChainItem[]): {
+    frontmatter: string;
+    body: string;
+  } {
+    let accumulatedFrontmatter = '';
+    let accumulatedBody = '';
+
+    for (const template of templates) {
+      if (template.content === undefined || template.content === '') {
+        continue;
+      }
+
+      const parts = this.splitContent(template.content);
+
+      // Merge frontmatter
+      if (parts.frontmatter !== null && parts.frontmatter.trim() !== '') {
+        if (accumulatedFrontmatter === '') {
+          accumulatedFrontmatter = parts.frontmatter;
+        } else {
+          const mergeResult = this.frontmatterMerger.mergeFrontmatter(
+            accumulatedFrontmatter,
+            parts.frontmatter
+          );
+          accumulatedFrontmatter = mergeResult.merged;
+        }
+      }
+
+      // Append body content
+      if (parts.body.trim() !== '') {
+        if (accumulatedBody !== '') {
+          accumulatedBody += '\n\n';
+        }
+        accumulatedBody += parts.body.trim();
+      }
+    }
+
+    return { frontmatter: accumulatedFrontmatter, body: accumulatedBody };
+  }
+
+  /**
+   * Format merged frontmatter and body into final content
+   */
+  private formatMergedContent(frontmatter: string, body: string): string {
+    if (frontmatter !== '') {
+      const trimmedFrontmatter = frontmatter.trimEnd();
+      let mergedContent = `---\n${trimmedFrontmatter}\n---`;
+      if (body !== '') {
+        mergedContent += '\n' + body;
+      }
+      return mergedContent;
+    }
+    return body;
   }
 }

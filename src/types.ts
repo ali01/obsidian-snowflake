@@ -225,22 +225,28 @@ export interface SettingsUpdateContext {
 }
 
 /**
- * Future type definitions prepared for template inheritance
+ * Represents a template in the inheritance chain
  *
- * REQ-032: [FUTURE] Where template inheritance is implemented, the plugin
- * shall apply BOTH parent and child templates when a file is created in a
- * nested folder.
- *
- * REQ-033: [FUTURE] When applying multiple inherited templates, the plugin
- * shall merge them with child templates taking precedence over parent
- * templates.
- *
- * These types are defined now to ensure the architecture supports future
- * enhancements without breaking changes.
+ * REQ-032: When a file is created in a nested folder, the plugin
+ * shall check parent folders for template mappings and apply them
+ * in order from root to leaf.
  */
-export interface FutureTemplateInheritance {
-  enableInheritance?: boolean;
-  inheritanceStrategy?: 'merge' | 'override';
+export interface TemplateChainItem {
+  path: string; // Template file path
+  folderPath: string; // Folder this template is mapped to
+  depth: number; // Depth in folder hierarchy (0 = root)
+  content?: string; // Loaded template content
+}
+
+/**
+ * Result of template chain resolution
+ *
+ * REQ-032: Template inheritance from parent folders
+ * REQ-033: Merging multiple templates in inheritance chain
+ */
+export interface TemplateChain {
+  templates: TemplateChainItem[]; // Ordered from root to leaf
+  hasInheritance: boolean; // Whether multiple templates apply
 }
 
 /**

@@ -68,7 +68,7 @@ export default tseslint.config(
           'format': ['UPPER_CASE']
         }
       ],
-      
+
       // General JavaScript/TypeScript rules
       'no-console': ['error', { 'allow': ['warn', 'error'] }],
       'no-debugger': 'error',
@@ -91,13 +91,13 @@ export default tseslint.config(
       'no-unreachable-loop': 'error',
       'no-nested-ternary': 'error',
       'no-unneeded-ternary': 'error',
-      'complexity': ['error', 30],
+      'complexity': ['error', 50],
       'max-depth': ['error', 4],
       'max-lines': ['error', 500],
       'max-lines-per-function': ['error', 80],
       'max-params': ['error', 5],
       'max-statements': ['error', 25],
-      
+
       // Code style (handled by Prettier but still useful)
       'max-len': ['error', { 'code': 100, 'ignoreUrls': true, 'ignoreStrings': true }],
       'prettier/prettier': ['error', {

@@ -36,35 +36,52 @@ interface ParsedFrontmatter {
  */
 export class FrontmatterMerger {
   /**
-   * Merge template frontmatter with existing file frontmatter
+   * Merge two frontmatter sections
    *
    * REQ-008: Intelligently merge frontmatter blocks
-   * REQ-009: Preserve existing file values
-   * REQ-010: Add new keys from template
+   * REQ-009: Incoming values take precedence (except for lists)
+   * REQ-010: Add new keys from incoming frontmatter
+   * REQ-010a: Concatenate list-type fields (base first, then incoming)
    *
-   * @param fileContent - The existing file content (may or may not have frontmatter)
-   * @param templateFrontmatter - The template's frontmatter content
+   * @param baseFrontmatter - The base frontmatter content
+   * @param incomingFrontmatter - The incoming frontmatter to merge
    * @returns Merge result with conflicts and additions tracked
    */
-  merge(fileContent: string, templateFrontmatter: string): FrontmatterMergeResult {
+  mergeFrontmatter(baseFrontmatter: string, incomingFrontmatter: string): FrontmatterMergeResult {
     // Parse both frontmatter sections
-    const fileFm = this.parseFrontmatter(fileContent);
-    const templateFm = this.parseYaml(templateFrontmatter);
+    const baseFm = this.parseYaml(baseFrontmatter);
+    const incomingFm = this.parseYaml(incomingFrontmatter);
 
     // Track conflicts and additions
     const conflicts: string[] = [];
     const added: string[] = [];
 
-    // Start with existing file data (REQ-009: existing values take precedence)
-    const mergedData = { ...fileFm.data };
+    // Start with base data
+    const mergedData = { ...baseFm };
 
-    // Process template keys
-    for (const [key, value] of Object.entries(templateFm)) {
-      if (key in fileFm.data) {
-        // REQ-009: Key exists in both - keep file's value, track conflict
-        conflicts.push(key);
+    // Process incoming keys
+    for (const [key, value] of Object.entries(incomingFm)) {
+      if (key in baseFm) {
+        // REQ-010a: Special handling for arrays - concatenate them
+        const baseVal = baseFm[key];
+        const isBaseArray = Array.isArray(baseVal);
+        const isIncomingArray = Array.isArray(value);
+        const isBaseEmpty = baseVal === '' || baseVal === null || baseVal === undefined;
+        const isIncomingEmpty = value === '' || value === null || value === undefined;
+
+        if ((isBaseArray || isBaseEmpty) && (isIncomingArray || isIncomingEmpty)) {
+          // Treat empty values as empty arrays for list concatenation
+          const baseArray = isBaseArray ? (baseVal as unknown[]) : [];
+          const incomingArray = isIncomingArray ? (value as unknown[]) : [];
+          mergedData[key] = this.concatenateArrays(baseArray, incomingArray);
+          conflicts.push(key); // Still track as conflict for transparency
+        } else {
+          // REQ-009: Key exists in both - incoming value takes precedence
+          mergedData[key] = value;
+          conflicts.push(key);
+        }
       } else {
-        // REQ-010: Key only in template - add it
+        // REQ-010: Key only in incoming - add it
         mergedData[key] = value;
         added.push(key);
       }
@@ -78,6 +95,23 @@ export class FrontmatterMerger {
       conflicts,
       added
     };
+  }
+
+  /**
+   * Merge template frontmatter with existing file frontmatter
+   *
+   * Convenience method that extracts frontmatter from file content
+   *
+   * @param fileContent - The existing file content (may or may not have frontmatter)
+   * @param templateFrontmatter - The template's frontmatter content
+   * @returns Merge result with conflicts and additions tracked
+   */
+  mergeWithFile(fileContent: string, templateFrontmatter: string): FrontmatterMergeResult {
+    // Extract frontmatter from file
+    const fileFm = this.parseFrontmatter(fileContent);
+
+    // Use the general-purpose merge (template is base, file is incoming)
+    return this.mergeFrontmatter(templateFrontmatter, fileFm.content);
   }
 
   /**
@@ -180,15 +214,21 @@ export class FrontmatterMerger {
       this.handleKeyValueLine(keyMatch, data, state);
     } else if (state.currentKey !== null) {
       // Check for array items with dash notation
-      const arrayMatch = line.match(/^\s+- (.+)$/);
+      const arrayMatch = line.match(/^\s*- (.*)$/);
       if (arrayMatch) {
         // This is an array item
         if (!Array.isArray(data[state.currentKey])) {
           data[state.currentKey] = [];
         }
-        // Parse the array item value
-        const itemValue = this.parseValue(arrayMatch[1].trim());
-        (data[state.currentKey] as unknown[]).push(itemValue);
+        // Handle empty array items
+        const itemContent = arrayMatch[1].trim();
+        if (itemContent === '') {
+          (data[state.currentKey] as unknown[]).push('');
+        } else {
+          // Parse the array item value
+          const itemValue = this.parseValue(itemContent);
+          (data[state.currentKey] as unknown[]).push(itemValue);
+        }
       } else if (line.startsWith('  ')) {
         // Continuation of multi-line value
         state.currentValue.push(line.slice(2));
@@ -217,8 +257,7 @@ export class FrontmatterMerger {
       state.currentValue = [];
     } else {
       // Empty value or start of array/multi-line
-      // Keep the key active to handle arrays or just store empty string
-      data[state.currentKey] = '';
+      // Don't set a value yet - wait to see if it's an array
       state.currentValue = [];
     }
   }
@@ -227,8 +266,13 @@ export class FrontmatterMerger {
     data: Record<string, unknown>,
     state: { currentKey: string | null; currentValue: string[] }
   ): void {
-    if (state.currentKey !== null && state.currentValue.length > 0) {
-      data[state.currentKey] = state.currentValue.join('\n').trim();
+    if (state.currentKey !== null) {
+      if (state.currentValue.length > 0) {
+        data[state.currentKey] = state.currentValue.join('\n').trim();
+      } else if (!(state.currentKey in data)) {
+        // Only set empty string if the key wasn't already set (e.g., by an array)
+        data[state.currentKey] = '';
+      }
     }
   }
 
@@ -281,10 +325,15 @@ export class FrontmatterMerger {
 
   private tryParseArray(value: string): unknown[] | undefined {
     if (value.startsWith('[') && value.endsWith(']')) {
-      return value
-        .slice(1, -1)
+      const inner = value.slice(1, -1).trim();
+      // Handle empty arrays
+      if (inner === '') {
+        return [];
+      }
+      return inner
         .split(',')
-        .map((item) => this.parseValue(item.trim()));
+        .map((item) => this.parseValue(item.trim()))
+        .filter((item) => item !== ''); // Filter out empty strings
     }
     return undefined;
   }
@@ -387,6 +436,44 @@ export class FrontmatterMerger {
       return value;
     }
     return String(value);
+  }
+
+  /**
+   * Concatenate two arrays with deduplication
+   *
+   * REQ-010a: When merging list-type fields, concatenate values
+   * Preserves order: base array items first, then incoming items
+   * Removes duplicates based on first occurrence
+   *
+   * @param baseArray - The base array
+   * @param incomingArray - The array to concatenate
+   * @returns Concatenated array with duplicates removed
+   */
+  private concatenateArrays(baseArray: unknown[], incomingArray: unknown[]): unknown[] {
+    const result: unknown[] = [];
+    const seen = new Set<string>();
+
+    // Helper to add unique items
+    const addUniqueItem = (item: unknown): void => {
+      // Convert to string for comparison (handles objects/arrays)
+      const key = JSON.stringify(item);
+      if (!seen.has(key)) {
+        seen.add(key);
+        result.push(item);
+      }
+    };
+
+    // Add base array items first (preserving order)
+    for (const item of baseArray) {
+      addUniqueItem(item);
+    }
+
+    // Then add incoming array items (only if not already present)
+    for (const item of incomingArray) {
+      addUniqueItem(item);
+    }
+
+    return result;
   }
 
   /**
