@@ -39,26 +39,12 @@ export class FileInputSuggest extends AbstractInputSuggest<TFile> {
     }
 
     if (!query) {
-      // Return files in root folder when query is empty
-      return this.getFilesInRootFolder(allFiles).slice(0, 10);
+      // Return all files sorted by path when query is empty
+      return allFiles.sort((a, b) => a.path.localeCompare(b.path)).slice(0, 10);
     }
 
     // Filter and sort files based on query
     return this.filterAndSortFiles(allFiles, lowerQuery).slice(0, 10);
-  }
-
-  private getFilesInRootFolder(files: TFile[]): TFile[] {
-    return files
-      .filter((file) => {
-        if (this.rootFolder !== undefined && this.rootFolder !== '') {
-          // Files directly in the specified root folder
-          const relativePath = file.path.substring(this.rootFolder.length + 1);
-          return !relativePath.includes('/');
-        }
-        // Top-level files
-        return !file.path.includes('/');
-      })
-      .sort((a, b) => a.basename.localeCompare(b.basename));
   }
 
   private filterAndSortFiles(files: TFile[], lowerQuery: string): TFile[] {
