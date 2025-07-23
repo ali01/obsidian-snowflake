@@ -7,10 +7,12 @@ import { Plugin, Notice, Editor, MarkdownView, MarkdownFileInfo, TFile, TFolder 
 import { SnowflakeSettings } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { FolderSuggestModal } from './ui/folder-modal';
+import { ConfirmationModal } from './ui/confirmation-modal';
 
 // Mock the dependencies
 jest.mock('./template-applicator');
 jest.mock('./ui/folder-modal');
+jest.mock('./ui/confirmation-modal');
 jest.mock('obsidian', () => ({
   ...jest.requireActual('obsidian'),
   Notice: jest.fn()
@@ -22,6 +24,7 @@ describe('SnowflakeCommands', () => {
   let settings: SnowflakeSettings;
   let mockTemplateApplicator: jest.Mocked<TemplateApplicator>;
   let mockFolderModal: any;
+  let mockConfirmationModal: any;
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
@@ -39,6 +42,18 @@ describe('SnowflakeCommands', () => {
       mockFolderModal.callback = callback;
       return mockFolderModal;
     });
+
+    // Mock ConfirmationModal constructor
+    mockConfirmationModal = {
+      open: jest.fn()
+    };
+    (ConfirmationModal as jest.Mock).mockImplementation(
+      (app, title, message, onConfirm, onCancel) => {
+        mockConfirmationModal.onConfirm = onConfirm;
+        mockConfirmationModal.onCancel = onCancel;
+        return mockConfirmationModal;
+      }
+    );
 
     // Mock plugin
     mockPlugin = {
@@ -252,13 +267,25 @@ describe('SnowflakeCommands', () => {
         );
 
       const mockFolder = Object.assign(new TFolder(), {
-        children: mockFiles
+        children: mockFiles,
+        path: 'folder'
       });
 
       mockTemplateApplicator.applyTemplate.mockResolvedValue({
         success: true,
         message: 'Applied'
       });
+
+      // Auto-confirm the dialog
+      (ConfirmationModal as jest.Mock).mockImplementationOnce(
+        (app, title, message, onConfirm, onCancel) => {
+          const modal = mockConfirmationModal;
+          modal.onConfirm = onConfirm;
+          modal.onCancel = onCancel;
+          setTimeout(() => onConfirm(), 0);
+          return modal;
+        }
+      );
 
       await processFolderBatch(mockFolder);
 
@@ -286,7 +313,8 @@ describe('SnowflakeCommands', () => {
         );
 
       const mockFolder = Object.assign(new TFolder(), {
-        children: mockFiles
+        children: mockFiles,
+        path: 'folder'
       });
 
       // Make half succeed and half fail
@@ -297,6 +325,17 @@ describe('SnowflakeCommands', () => {
         .mockResolvedValueOnce({ success: true, message: 'Applied' })
         .mockResolvedValueOnce({ success: true, message: 'Applied' })
         .mockResolvedValue({ success: false, message: 'Failed' });
+
+      // Auto-confirm the dialog
+      (ConfirmationModal as jest.Mock).mockImplementationOnce(
+        (app, title, message, onConfirm, onCancel) => {
+          const modal = mockConfirmationModal;
+          modal.onConfirm = onConfirm;
+          modal.onCancel = onCancel;
+          setTimeout(() => onConfirm(), 0);
+          return modal;
+        }
+      );
 
       await processFolderBatch(mockFolder);
 
@@ -333,7 +372,8 @@ describe('SnowflakeCommands', () => {
       });
 
       const mockFolder = Object.assign(new TFolder(), {
-        children: [file1, mockSubfolder, txtFile]
+        children: [file1, mockSubfolder, txtFile],
+        path: 'folder'
       });
 
       mockTemplateApplicator.applyTemplate.mockResolvedValue({
@@ -341,10 +381,118 @@ describe('SnowflakeCommands', () => {
         message: 'Applied'
       });
 
+      // Auto-confirm the dialog
+      (ConfirmationModal as jest.Mock).mockImplementationOnce(
+        (app, title, message, onConfirm, onCancel) => {
+          const modal = mockConfirmationModal;
+          modal.onConfirm = onConfirm;
+          modal.onCancel = onCancel;
+          setTimeout(() => onConfirm(), 0);
+          return modal;
+        }
+      );
+
       await processFolderBatch(mockFolder);
+
+      // Wait for async processing
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Should process markdown files only
       expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledTimes(2);
+    });
+
+    test('Should show confirmation dialog before processing files', async () => {
+      const mockFiles = [
+        Object.assign(new TFile(), {
+          extension: 'md',
+          basename: 'test1',
+          path: 'folder/test1.md'
+        }),
+        Object.assign(new TFile(), {
+          extension: 'md',
+          basename: 'test2',
+          path: 'folder/test2.md'
+        })
+      ];
+
+      const mockFolder = Object.assign(new TFolder(), {
+        children: mockFiles,
+        path: 'folder'
+      });
+
+      mockTemplateApplicator.applyTemplate.mockResolvedValue({
+        success: true,
+        message: 'Applied'
+      });
+
+      // Simulate user confirming
+      (ConfirmationModal as jest.Mock).mockImplementationOnce(
+        (app, title, message, onConfirm, onCancel) => {
+          const modal = mockConfirmationModal;
+          modal.onConfirm = onConfirm;
+          modal.onCancel = onCancel;
+          // Simulate immediate confirmation
+          setTimeout(() => onConfirm(), 0);
+          return modal;
+        }
+      );
+
+      await processFolderBatch(mockFolder);
+
+      // Verify confirmation dialog was shown with correct message
+      expect(ConfirmationModal).toHaveBeenCalledWith(
+        mockPlugin.app,
+        'Apply templates to 2 notes in "folder"?',
+        'This will apply the appropriate template to all markdown files in this folder.',
+        expect.any(Function),
+        expect.any(Function)
+      );
+      expect(mockConfirmationModal.open).toHaveBeenCalled();
+
+      // Wait for async processing
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify files were processed after confirmation
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledTimes(2);
+      expect(Notice).toHaveBeenCalledWith('Templates applied to 2 notes');
+    });
+
+    test('Should cancel processing when user declines confirmation', async () => {
+      const mockFiles = [
+        Object.assign(new TFile(), {
+          extension: 'md',
+          basename: 'test1',
+          path: 'folder/test1.md'
+        })
+      ];
+
+      const mockFolder = Object.assign(new TFolder(), {
+        children: mockFiles,
+        path: 'folder'
+      });
+
+      // Simulate user cancelling
+      (ConfirmationModal as jest.Mock).mockImplementationOnce(
+        (app, title, message, onConfirm, onCancel) => {
+          const modal = mockConfirmationModal;
+          modal.onConfirm = onConfirm;
+          modal.onCancel = onCancel;
+          // Simulate immediate cancellation
+          setTimeout(() => onCancel(), 0);
+          return modal;
+        }
+      );
+
+      await processFolderBatch(mockFolder);
+
+      // Wait a bit to ensure no async processing happens
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Verify confirmation dialog was shown but no processing occurred
+      expect(ConfirmationModal).toHaveBeenCalled();
+      expect(mockConfirmationModal.open).toHaveBeenCalled();
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+      expect(Notice).not.toHaveBeenCalledWith(expect.stringContaining('Processing'));
     });
   });
 

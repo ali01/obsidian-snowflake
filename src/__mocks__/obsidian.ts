@@ -95,12 +95,34 @@ export class Vault {
   }
 }
 
-export class FuzzySuggestModal<T> {
-  constructor(app: any) {}
+export class Modal {
+  app: any;
+  contentEl: {
+    createEl: (tag: string, options?: any) => any;
+    empty: () => void;
+  };
+
+  constructor(app: any) {
+    this.app = app;
+    this.contentEl = {
+      createEl: (tag: string, options?: any) => ({ text: options?.text || '' }),
+      empty: () => {}
+    };
+  }
 
   open() {}
 
   close() {}
+
+  onOpen() {}
+
+  onClose() {}
+}
+
+export class FuzzySuggestModal<T> extends Modal {
+  constructor(app: any) {
+    super(app);
+  }
 }
 
 export class TFolder extends TAbstractFile {
@@ -110,6 +132,51 @@ export class TFolder extends TAbstractFile {
   constructor(data: Partial<TFolder> = {}) {
     super();
     Object.assign(this, data);
+  }
+}
+
+export class Setting {
+  containerEl: HTMLElement;
+
+  constructor(containerEl: HTMLElement) {
+    this.containerEl = containerEl;
+  }
+
+  addButton(cb: (button: any) => void): this {
+    const button = {
+      setButtonText: (text: string) => button,
+      setCta: () => button,
+      onClick: (handler: () => void) => button
+    };
+    cb(button);
+    return this;
+  }
+
+  addText(cb: (text: any) => void): this {
+    const text = {
+      setValue: (value: string) => text,
+      setPlaceholder: (placeholder: string) => text,
+      onChange: (handler: (value: string) => void) => text
+    };
+    cb(text);
+    return this;
+  }
+
+  addToggle(cb: (toggle: any) => void): this {
+    const toggle = {
+      setValue: (value: boolean) => toggle,
+      onChange: (handler: (value: boolean) => void) => toggle
+    };
+    cb(toggle);
+    return this;
+  }
+
+  setName(name: string): this {
+    return this;
+  }
+
+  setDesc(desc: string): this {
+    return this;
   }
 }
 

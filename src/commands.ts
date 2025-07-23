@@ -35,6 +35,7 @@ import type {
 } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { FolderSuggestModal } from './ui/folder-modal';
+import { ConfirmationModal } from './ui/confirmation-modal';
 import { ErrorHandler } from './error-handler';
 
 /**
@@ -154,6 +155,12 @@ export class SnowflakeCommands {
       return;
     }
 
+    // Show confirmation dialog
+    const confirmed = await this.confirmBatchOperation(folder, markdownFiles.length);
+    if (!confirmed) {
+      return;
+    }
+
     new Notice(`Processing ${String(markdownFiles.length)} files...`);
     const result = await this.processFilesInBatches(markdownFiles);
     this.showCompletionNotice(result);
@@ -207,6 +214,30 @@ export class SnowflakeCommands {
     } else {
       new Notice(`Templates applied to ${String(result.success)} of ${String(result.total)} notes`);
     }
+  }
+
+  /**
+   * Show confirmation dialog for batch operation
+   *
+   * @param folder - The folder to process
+   * @param fileCount - Number of files that will be processed
+   * @returns Promise resolving to true if confirmed, false if cancelled
+   */
+  private confirmBatchOperation(folder: TFolder, fileCount: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const modal = new ConfirmationModal(
+        this.plugin.app,
+        `Apply templates to ${String(fileCount)} notes in "${folder.path}"?`,
+        'This will apply the appropriate template to all markdown files in this folder.',
+        () => {
+          resolve(true);
+        },
+        () => {
+          resolve(false);
+        }
+      );
+      modal.open();
+    });
   }
 
   /**
