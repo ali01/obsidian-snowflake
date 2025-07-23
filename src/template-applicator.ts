@@ -51,7 +51,10 @@ export class TemplateApplicator {
     this.vault = vault;
     this.settings = settings;
     this.loader = new TemplateLoader(vault, settings);
-    this.variableProcessor = new TemplateVariableProcessor();
+    this.variableProcessor = new TemplateVariableProcessor(
+      settings.dateFormat,
+      settings.timeFormat
+    );
     this.frontmatterMerger = new FrontmatterMerger();
     this.errorHandler = ErrorHandler.getInstance();
   }
@@ -347,6 +350,8 @@ export class TemplateApplicator {
   updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
     this.loader.updateSettings(settings);
+    this.variableProcessor.setDateFormat(settings.dateFormat);
+    this.variableProcessor.setTimeFormat(settings.timeFormat);
   }
 
   /**

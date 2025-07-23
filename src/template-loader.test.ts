@@ -78,7 +78,9 @@ describe('TemplateLoader', () => {
         '': 'Templates/root.md' // Root folder mapping
       },
 
-      templatesFolder: 'Templates'
+      templatesFolder: 'Templates',
+      dateFormat: 'YYYY-MM-DD',
+      timeFormat: 'HH:mm'
     };
     loader = new TemplateLoader(mockVault as any, settings);
 
@@ -141,7 +143,9 @@ describe('TemplateLoader', () => {
       // Create a new loader with no mappings
       const loaderNoMappings = new TemplateLoader(mockVault as any, {
         templateMappings: {},
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       });
 
       const file = {

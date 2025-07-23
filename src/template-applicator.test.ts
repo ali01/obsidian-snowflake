@@ -40,7 +40,9 @@ describe('TemplateApplicator', () => {
   };
 
   const mockVariableProcessor = {
-    processTemplate: jest.fn()
+    processTemplate: jest.fn(),
+    setDateFormat: jest.fn(),
+    setTimeFormat: jest.fn()
   };
 
   const mockFrontmatterMerger = {
@@ -84,7 +86,9 @@ describe('TemplateApplicator', () => {
         Projects: 'Templates/project.md'
       },
 
-      templatesFolder: 'Templates'
+      templatesFolder: 'Templates',
+      dateFormat: 'YYYY-MM-DD',
+      timeFormat: 'HH:mm'
     };
 
     // Reset all mocks to default behavior
@@ -729,8 +733,10 @@ title: test
 
       applicator.updateSettings(newSettings);
 
-      // Only TemplateLoader has updateSettings method
+      // Verify all dependencies are updated
       expect(mockTemplateLoader.updateSettings).toHaveBeenCalledWith(newSettings);
+      expect(mockVariableProcessor.setDateFormat).toHaveBeenCalledWith(newSettings.dateFormat);
+      expect(mockVariableProcessor.setTimeFormat).toHaveBeenCalledWith(newSettings.timeFormat);
     });
   });
 

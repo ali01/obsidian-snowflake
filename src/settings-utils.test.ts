@@ -20,7 +20,9 @@ describe('Settings Utilities', () => {
       expect(settings).toEqual({
         templateMappings: {},
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       });
     });
   });
@@ -30,7 +32,9 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       };
 
       const result = validateSettings(settings);
@@ -46,13 +50,16 @@ describe('Settings Utilities', () => {
       const result = validateSettings(settings);
       expect(result.isValid).toBe(false);
       expect(result.errors).toContain('Missing required field: templatesFolder');
+      expect(result.errors).toContain('Missing required field: dateFormat');
+      expect(result.errors).toContain('Missing required field: timeFormat');
     });
 
     test('Should detect invalid types', () => {
       const settings = {
         templateMappings: 'invalid',
-
-        templatesFolder: null
+        templatesFolder: null,
+        dateFormat: 123,
+        timeFormat: false
       } as any;
 
       const result = validateSettings(settings);
@@ -60,6 +67,8 @@ describe('Settings Utilities', () => {
       expect(result.errors).toContain('templateMappings must be an object');
 
       expect(result.errors).toContain('templatesFolder must be a string');
+      expect(result.errors).toContain('dateFormat must be a string');
+      expect(result.errors).toContain('timeFormat must be a string');
     });
 
     test('Should validate template mapping values', () => {
@@ -69,7 +78,9 @@ describe('Settings Utilities', () => {
           Invalid: 123 as any
         },
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       };
 
       const result = validateSettings(settings);
@@ -96,7 +107,9 @@ describe('Settings Utilities', () => {
           Projects: 'Templates/project.md',
           '/': 'Templates/default.md'
         },
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       });
     });
 
@@ -104,7 +117,9 @@ describe('Settings Utilities', () => {
       const currentSettings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       };
 
       const migrated = migrateSettings(currentSettings);
@@ -120,13 +135,17 @@ describe('Settings Utilities', () => {
 
       expect(migrated.templateMappings).toEqual({ Projects: 'Templates/project.md' });
       expect(migrated.templatesFolder).toBe('Templates');
+      expect(migrated.dateFormat).toBe('YYYY-MM-DD');
+      expect(migrated.timeFormat).toBe('HH:mm');
     });
 
     test('Should preserve absolute template paths', () => {
       const settings = {
         templateMappings: { Projects: '/absolute/path/project.md' },
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       };
 
       const migrated = migrateSettings(settings as any);
@@ -140,7 +159,9 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       };
 
       const updated = updateTemplateMappings(settings, 'Daily', 'Templates/daily.md');
@@ -155,7 +176,9 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/old-project.md' },
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       };
 
       const updated = updateTemplateMappings(settings, 'Projects', 'Templates/new-project.md');
@@ -167,7 +190,9 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       };
 
       const updated = updateTemplateMappings(settings, 'Daily', 'Templates/daily.md');
@@ -185,7 +210,9 @@ describe('Settings Utilities', () => {
           Daily: 'Templates/daily.md'
         },
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       };
 
       const updated = removeTemplateMapping(settings, 'Daily');
@@ -199,7 +226,9 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
 
-        templatesFolder: 'Templates'
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
       };
 
       const updated = removeTemplateMapping(settings, 'NonExistent');

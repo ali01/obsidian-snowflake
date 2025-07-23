@@ -42,6 +42,7 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     this.addHeader(containerEl);
     this.addGeneralSettings(containerEl);
     this.addTemplateMappings(containerEl);
+    this.addVariableFormatSettings(containerEl);
     this.addHelpSection(containerEl);
   }
 
@@ -74,6 +75,80 @@ export class SnowflakeSettingTab extends PluginSettingTab {
           });
         return text;
       });
+  }
+
+  private addVariableFormatSettings(containerEl: HTMLElement): void {
+    containerEl.createEl('h2', { text: 'Variable Formats' });
+    containerEl.createEl('p', {
+      text: 'Customize the format for date and time variables in templates',
+      cls: 'setting-item-description'
+    });
+
+    // Date format setting
+    new Setting(containerEl)
+      .setName('Date format')
+      .setDesc('Format for {{date}} variable (uses moment.js format)')
+      .addText((text) => {
+        text.setPlaceholder('YYYY-MM-DD').setValue(this.plugin.settings.dateFormat);
+
+        // Add example preview
+        const preview = text.inputEl.parentElement?.createDiv({
+          cls: 'setting-item-description',
+          text: `Preview: ${window.moment().format(this.plugin.settings.dateFormat)}`
+        });
+
+        // Update preview on change
+        text.onChange(async (value) => {
+          const format = value || 'YYYY-MM-DD';
+          this.plugin.settings.dateFormat = format;
+          await this.plugin.saveSettings();
+          if (preview) {
+            try {
+              preview.textContent = `Preview: ${window.moment().format(format)}`;
+            } catch {
+              preview.textContent = 'Preview: Invalid format';
+            }
+          }
+        });
+
+        return text;
+      });
+
+    // Time format setting
+    new Setting(containerEl)
+      .setName('Time format')
+      .setDesc('Format for {{time}} variable (uses moment.js format)')
+      .addText((text) => {
+        text.setPlaceholder('HH:mm').setValue(this.plugin.settings.timeFormat);
+
+        // Add example preview
+        const preview = text.inputEl.parentElement?.createDiv({
+          cls: 'setting-item-description',
+          text: `Preview: ${window.moment().format(this.plugin.settings.timeFormat)}`
+        });
+
+        // Update preview on change
+        text.onChange(async (value) => {
+          const format = value || 'HH:mm';
+          this.plugin.settings.timeFormat = format;
+          await this.plugin.saveSettings();
+          if (preview) {
+            try {
+              preview.textContent = `Preview: ${window.moment().format(format)}`;
+            } catch {
+              preview.textContent = 'Preview: Invalid format';
+            }
+          }
+        });
+
+        return text;
+      });
+
+    // Add format reference link
+    containerEl.createEl('p', {
+      cls: 'setting-item-description',
+      text: 'Common formats: YYYY-MM-DD, DD/MM/YYYY, MMM DD YYYY, HH:mm:ss, h:mm A'
+    });
   }
 
   private addTemplateMappings(containerEl: HTMLElement): void {
@@ -195,8 +270,12 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     });
 
     variableList.createEl('li', { text: '{{title}} - The filename without extension' });
-    variableList.createEl('li', { text: '{{date}} - Current date (YYYY-MM-DD format)' });
-    variableList.createEl('li', { text: '{{time}} - Current time (HH:mm format)' });
+    variableList.createEl('li', {
+      text: `{{date}} - Current date (using your format: ${this.plugin.settings.dateFormat})`
+    });
+    variableList.createEl('li', {
+      text: `{{time}} - Current time (using your format: ${this.plugin.settings.timeFormat})`
+    });
     variableList.createEl('li', { text: '{{snowflake_id}} - Unique 10-character ID' });
   }
 

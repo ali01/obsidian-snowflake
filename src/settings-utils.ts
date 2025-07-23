@@ -49,7 +49,11 @@ export function areSettingsValid(settings: unknown): settings is SnowflakeSettin
     'templateMappings' in s &&
     isValidTemplateMapping(s.templateMappings) &&
     'templatesFolder' in s &&
-    typeof s.templatesFolder === 'string'
+    typeof s.templatesFolder === 'string' &&
+    'dateFormat' in s &&
+    typeof s.dateFormat === 'string' &&
+    'timeFormat' in s &&
+    typeof s.timeFormat === 'string'
   );
 }
 
@@ -141,6 +145,12 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
   if (!('templatesFolder' in s)) {
     errors.push('Missing required field: templatesFolder');
   }
+  if (!('dateFormat' in s)) {
+    errors.push('Missing required field: dateFormat');
+  }
+  if (!('timeFormat' in s)) {
+    errors.push('Missing required field: timeFormat');
+  }
 
   // Check types
   if ('templateMappings' in s && !isValidTemplateMapping(s.templateMappings)) {
@@ -148,6 +158,12 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
   }
   if ('templatesFolder' in s && typeof s.templatesFolder !== 'string') {
     errors.push('templatesFolder must be a string');
+  }
+  if ('dateFormat' in s && typeof s.dateFormat !== 'string') {
+    errors.push('dateFormat must be a string');
+  }
+  if ('timeFormat' in s && typeof s.timeFormat !== 'string') {
+    errors.push('timeFormat must be a string');
   }
 
   // Validate template mapping values
@@ -222,6 +238,16 @@ export function migrateSettings(settings: unknown): SnowflakeSettings {
   // Templates folder
   if ('templatesFolder' in s && typeof s.templatesFolder === 'string') {
     migrated.templatesFolder = s.templatesFolder;
+  }
+
+  // Date format
+  if ('dateFormat' in s && typeof s.dateFormat === 'string') {
+    migrated.dateFormat = s.dateFormat;
+  }
+
+  // Time format
+  if ('timeFormat' in s && typeof s.timeFormat === 'string') {
+    migrated.timeFormat = s.timeFormat;
   }
 
   return migrated;

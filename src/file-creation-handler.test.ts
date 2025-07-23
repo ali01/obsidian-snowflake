@@ -44,7 +44,9 @@ describe('FileCreationHandler', () => {
         Projects: 'Templates/project.md'
       },
 
-      templatesFolder: 'Templates'
+      templatesFolder: 'Templates',
+      dateFormat: 'YYYY-MM-DD',
+      timeFormat: 'HH:mm'
     };
 
     // Create handler

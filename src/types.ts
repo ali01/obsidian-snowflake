@@ -42,6 +42,8 @@ export interface TemplateMapping {
 export interface SnowflakeSettings {
   templateMappings: TemplateMapping;
   templatesFolder: string;
+  dateFormat: string;
+  timeFormat: string;
 }
 
 /**

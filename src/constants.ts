@@ -16,7 +16,13 @@ export const DEFAULT_SETTINGS: SnowflakeSettings = {
   templateMappings: {},
 
   // Base directory where templates are stored
-  templatesFolder: 'Templates'
+  templatesFolder: 'Templates',
+
+  // Date format for {{date}} variable (uses moment.js format)
+  dateFormat: 'YYYY-MM-DD',
+
+  // Time format for {{time}} variable (uses moment.js format)
+  timeFormat: 'HH:mm'
 };
 
 /**
