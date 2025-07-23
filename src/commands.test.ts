@@ -6,12 +6,10 @@ import { SnowflakeCommands } from './commands';
 import { Plugin, Notice, Editor, MarkdownView, MarkdownFileInfo, TFile, TFolder } from 'obsidian';
 import { SnowflakeSettings } from './types';
 import { TemplateApplicator } from './template-applicator';
-import { FolderSuggestModal } from './ui/folder-modal';
 import { ConfirmationModal } from './ui/confirmation-modal';
 
 // Mock the dependencies
 jest.mock('./template-applicator');
-jest.mock('./ui/folder-modal');
 jest.mock('./ui/confirmation-modal');
 jest.mock('obsidian', () => ({
   ...jest.requireActual('obsidian'),
@@ -23,7 +21,6 @@ describe('SnowflakeCommands', () => {
   let mockPlugin: Plugin;
   let settings: SnowflakeSettings;
   let mockTemplateApplicator: jest.Mocked<TemplateApplicator>;
-  let mockFolderModal: any;
   let mockConfirmationModal: any;
   let consoleErrorSpy: jest.SpyInstance;
 
@@ -33,15 +30,6 @@ describe('SnowflakeCommands', () => {
 
     // Mock console.error to prevent noise in tests
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
-
-    // Mock FolderSuggestModal constructor
-    mockFolderModal = {
-      open: jest.fn()
-    };
-    (FolderSuggestModal as jest.Mock).mockImplementation((app, callback) => {
-      mockFolderModal.callback = callback;
-      return mockFolderModal;
-    });
 
     // Mock ConfirmationModal constructor
     mockConfirmationModal = {
@@ -86,23 +74,16 @@ describe('SnowflakeCommands', () => {
   });
 
   describe('registerCommands', () => {
-    test('Should register two commands', () => {
+    test('Should register one command', () => {
       commands.registerCommands();
 
-      expect(mockPlugin.addCommand).toHaveBeenCalledTimes(2);
+      expect(mockPlugin.addCommand).toHaveBeenCalledTimes(1);
 
-      // Check first command
+      // Check the command
       expect(mockPlugin.addCommand).toHaveBeenCalledWith({
         id: 'apply-template-to-current-note',
         name: 'Apply mapped templates',
         editorCallback: expect.any(Function)
-      });
-
-      // Check second command
-      expect(mockPlugin.addCommand).toHaveBeenCalledWith({
-        id: 'apply-template-to-folder',
-        name: 'Apply mapped templates to all notes in folder',
-        callback: expect.any(Function)
       });
     });
   });
@@ -213,43 +194,67 @@ describe('SnowflakeCommands', () => {
     });
   });
 
-  describe('Apply mapped templates to all notes in folder command', () => {
-    let folderCallback: () => void;
+  describe('applyTemplateToFolderPath', () => {
+    test('Should process markdown files in the specified folder', async () => {
+      const mockFolder = Object.assign(new TFolder(), {
+        children: [
+          Object.assign(new TFile(), {
+            extension: 'md',
+            basename: 'test',
+            path: 'folder/test.md'
+          })
+        ],
+        path: 'folder'
+      });
 
-    beforeEach(() => {
-      commands.registerCommands();
-      // Get the registered callback
-      folderCallback = (mockPlugin.addCommand as jest.Mock).mock.calls[1][0].callback;
+      mockPlugin.app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFolder);
+
+      mockTemplateApplicator.applyTemplate.mockResolvedValue({
+        success: true,
+        message: 'Applied'
+      });
+
+      // Auto-confirm the dialog
+      (ConfirmationModal as jest.Mock).mockImplementationOnce(
+        (app, title, message, onConfirm, onCancel) => {
+          const modal = mockConfirmationModal;
+          modal.onConfirm = onConfirm;
+          modal.onCancel = onCancel;
+          setTimeout(() => onConfirm(), 0);
+          return modal;
+        }
+      );
+
+      await commands.applyTemplateToFolderPath('folder');
+
+      // Wait for async processing
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockPlugin.app.vault.getAbstractFileByPath).toHaveBeenCalledWith('folder');
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalled();
+      expect(Notice).toHaveBeenCalledWith('Templates applied to 1 notes');
     });
 
-    test('REQ-019: Should show folder selection modal', () => {
-      folderCallback();
+    test('Should show error when folder does not exist', async () => {
+      mockPlugin.app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(null);
 
-      expect(FolderSuggestModal).toHaveBeenCalledWith(mockPlugin.app, expect.any(Function));
-      expect(mockFolderModal.open).toHaveBeenCalled();
+      await commands.applyTemplateToFolderPath('nonexistent');
+
+      expect(Notice).toHaveBeenCalledWith('Folder not found: nonexistent');
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
   });
 
-  describe('processFolderBatch', () => {
-    let processFolderBatch: (folder: TFolder) => Promise<void>;
-
-    beforeEach(() => {
-      commands.registerCommands();
-
-      // Trigger the folder command to register the callback
-      const folderCallback = (mockPlugin.addCommand as jest.Mock).mock.calls[1][0].callback;
-      folderCallback();
-
-      // Get the folder selection callback
-      processFolderBatch = mockFolderModal.callback;
-    });
-
+  describe('Batch processing (via applyTemplateToFolderPath)', () => {
     test('Should show notice when no markdown files found', async () => {
-      const mockFolder = {
-        children: []
-      } as any;
+      const mockFolder = Object.assign(new TFolder(), {
+        children: [],
+        path: 'folder'
+      });
 
-      await processFolderBatch(mockFolder);
+      mockPlugin.app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFolder);
+
+      await commands.applyTemplateToFolderPath('folder');
 
       expect(Notice).toHaveBeenCalledWith('No markdown files found in selected folder');
     });
@@ -271,6 +276,8 @@ describe('SnowflakeCommands', () => {
         path: 'folder'
       });
 
+      mockPlugin.app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFolder);
+
       mockTemplateApplicator.applyTemplate.mockResolvedValue({
         success: true,
         message: 'Applied'
@@ -287,7 +294,7 @@ describe('SnowflakeCommands', () => {
         }
       );
 
-      await processFolderBatch(mockFolder);
+      await commands.applyTemplateToFolderPath('folder');
 
       // Wait for all batches to complete (3 batches with 10ms delay between each)
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -317,6 +324,8 @@ describe('SnowflakeCommands', () => {
         path: 'folder'
       });
 
+      mockPlugin.app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFolder);
+
       // Make half succeed and half fail
       mockTemplateApplicator.applyTemplate
         .mockResolvedValueOnce({ success: true, message: 'Applied' })
@@ -337,7 +346,7 @@ describe('SnowflakeCommands', () => {
         }
       );
 
-      await processFolderBatch(mockFolder);
+      await commands.applyTemplateToFolderPath('folder');
 
       // Wait for batch processing to complete
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -376,6 +385,8 @@ describe('SnowflakeCommands', () => {
         path: 'folder'
       });
 
+      mockPlugin.app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFolder);
+
       mockTemplateApplicator.applyTemplate.mockResolvedValue({
         success: true,
         message: 'Applied'
@@ -392,7 +403,7 @@ describe('SnowflakeCommands', () => {
         }
       );
 
-      await processFolderBatch(mockFolder);
+      await commands.applyTemplateToFolderPath('folder');
 
       // Wait for async processing
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -420,6 +431,8 @@ describe('SnowflakeCommands', () => {
         path: 'folder'
       });
 
+      mockPlugin.app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFolder);
+
       mockTemplateApplicator.applyTemplate.mockResolvedValue({
         success: true,
         message: 'Applied'
@@ -437,7 +450,7 @@ describe('SnowflakeCommands', () => {
         }
       );
 
-      await processFolderBatch(mockFolder);
+      await commands.applyTemplateToFolderPath('folder');
 
       // Verify confirmation dialog was shown with correct message
       expect(ConfirmationModal).toHaveBeenCalledWith(
@@ -471,6 +484,8 @@ describe('SnowflakeCommands', () => {
         path: 'folder'
       });
 
+      mockPlugin.app.vault.getAbstractFileByPath = jest.fn().mockReturnValue(mockFolder);
+
       // Simulate user cancelling
       (ConfirmationModal as jest.Mock).mockImplementationOnce(
         (app, title, message, onConfirm, onCancel) => {
@@ -483,7 +498,7 @@ describe('SnowflakeCommands', () => {
         }
       );
 
-      await processFolderBatch(mockFolder);
+      await commands.applyTemplateToFolderPath('folder');
 
       // Wait a bit to ensure no async processing happens
       await new Promise((resolve) => setTimeout(resolve, 50));

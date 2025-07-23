@@ -32,16 +32,16 @@ export default class SnowflakePlugin extends Plugin {
     // Load saved settings or use defaults
     await this.loadSettings();
 
-    // Add settings tab to Obsidian settings
-    this.addSettingTab(new SnowflakeSettingTab(this.app, this));
+    // Initialize commands first so they're available for settings tab
+    this.commands = new SnowflakeCommands(this, this.settings);
+    this.commands.registerCommands();
+
+    // Add settings tab to Obsidian settings (after commands are initialized)
+    this.addSettingTab(new SnowflakeSettingTab(this.app, this, this.commands));
 
     // Initialize file creation handler
     this.fileCreationHandler = new FileCreationHandler(this, this.app.vault, this.settings);
     this.fileCreationHandler.start();
-
-    // Initialize and register commands
-    this.commands = new SnowflakeCommands(this, this.settings);
-    this.commands.registerCommands();
   }
 
   onunload(): void {

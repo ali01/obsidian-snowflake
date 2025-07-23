@@ -34,7 +34,6 @@ import type {
   MarkdownFile
 } from './types';
 import { TemplateApplicator } from './template-applicator';
-import { FolderSuggestModal } from './ui/folder-modal';
 import { ConfirmationModal } from './ui/confirmation-modal';
 import { ErrorHandler } from './error-handler';
 
@@ -69,15 +68,6 @@ export class SnowflakeCommands {
         this.applyTemplateToCurrentNote(editor, view).catch(() => {
           // Error is handled in the method
         });
-      }
-    });
-
-    // REQ-019: Command to apply templates to all notes in a folder
-    this.plugin.addCommand({
-      id: 'apply-template-to-folder',
-      name: 'Apply mapped templates to all notes in folder',
-      callback: () => {
-        this.applyTemplateToFolder();
       }
     });
   }
@@ -124,23 +114,6 @@ export class SnowflakeCommands {
   }
 
   /**
-   * Apply templates to all notes in a selected folder
-   *
-   * REQ-019: Show folder selection dialog
-   * REQ-020: Apply to ALL markdown files in folder
-   * REQ-021: Process asynchronously
-   * REQ-022: Show completion notice
-   */
-  private applyTemplateToFolder(): void {
-    // REQ-019: Show folder selection dialog
-    new FolderSuggestModal(this.plugin.app, (folder: TFolder) => {
-      this.processFolderBatch(folder).catch(() => {
-        // Error is handled in the method
-      });
-    }).open();
-  }
-
-  /**
    * Process all markdown files in a folder
    *
    * REQ-020: Process ALL markdown files
@@ -164,6 +137,24 @@ export class SnowflakeCommands {
     new Notice(`Processing ${String(markdownFiles.length)} files...`);
     const result = await this.processFilesInBatches(markdownFiles);
     this.showCompletionNotice(result);
+  }
+
+  /**
+   * Apply template to all notes in a folder by path
+   *
+   * Public method for use from settings panel
+   *
+   * @param folderPath - Path to the folder to process
+   */
+  async applyTemplateToFolderPath(folderPath: string): Promise<void> {
+    const folder = this.plugin.app.vault.getAbstractFileByPath(folderPath);
+
+    if (!folder || !(folder instanceof TFolder)) {
+      new Notice(`Folder not found: ${folderPath}`);
+      return;
+    }
+
+    await this.processFolderBatch(folder);
   }
 
   private getMarkdownFiles(folder: TFolder): TFile[] {

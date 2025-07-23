@@ -21,6 +21,7 @@ import { FolderInputSuggest } from './folder-input-suggest';
 import { FileInputSuggest } from './file-input-suggest';
 import { ErrorHandler } from '../error-handler';
 import type { ErrorContext } from '../types';
+import type { SnowflakeCommands } from '../commands';
 
 /**
  * Settings tab for configuring the Snowflake plugin
@@ -28,11 +29,13 @@ import type { ErrorContext } from '../types';
 export class SnowflakeSettingTab extends PluginSettingTab {
   plugin: SnowflakePlugin;
   private readonly errorHandler: ErrorHandler;
+  private readonly commands: SnowflakeCommands;
 
-  constructor(app: App, plugin: SnowflakePlugin) {
+  constructor(app: App, plugin: SnowflakePlugin, commands: SnowflakeCommands) {
     super(app, plugin);
     this.plugin = plugin;
     this.errorHandler = ErrorHandler.getInstance();
+    this.commands = commands;
   }
 
   display(): void {
@@ -158,6 +161,15 @@ export class SnowflakeSettingTab extends PluginSettingTab {
         .setTooltip('Preview template')
         .onClick(async () => {
           await this.previewTemplate(templatePath);
+        })
+    );
+
+    setting.addButton((button) =>
+      button
+        .setIcon('play')
+        .setTooltip('Apply template to all notes in folder')
+        .onClick(async () => {
+          await this.commands.applyTemplateToFolderPath(folderPath);
         })
     );
 
