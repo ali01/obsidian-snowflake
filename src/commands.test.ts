@@ -94,20 +94,20 @@ describe('SnowflakeCommands', () => {
       // Check first command
       expect(mockPlugin.addCommand).toHaveBeenCalledWith({
         id: 'apply-template-to-current-note',
-        name: 'Apply template to current note',
+        name: 'Apply mapped templates',
         editorCallback: expect.any(Function)
       });
 
       // Check second command
       expect(mockPlugin.addCommand).toHaveBeenCalledWith({
         id: 'apply-template-to-folder',
-        name: 'Apply template to all notes in folder',
+        name: 'Apply mapped templates to all notes in folder',
         callback: expect.any(Function)
       });
     });
   });
 
-  describe('Apply template to current note command', () => {
+  describe('Apply mapped templates command', () => {
     let editorCallback: (editor: Editor, view: MarkdownView | MarkdownFileInfo) => void;
     let mockEditor: Editor;
     let mockView: MarkdownView | MarkdownFileInfo;
@@ -213,7 +213,7 @@ describe('SnowflakeCommands', () => {
     });
   });
 
-  describe('Apply template to folder command', () => {
+  describe('Apply mapped templates to all notes in folder command', () => {
     let folderCallback: () => void;
 
     beforeEach(() => {

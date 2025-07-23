@@ -64,7 +64,7 @@ export class SnowflakeCommands {
     // REQ-017: Command to apply template to current note
     this.plugin.addCommand({
       id: 'apply-template-to-current-note',
-      name: 'Apply template to current note',
+      name: 'Apply mapped templates',
       editorCallback: (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
         this.applyTemplateToCurrentNote(editor, view).catch(() => {
           // Error is handled in the method
@@ -75,7 +75,7 @@ export class SnowflakeCommands {
     // REQ-019: Command to apply templates to all notes in a folder
     this.plugin.addCommand({
       id: 'apply-template-to-folder',
-      name: 'Apply template to all notes in folder',
+      name: 'Apply mapped templates to all notes in folder',
       callback: () => {
         this.applyTemplateToFolder();
       }
