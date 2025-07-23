@@ -57,7 +57,7 @@ describe('SnowflakeCommands', () => {
         Projects: 'Templates/project.md'
       },
       defaultTemplate: 'Templates/default.md',
-      enableAutoTemplating: false, // Disabled to test REQ-025
+
       templatesFolder: 'Templates'
     };
 
@@ -513,8 +513,7 @@ describe('SnowflakeCommands', () => {
   describe('updateSettings', () => {
     test('Should update internal settings and applicator', () => {
       const newSettings: SnowflakeSettings = {
-        ...settings,
-        enableAutoTemplating: true
+        ...settings
       };
 
       commands.updateSettings(newSettings);

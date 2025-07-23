@@ -8,8 +8,8 @@
  * REQ-004: When a user creates any non-markdown file (like .txt, .pdf,
  * .json), the plugin shall NOT apply any template.
  *
- * REQ-005: While auto-templating is disabled in settings, the plugin shall
- * NOT automatically apply templates to any new files.
+ * The plugin automatically applies templates to all new markdown files
+ * based on their folder location.
  */
 
 import { TFile } from 'obsidian';
@@ -72,7 +72,6 @@ export class FileCreationHandler {
    * Handle file creation event
    *
    * REQ-004: Check if file is markdown before processing
-   * REQ-005: Check if auto-templating is enabled
    *
    * @param file - The newly created file
    */
@@ -95,11 +94,6 @@ export class FileCreationHandler {
   private shouldProcessFile(file: TFile): boolean {
     // REQ-004: Only process markdown files
     if (!isMarkdownFile(file)) {
-      return false;
-    }
-
-    // REQ-005: Check if auto-templating is enabled
-    if (!this.settings.enableAutoTemplating) {
       return false;
     }
 

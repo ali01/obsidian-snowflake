@@ -4,7 +4,6 @@
  * REQ-023: The plugin shall allow users to configure these settings:
  * - templateMappings: Which folders use which templates
  * - defaultTemplate: Fallback template for unmapped folders
- * - enableAutoTemplating: Turn automatic templating on/off
  * - templatesFolder: Where to look for template files
  *
  * REQ-024: When a user adds a folder→template mapping in settings, the plugin
@@ -58,24 +57,8 @@ export class SnowflakeSettingTab extends PluginSettingTab {
   private addGeneralSettings(containerEl: HTMLElement): void {
     containerEl.createEl('h2', { text: 'General Settings' });
 
-    this.addAutoTemplatingToggle(containerEl);
     this.addTemplatesFolderSetting(containerEl);
     this.addDefaultTemplateSetting(containerEl);
-  }
-
-  private addAutoTemplatingToggle(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName('Enable automatic templating')
-      .setDesc(
-        'When enabled, new notes will automatically have templates applied ' +
-          'based on their folder location'
-      )
-      .addToggle((toggle) =>
-        toggle.setValue(this.plugin.settings.enableAutoTemplating).onChange(async (value) => {
-          this.plugin.settings.enableAutoTemplating = value;
-          await this.plugin.saveSettings();
-        })
-      );
   }
 
   private addTemplatesFolderSetting(containerEl: HTMLElement): void {

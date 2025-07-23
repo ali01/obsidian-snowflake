@@ -44,7 +44,7 @@ describe('FileCreationHandler', () => {
         Projects: 'Templates/project.md'
       },
       defaultTemplate: 'Templates/default.md',
-      enableAutoTemplating: true,
+
       templatesFolder: 'Templates'
     };
 
@@ -107,18 +107,7 @@ describe('FileCreationHandler', () => {
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
-    test('REQ-005: Should skip when auto-templating is disabled', async () => {
-      settings.enableAutoTemplating = false;
-      handler.updateSettings(settings);
-
-      const file = createMockFile('test.md', 'Projects');
-
-      await handleFileCreation(file);
-
-      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
-    });
-
-    test('Should process markdown files when enabled', async () => {
+    test('Should process markdown files', async () => {
       const file = createMockFile('test.md', 'Projects');
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
       (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content for new file
@@ -180,8 +169,7 @@ describe('FileCreationHandler', () => {
   describe('updateSettings', () => {
     test('Should update internal settings and applicator', () => {
       const newSettings: SnowflakeSettings = {
-        ...settings,
-        enableAutoTemplating: false
+        ...settings
       };
 
       handler.updateSettings(newSettings);

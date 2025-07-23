@@ -1,17 +1,13 @@
 /**
  * Template Applicator
  *
- * REQ-005: While the global "Enable auto-templating" setting is disabled,
- * the plugin shall NOT automatically apply templates to new files.
- *
  * REQ-006: When applying a template to an existing file, the plugin shall
  * merge the template content with the existing content.
  *
  * REQ-007: When merging template body content with existing content, the plugin
  * shall insert the template body at the cursor position.
  *
- * REQ-025: Where auto-templating is disabled but a user runs a manual command,
- * the plugin shall still apply the template.
+ * REQ-025: Manual commands always apply templates regardless of other settings.
  */
 
 import { Notice } from 'obsidian';
@@ -63,8 +59,7 @@ export class TemplateApplicator {
   /**
    * Apply a template to a file
    *
-   * REQ-005: Check if auto-templating is enabled (unless manual)
-   * REQ-025: Allow manual application regardless of auto-templating setting
+   * REQ-025: Manual commands always work
    *
    * @param file - The file to apply template to
    * @param context - Command context (manual vs automatic)
@@ -76,10 +71,7 @@ export class TemplateApplicator {
     context: CommandContext = { isManualCommand: false },
     editor?: Editor
   ): Promise<ApplyResult> {
-    // REQ-005/REQ-025: Check if we should apply template
-    if (!this.shouldApplyTemplate(context)) {
-      return { success: false, message: 'Auto-templating is disabled' };
-    }
+    // Always apply templates (automatic templating is the core purpose of this plugin)
 
     // Get template chain for inheritance support
     const chain = this.loader.getTemplateChain(file);
@@ -109,10 +101,6 @@ export class TemplateApplicator {
     }
 
     return result;
-  }
-
-  private shouldApplyTemplate(context: CommandContext): boolean {
-    return context.isManualCommand || this.settings.enableAutoTemplating;
   }
 
   /**

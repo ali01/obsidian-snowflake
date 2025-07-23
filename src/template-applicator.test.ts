@@ -84,7 +84,7 @@ describe('TemplateApplicator', () => {
         Projects: 'Templates/project.md'
       },
       defaultTemplate: 'Templates/default.md',
-      enableAutoTemplating: true,
+
       templatesFolder: 'Templates'
     };
 
@@ -475,21 +475,7 @@ title: test
       expect(mockErrorHandler.handleError).toHaveBeenCalled();
     });
 
-    test('REQ-005: Should not apply template when auto-templating is disabled', async () => {
-      // Disable auto-templating
-      applicator.updateSettings({ ...settings, enableAutoTemplating: false });
-
-      const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
-
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('Auto-templating is disabled');
-      expect(mockVault.modify).not.toHaveBeenCalled();
-    });
-
-    test('REQ-025: Should apply template with manual command even when auto-templating is disabled', async () => {
-      // Disable auto-templating
-      applicator.updateSettings({ ...settings, enableAutoTemplating: false });
-
+    test('REQ-025: Should always apply template with manual command', async () => {
       const templateContent = `---
 title: {{title}}
 ---

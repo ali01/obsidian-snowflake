@@ -10,7 +10,6 @@ import type { SnowflakeSettings } from './types';
  * REQ-023: The plugin shall allow users to configure these settings:
  * - templateMappings: Which folders use which templates
  * - defaultTemplate: Fallback template for unmapped folders
- * - enableAutoTemplating: Turn automatic templating on/off
  * - templatesFolder: Where to look for template files
  */
 export const DEFAULT_SETTINGS: SnowflakeSettings = {
@@ -20,9 +19,6 @@ export const DEFAULT_SETTINGS: SnowflakeSettings = {
   // Fallback template for unmapped folders (REQ-003)
   // Empty string means no default template
   defaultTemplate: '',
-
-  // Master switch for automatic template application (REQ-005)
-  enableAutoTemplating: true,
 
   // Base directory where templates are stored
   templatesFolder: 'Templates'

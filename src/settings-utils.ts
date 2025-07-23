@@ -50,8 +50,6 @@ export function areSettingsValid(settings: unknown): settings is SnowflakeSettin
     isValidTemplateMapping(s.templateMappings) &&
     'defaultTemplate' in s &&
     typeof s.defaultTemplate === 'string' &&
-    'enableAutoTemplating' in s &&
-    typeof s.enableAutoTemplating === 'boolean' &&
     'templatesFolder' in s &&
     typeof s.templatesFolder === 'string'
   );
@@ -145,9 +143,6 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
   if (!('defaultTemplate' in s)) {
     errors.push('Missing required field: defaultTemplate');
   }
-  if (!('enableAutoTemplating' in s)) {
-    errors.push('Missing required field: enableAutoTemplating');
-  }
   if (!('templatesFolder' in s)) {
     errors.push('Missing required field: templatesFolder');
   }
@@ -158,9 +153,6 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
   }
   if ('defaultTemplate' in s && typeof s.defaultTemplate !== 'string') {
     errors.push('defaultTemplate must be a string');
-  }
-  if ('enableAutoTemplating' in s && typeof s.enableAutoTemplating !== 'boolean') {
-    errors.push('enableAutoTemplating must be a boolean');
   }
   if ('templatesFolder' in s && typeof s.templatesFolder !== 'string') {
     errors.push('templatesFolder must be a string');
@@ -227,13 +219,6 @@ export function migrateSettings(settings: unknown): SnowflakeSettings {
       s.defaultTemplate.startsWith('/') || s.defaultTemplate.startsWith('Templates/')
         ? s.defaultTemplate
         : `Templates/${s.defaultTemplate}`;
-  }
-
-  // Migrate auto templating
-  if ('autoApply' in s && typeof s.autoApply === 'boolean') {
-    migrated.enableAutoTemplating = s.autoApply;
-  } else if ('enableAutoTemplating' in s && typeof s.enableAutoTemplating === 'boolean') {
-    migrated.enableAutoTemplating = s.enableAutoTemplating;
   }
 
   // Templates folder

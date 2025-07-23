@@ -102,11 +102,6 @@ export default class SnowflakePlugin extends Plugin {
       this.settings.defaultTemplate = '';
     }
 
-    // Ensure enableAutoTemplating is a boolean
-    if (typeof this.settings.enableAutoTemplating !== 'boolean') {
-      this.settings.enableAutoTemplating = true;
-    }
-
     // Ensure templatesFolder is a non-empty string
     if (
       typeof this.settings.templatesFolder !== 'string' ||

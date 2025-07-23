@@ -34,20 +34,16 @@ export interface TemplateMapping {
  * REQ-023: The plugin shall allow users to configure these settings:
  * - templateMappings: Which folders use which templates
  * - defaultTemplate: Fallback template for unmapped folders
- * - enableAutoTemplating: Turn automatic templating on/off
  * - templatesFolder: Where to look for template files (default: "Templates")
  *
  * Fields:
  * - templateMappings: Folder-specific template assignments (REQ-002)
  * - defaultTemplate: Fallback template for unmapped folders (REQ-003)
- * - enableAutoTemplating: Master switch for automatic template application
- *   (REQ-005)
  * - templatesFolder: Base directory where templates are stored
  */
 export interface SnowflakeSettings {
   templateMappings: TemplateMapping;
   defaultTemplate: string; // empty string = no default (REQ-003)
-  enableAutoTemplating: boolean; // REQ-005: While disabled, no auto templates
   templatesFolder: string;
 }
 

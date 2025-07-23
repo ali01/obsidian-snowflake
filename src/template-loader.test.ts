@@ -78,7 +78,7 @@ describe('TemplateLoader', () => {
         '': 'Templates/root.md' // Root folder mapping
       },
       defaultTemplate: 'Templates/default.md',
-      enableAutoTemplating: true,
+
       templatesFolder: 'Templates'
     };
     loader = new TemplateLoader(mockVault as any, settings);

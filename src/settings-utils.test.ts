@@ -20,7 +20,7 @@ describe('Settings Utilities', () => {
       expect(settings).toEqual({
         templateMappings: {},
         defaultTemplate: '',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       });
     });
@@ -31,7 +31,7 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
         defaultTemplate: 'Templates/default.md',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       };
 
@@ -42,8 +42,7 @@ describe('Settings Utilities', () => {
 
     test('Should detect missing required fields', () => {
       const settings = {
-        templateMappings: {},
-        enableAutoTemplating: true
+        templateMappings: {}
       } as any;
 
       const result = validateSettings(settings);
@@ -56,7 +55,7 @@ describe('Settings Utilities', () => {
       const settings = {
         templateMappings: 'invalid',
         defaultTemplate: 123,
-        enableAutoTemplating: 'yes',
+
         templatesFolder: null
       } as any;
 
@@ -64,7 +63,7 @@ describe('Settings Utilities', () => {
       expect(result.isValid).toBe(false);
       expect(result.errors).toContain('templateMappings must be an object');
       expect(result.errors).toContain('defaultTemplate must be a string');
-      expect(result.errors).toContain('enableAutoTemplating must be a boolean');
+
       expect(result.errors).toContain('templatesFolder must be a string');
     });
 
@@ -75,7 +74,7 @@ describe('Settings Utilities', () => {
           Invalid: 123 as any
         },
         defaultTemplate: '',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       };
 
@@ -103,7 +102,7 @@ describe('Settings Utilities', () => {
           Projects: 'Templates/project.md'
         },
         defaultTemplate: 'Templates/default.md',
-        enableAutoTemplating: false,
+
         templatesFolder: 'Templates'
       });
     });
@@ -112,7 +111,7 @@ describe('Settings Utilities', () => {
       const currentSettings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
         defaultTemplate: 'Templates/default.md',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       };
 
@@ -122,8 +121,7 @@ describe('Settings Utilities', () => {
 
     test('Should handle partial migration', () => {
       const partialSettings = {
-        templateMappings: { Projects: 'project.md' },
-        enableAutoTemplating: true
+        templateMappings: { Projects: 'project.md' }
       };
 
       const migrated = migrateSettings(partialSettings as any);
@@ -137,7 +135,7 @@ describe('Settings Utilities', () => {
       const settings = {
         templateMappings: { Projects: '/absolute/path/project.md' },
         defaultTemplate: 'relative/default.md',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       };
 
@@ -153,7 +151,7 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
         defaultTemplate: '',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       };
 
@@ -169,7 +167,7 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/old-project.md' },
         defaultTemplate: '',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       };
 
@@ -182,7 +180,7 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
         defaultTemplate: '',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       };
 
@@ -201,7 +199,7 @@ describe('Settings Utilities', () => {
           Daily: 'Templates/daily.md'
         },
         defaultTemplate: '',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       };
 
@@ -216,7 +214,7 @@ describe('Settings Utilities', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
         defaultTemplate: '',
-        enableAutoTemplating: true,
+
         templatesFolder: 'Templates'
       };
 
