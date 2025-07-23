@@ -98,16 +98,15 @@ export class TemplateLoader {
       }
     }
 
-    // Check root folder mapping
+    // Check root folder mapping (both empty string and "/")
     if (this.settings.templateMappings['']) {
       return this.settings.templateMappings[''];
     }
-
-    // REQ-003: Use default template if no folder mapping found
-    if (this.settings.defaultTemplate) {
-      return this.settings.defaultTemplate;
+    if (this.settings.templateMappings['/']) {
+      return this.settings.templateMappings['/'];
     }
 
+    // No mapping found
     return null;
   }
 
@@ -196,13 +195,17 @@ export class TemplateLoader {
       }
     }
 
-    // If no folder mappings found, use default template if configured
-    if (templates.length === 0 && this.settings.defaultTemplate) {
-      templates.push({
-        path: this.settings.defaultTemplate,
-        folderPath: '',
-        depth: 0
-      });
+    // If no folder mappings found, check for root mapping
+    if (templates.length === 0) {
+      const rootTemplate =
+        this.settings.templateMappings[''] || this.settings.templateMappings['/'];
+      if (rootTemplate) {
+        templates.push({
+          path: rootTemplate,
+          folderPath: '',
+          depth: 0
+        });
+      }
     }
 
     return {

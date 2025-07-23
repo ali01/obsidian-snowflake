@@ -97,11 +97,6 @@ export default class SnowflakePlugin extends Plugin {
       this.settings.templateMappings = {};
     }
 
-    // Ensure defaultTemplate is a string
-    if (typeof this.settings.defaultTemplate !== 'string') {
-      this.settings.defaultTemplate = '';
-    }
-
     // Ensure templatesFolder is a non-empty string
     if (
       typeof this.settings.templatesFolder !== 'string' ||

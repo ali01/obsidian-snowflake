@@ -19,7 +19,6 @@ describe('Settings Utilities', () => {
 
       expect(settings).toEqual({
         templateMappings: {},
-        defaultTemplate: '',
 
         templatesFolder: 'Templates'
       });
@@ -30,7 +29,6 @@ describe('Settings Utilities', () => {
     test('Should validate correct settings', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
-        defaultTemplate: 'Templates/default.md',
 
         templatesFolder: 'Templates'
       };
@@ -47,14 +45,12 @@ describe('Settings Utilities', () => {
 
       const result = validateSettings(settings);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Missing required field: defaultTemplate');
       expect(result.errors).toContain('Missing required field: templatesFolder');
     });
 
     test('Should detect invalid types', () => {
       const settings = {
         templateMappings: 'invalid',
-        defaultTemplate: 123,
 
         templatesFolder: null
       } as any;
@@ -62,7 +58,6 @@ describe('Settings Utilities', () => {
       const result = validateSettings(settings);
       expect(result.isValid).toBe(false);
       expect(result.errors).toContain('templateMappings must be an object');
-      expect(result.errors).toContain('defaultTemplate must be a string');
 
       expect(result.errors).toContain('templatesFolder must be a string');
     });
@@ -73,7 +68,6 @@ describe('Settings Utilities', () => {
           Projects: 'Templates/project.md',
           Invalid: 123 as any
         },
-        defaultTemplate: '',
 
         templatesFolder: 'Templates'
       };
@@ -99,10 +93,9 @@ describe('Settings Utilities', () => {
 
       expect(migrated).toEqual({
         templateMappings: {
-          Projects: 'Templates/project.md'
+          Projects: 'Templates/project.md',
+          '/': 'Templates/default.md'
         },
-        defaultTemplate: 'Templates/default.md',
-
         templatesFolder: 'Templates'
       });
     });
@@ -110,7 +103,6 @@ describe('Settings Utilities', () => {
     test('Should handle already migrated settings', () => {
       const currentSettings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
-        defaultTemplate: 'Templates/default.md',
 
         templatesFolder: 'Templates'
       };
@@ -127,14 +119,12 @@ describe('Settings Utilities', () => {
       const migrated = migrateSettings(partialSettings as any);
 
       expect(migrated.templateMappings).toEqual({ Projects: 'Templates/project.md' });
-      expect(migrated.defaultTemplate).toBe('');
       expect(migrated.templatesFolder).toBe('Templates');
     });
 
     test('Should preserve absolute template paths', () => {
       const settings = {
         templateMappings: { Projects: '/absolute/path/project.md' },
-        defaultTemplate: 'relative/default.md',
 
         templatesFolder: 'Templates'
       };
@@ -142,7 +132,6 @@ describe('Settings Utilities', () => {
       const migrated = migrateSettings(settings as any);
 
       expect(migrated.templateMappings['Projects']).toBe('/absolute/path/project.md');
-      expect(migrated.defaultTemplate).toBe('relative/default.md');
     });
   });
 
@@ -150,7 +139,6 @@ describe('Settings Utilities', () => {
     test('Should add new mapping', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
-        defaultTemplate: '',
 
         templatesFolder: 'Templates'
       };
@@ -166,7 +154,6 @@ describe('Settings Utilities', () => {
     test('Should update existing mapping', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/old-project.md' },
-        defaultTemplate: '',
 
         templatesFolder: 'Templates'
       };
@@ -179,7 +166,6 @@ describe('Settings Utilities', () => {
     test('Should create new object to maintain immutability', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
-        defaultTemplate: '',
 
         templatesFolder: 'Templates'
       };
@@ -198,7 +184,6 @@ describe('Settings Utilities', () => {
           Projects: 'Templates/project.md',
           Daily: 'Templates/daily.md'
         },
-        defaultTemplate: '',
 
         templatesFolder: 'Templates'
       };
@@ -213,7 +198,6 @@ describe('Settings Utilities', () => {
     test('Should handle non-existent mapping', () => {
       const settings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
-        defaultTemplate: '',
 
         templatesFolder: 'Templates'
       };

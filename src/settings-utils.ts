@@ -48,8 +48,6 @@ export function areSettingsValid(settings: unknown): settings is SnowflakeSettin
   return (
     'templateMappings' in s &&
     isValidTemplateMapping(s.templateMappings) &&
-    'defaultTemplate' in s &&
-    typeof s.defaultTemplate === 'string' &&
     'templatesFolder' in s &&
     typeof s.templatesFolder === 'string'
   );
@@ -140,9 +138,6 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
   if (!('templateMappings' in s)) {
     errors.push('Missing required field: templateMappings');
   }
-  if (!('defaultTemplate' in s)) {
-    errors.push('Missing required field: defaultTemplate');
-  }
   if (!('templatesFolder' in s)) {
     errors.push('Missing required field: templatesFolder');
   }
@@ -150,9 +145,6 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
   // Check types
   if ('templateMappings' in s && !isValidTemplateMapping(s.templateMappings)) {
     errors.push('templateMappings must be an object');
-  }
-  if ('defaultTemplate' in s && typeof s.defaultTemplate !== 'string') {
-    errors.push('defaultTemplate must be a string');
   }
   if ('templatesFolder' in s && typeof s.templatesFolder !== 'string') {
     errors.push('templatesFolder must be a string');
@@ -209,16 +201,22 @@ export function migrateSettings(settings: unknown): SnowflakeSettings {
     }
   }
 
-  // Migrate default template
+  // Migrate default template to root mapping
   if ('defaultTemplateFile' in s && typeof s.defaultTemplateFile === 'string') {
-    migrated.defaultTemplate = s.defaultTemplateFile.startsWith('/')
+    const defaultPath = s.defaultTemplateFile.startsWith('/')
       ? s.defaultTemplateFile
       : `Templates/${s.defaultTemplateFile}`;
-  } else if ('defaultTemplate' in s && typeof s.defaultTemplate === 'string') {
-    migrated.defaultTemplate =
+    migrated.templateMappings['/'] = defaultPath;
+  } else if (
+    'defaultTemplate' in s &&
+    typeof s.defaultTemplate === 'string' &&
+    s.defaultTemplate !== ''
+  ) {
+    const defaultPath =
       s.defaultTemplate.startsWith('/') || s.defaultTemplate.startsWith('Templates/')
         ? s.defaultTemplate
         : `Templates/${s.defaultTemplate}`;
+    migrated.templateMappings['/'] = defaultPath;
   }
 
   // Templates folder

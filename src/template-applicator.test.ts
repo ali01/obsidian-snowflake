@@ -83,7 +83,6 @@ describe('TemplateApplicator', () => {
       templateMappings: {
         Projects: 'Templates/project.md'
       },
-      defaultTemplate: 'Templates/default.md',
 
       templatesFolder: 'Templates'
     };
@@ -651,7 +650,7 @@ Template`;
       expect(result2.success).toBe(true);
       const finalContent = mockVault.modify.mock.calls[mockVault.modify.mock.calls.length - 1][1];
       expect(finalContent).toBe('---\ntitle: Test\n---\n# Test\n\nContent\n');
-      expect(finalContent).not.toMatch(/\n{3,}/);
+      expect(finalContent).not.toMatch(/\n{3}/);
     });
   });
 
@@ -725,8 +724,7 @@ title: test
   describe('updateSettings', () => {
     test('Should update internal settings and dependencies', () => {
       const newSettings: SnowflakeSettings = {
-        ...settings,
-        defaultTemplate: 'Templates/new-default.md'
+        ...settings
       };
 
       applicator.updateSettings(newSettings);

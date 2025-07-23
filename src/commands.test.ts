@@ -56,7 +56,6 @@ describe('SnowflakeCommands', () => {
       templateMappings: {
         Projects: 'Templates/project.md'
       },
-      defaultTemplate: 'Templates/default.md',
 
       templatesFolder: 'Templates'
     };

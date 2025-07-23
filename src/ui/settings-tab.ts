@@ -3,7 +3,6 @@
  *
  * REQ-023: The plugin shall allow users to configure these settings:
  * - templateMappings: Which folders use which templates
- * - defaultTemplate: Fallback template for unmapped folders
  * - templatesFolder: Where to look for template files
  *
  * REQ-024: When a user adds a folder→template mapping in settings, the plugin
@@ -15,7 +14,6 @@ import type { App } from 'obsidian';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import type SnowflakePlugin from '../main';
 import { FolderInputSuggest } from './folder-input-suggest';
-import { FileInputSuggest } from './file-input-suggest';
 import { AddMappingModal } from './add-mapping-modal';
 import { ErrorHandler } from '../error-handler';
 import type { ErrorContext } from '../types';
@@ -58,7 +56,6 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     containerEl.createEl('h2', { text: 'General Settings' });
 
     this.addTemplatesFolderSetting(containerEl);
-    this.addDefaultTemplateSetting(containerEl);
   }
 
   private addTemplatesFolderSetting(containerEl: HTMLElement): void {
@@ -72,23 +69,6 @@ export class SnowflakeSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.templatesFolder)
           .onChange(async (value) => {
             this.plugin.settings.templatesFolder = value || 'Templates';
-            await this.plugin.saveSettings();
-          });
-        return text;
-      });
-  }
-
-  private addDefaultTemplateSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
-      .setName('Default template')
-      .setDesc('Template to use for folders without specific mappings (leave empty for none)')
-      .addText((text) => {
-        new FileInputSuggest(this.app, text.inputEl, 'md', this.plugin.settings.templatesFolder);
-        text
-          .setPlaceholder('Templates/default.md')
-          .setValue(this.plugin.settings.defaultTemplate)
-          .onChange(async (value) => {
-            this.plugin.settings.defaultTemplate = value;
             await this.plugin.saveSettings();
           });
         return text;

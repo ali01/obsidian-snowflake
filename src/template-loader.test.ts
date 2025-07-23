@@ -77,7 +77,6 @@ describe('TemplateLoader', () => {
         Daily: 'Templates/daily.md',
         '': 'Templates/root.md' // Root folder mapping
       },
-      defaultTemplate: 'Templates/default.md',
 
       templatesFolder: 'Templates'
     };
@@ -138,17 +137,20 @@ describe('TemplateLoader', () => {
       expect(templatePath).toBe('Templates/project.md');
     });
 
-    test('REQ-003: Should return default template when no mapping', () => {
-      // Remove root mapping so default is used
-      delete settings.templateMappings[''];
+    test('REQ-003: Should return null when no mapping exists', () => {
+      // Create a new loader with no mappings
+      const loaderNoMappings = new TemplateLoader(mockVault as any, {
+        templateMappings: {},
+        templatesFolder: 'Templates'
+      });
 
       const file = {
         basename: 'test',
         parent: { path: 'Other/Folder' }
       } as MarkdownFile;
 
-      const templatePath = loader.getTemplateForFile(file);
-      expect(templatePath).toBe('Templates/default.md');
+      const templatePath = loaderNoMappings.getTemplateForFile(file);
+      expect(templatePath).toBe(null);
     });
 
     test('Should return root template for root files', () => {
@@ -162,7 +164,6 @@ describe('TemplateLoader', () => {
     });
 
     test('Should return null when no template configured', () => {
-      settings.defaultTemplate = '';
       settings.templateMappings = {};
 
       const file = {
@@ -201,8 +202,9 @@ describe('TemplateLoader', () => {
     test('Should update settings reference', () => {
       const newSettings: SnowflakeSettings = {
         ...settings,
-        templateMappings: {}, // Clear mappings
-        defaultTemplate: 'Templates/new-default.md'
+        templateMappings: {
+          '/': 'Templates/new-default.md'
+        }
       };
 
       loader.updateSettings(newSettings);
@@ -308,35 +310,28 @@ describe('TemplateLoader', () => {
       expect(chain.templates[0].path).toBe('Templates/project.md');
     });
 
-    test('Should use default template when no folder mappings', () => {
+    test('Should return empty chain when no folder mappings', () => {
       const file = {
         basename: 'test',
         parent: { path: 'Unknown/Path' }
       } as MarkdownFile;
 
-      // Clear template mappings to test default template
+      // Clear template mappings
       loader.updateSettings({
         ...settings,
-        templateMappings: {},
-        defaultTemplate: 'Templates/default.md'
+        templateMappings: {}
       });
 
       const chain = loader.getTemplateChain(file);
 
-      expect(chain.templates).toHaveLength(1);
+      expect(chain.templates).toHaveLength(0);
       expect(chain.hasInheritance).toBe(false);
-      expect(chain.templates[0]).toEqual({
-        path: 'Templates/default.md',
-        folderPath: '',
-        depth: 0
-      });
     });
 
     test('Should return empty chain when no templates configured', () => {
       loader.updateSettings({
         ...settings,
-        templateMappings: {},
-        defaultTemplate: ''
+        templateMappings: {}
       });
 
       const file = {
