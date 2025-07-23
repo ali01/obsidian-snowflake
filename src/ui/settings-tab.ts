@@ -15,6 +15,7 @@ import type { App } from 'obsidian';
 import type SnowflakePlugin from '../main';
 import { FolderInputSuggest } from './folder-input-suggest';
 import { AddMappingModal } from './add-mapping-modal';
+import { ConfirmationModal } from './confirmation-modal';
 import { ErrorHandler } from '../error-handler';
 import type { ErrorContext } from '../types';
 import type { SnowflakeCommands } from '../commands';
@@ -91,6 +92,11 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     }
 
     this.addNewMappingButton(containerEl);
+
+    // Only show Apply All button if there are 2 or more mappings
+    if (mappings.length >= 2) {
+      this.addApplyAllButton(containerEl);
+    }
   }
 
   private showNoMappingsMessage(containerEl: HTMLElement): void {
@@ -149,13 +155,27 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     );
   }
 
+  private addApplyAllButton(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName('Apply all mappings')
+      .setDesc('Apply templates to all mapped folders')
+      .addButton((button) =>
+        button
+          .setButtonText('Apply All')
+          .setTooltip('Apply templates to all mapped folders')
+          .onClick(() => {
+            this.applyAllMappings();
+          })
+      );
+  }
+
   private addNewMappingButton(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName('Add folder mapping')
       .setDesc('Map a folder to a specific template')
       .addButton((button) =>
         button
-          .setButtonText('Add mapping')
+          .setButtonText('Add Mapping')
           .setCta()
           .onClick(() => {
             this.showAddMappingDialog();
@@ -226,6 +246,56 @@ export class SnowflakeSettingTab extends PluginSettingTab {
       };
       this.errorHandler.handleError(error, errorContext);
     }
+  }
+
+  /**
+   * Apply templates to all mapped folders
+   */
+  private applyAllMappings(): void {
+    const mappings = Object.entries(this.plugin.settings.templateMappings);
+
+    if (mappings.length === 0) {
+      new Notice('No template mappings configured');
+      return;
+    }
+
+    // Show confirmation dialog
+    new ConfirmationModal(
+      this.app,
+      'Apply All Template Mappings',
+      `This will apply templates to all notes in ${String(mappings.length)} mapped folder${mappings.length > 1 ? 's' : ''}. Are you sure you want to continue?`,
+      () => {
+        // Apply templates to all mapped folders without individual confirmations
+        // eslint-disable-next-line no-void
+        void (async (): Promise<void> => {
+          let totalSuccess = 0;
+          let totalFiles = 0;
+
+          // Process all folders without individual confirmations
+          for (const [folderPath] of mappings) {
+            const result = await this.commands.applyTemplateToFolderPath(folderPath, true);
+            if (result) {
+              totalSuccess += result.success;
+              totalFiles += result.total;
+            }
+          }
+
+          // Show final completion notice
+          if (totalFiles === 0) {
+            new Notice('No markdown files found in selected folders');
+          } else if (totalSuccess === totalFiles) {
+            new Notice(`Templates applied to ${String(totalSuccess)} notes`);
+          } else {
+            new Notice(
+              `Templates applied to ${String(totalSuccess)} of ${String(totalFiles)} notes`
+            );
+          }
+        })();
+      },
+      () => {
+        // User cancelled - do nothing
+      }
+    ).open();
   }
 }
 

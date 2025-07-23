@@ -120,22 +120,35 @@ export class SnowflakeCommands {
    * REQ-021: Async processing for UI responsiveness
    * REQ-022: Show progress and completion
    */
-  private async processFolderBatch(folder: TFolder): Promise<void> {
+  private async processFolderBatch(
+    folder: TFolder,
+    skipConfirmation = false
+  ): Promise<BatchResult | null> {
     const markdownFiles = this.getMarkdownFiles(folder);
 
     if (markdownFiles.length === 0) {
-      new Notice('No markdown files found in selected folder');
-      return;
+      if (!skipConfirmation) {
+        new Notice('No markdown files found in selected folder');
+      }
+      return null;
     }
 
-    // Show confirmation dialog
-    const confirmed = await this.confirmBatchOperation(folder, markdownFiles.length);
-    if (!confirmed) {
-      return;
+    // Show confirmation dialog unless skipped
+    if (!skipConfirmation) {
+      const confirmed = await this.confirmBatchOperation(folder, markdownFiles.length);
+      if (!confirmed) {
+        return null;
+      }
     }
 
     const result = await this.processFilesInBatches(markdownFiles);
-    this.showCompletionNotice(result);
+
+    // Only show completion notice if not part of a larger batch
+    if (!skipConfirmation) {
+      this.showCompletionNotice(result);
+    }
+
+    return result;
   }
 
   /**
@@ -145,15 +158,20 @@ export class SnowflakeCommands {
    *
    * @param folderPath - Path to the folder to process
    */
-  async applyTemplateToFolderPath(folderPath: string): Promise<void> {
+  async applyTemplateToFolderPath(
+    folderPath: string,
+    skipConfirmation = false
+  ): Promise<BatchResult | null> {
     const folder = this.plugin.app.vault.getAbstractFileByPath(folderPath);
 
     if (!folder || !(folder instanceof TFolder)) {
-      new Notice(`Folder not found: ${folderPath}`);
-      return;
+      if (!skipConfirmation) {
+        new Notice(`Folder not found: ${folderPath}`);
+      }
+      return null;
     }
 
-    await this.processFolderBatch(folder);
+    return await this.processFolderBatch(folder, skipConfirmation);
   }
 
   private getMarkdownFiles(folder: TFolder): TFile[] {
