@@ -90,33 +90,9 @@ describe('Settings Utilities', () => {
   });
 
   describe('migrateSettings', () => {
-    test('Should migrate v1 settings to current version', () => {
-      const oldSettings = {
-        idField: 'id',
-        templates: {
-          Projects: 'project.md'
-        },
-        autoApply: false,
-        defaultTemplateFile: 'default.md'
-      };
-
-      const migrated = migrateSettings(oldSettings as any);
-
-      expect(migrated).toEqual({
-        templateMappings: {
-          Projects: 'Templates/project.md',
-          '/': 'Templates/default.md'
-        },
-        templatesFolder: 'Templates',
-        dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
-      });
-    });
-
-    test('Should handle already migrated settings', () => {
+    test('Should return valid settings unchanged', () => {
       const currentSettings: SnowflakeSettings = {
         templateMappings: { Projects: 'Templates/project.md' },
-
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
         timeFormat: 'HH:mm'
@@ -126,31 +102,55 @@ describe('Settings Utilities', () => {
       expect(migrated).toEqual(currentSettings);
     });
 
-    test('Should handle partial migration', () => {
+    test('Should return default settings for invalid settings', () => {
+      const invalidSettings = {
+        idField: 'id',
+        templates: {
+          Projects: 'project.md'
+        },
+        autoApply: false
+      };
+
+      const migrated = migrateSettings(invalidSettings as any);
+
+      expect(migrated).toEqual({
+        templateMappings: {},
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
+      });
+    });
+
+    test('Should return default settings for null/undefined', () => {
+      expect(migrateSettings(null as any)).toEqual({
+        templateMappings: {},
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
+      });
+
+      expect(migrateSettings(undefined as any)).toEqual({
+        templateMappings: {},
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
+      });
+    });
+
+    test('Should return default settings for partial settings', () => {
       const partialSettings = {
         templateMappings: { Projects: 'project.md' }
+        // Missing required fields
       };
 
       const migrated = migrateSettings(partialSettings as any);
 
-      expect(migrated.templateMappings).toEqual({ Projects: 'Templates/project.md' });
-      expect(migrated.templatesFolder).toBe('Templates');
-      expect(migrated.dateFormat).toBe('YYYY-MM-DD');
-      expect(migrated.timeFormat).toBe('HH:mm');
-    });
-
-    test('Should preserve absolute template paths', () => {
-      const settings = {
-        templateMappings: { Projects: '/absolute/path/project.md' },
-
+      expect(migrated).toEqual({
+        templateMappings: {},
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
         timeFormat: 'HH:mm'
-      };
-
-      const migrated = migrateSettings(settings as any);
-
-      expect(migrated.templateMappings['Projects']).toBe('/absolute/path/project.md');
+      });
     });
   });
 

@@ -189,68 +189,13 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
  * @returns Settings in current format
  */
 export function migrateSettings(settings: unknown): SnowflakeSettings {
+  // If settings are already valid, return them as-is
   if (areSettingsValid(settings)) {
-    // Already in current format
     return settings;
   }
 
-  const s = (settings ?? {}) as Record<string, unknown>;
-  const migrated: SnowflakeSettings = { ...DEFAULT_SETTINGS };
-
-  // Migrate from v1 format
-  if ('templates' in s && typeof s.templates === 'object') {
-    migrated.templateMappings = {};
-    for (const [key, value] of Object.entries(s.templates as Record<string, unknown>)) {
-      if (typeof value === 'string') {
-        // Add Templates folder prefix if not absolute path
-        migrated.templateMappings[key] = value.startsWith('/') ? value : `Templates/${value}`;
-      }
-    }
-  } else if ('templateMappings' in s && typeof s.templateMappings === 'object') {
-    migrated.templateMappings = {};
-    for (const [key, value] of Object.entries(s.templateMappings as Record<string, unknown>)) {
-      if (typeof value === 'string') {
-        // Add Templates folder prefix if not absolute path and doesn't already have it
-        migrated.templateMappings[key] =
-          value.startsWith('/') || value.startsWith('Templates/') ? value : `Templates/${value}`;
-      }
-    }
-  }
-
-  // Migrate default template to root mapping
-  if ('defaultTemplateFile' in s && typeof s.defaultTemplateFile === 'string') {
-    const defaultPath = s.defaultTemplateFile.startsWith('/')
-      ? s.defaultTemplateFile
-      : `Templates/${s.defaultTemplateFile}`;
-    migrated.templateMappings['/'] = defaultPath;
-  } else if (
-    'defaultTemplate' in s &&
-    typeof s.defaultTemplate === 'string' &&
-    s.defaultTemplate !== ''
-  ) {
-    const defaultPath =
-      s.defaultTemplate.startsWith('/') || s.defaultTemplate.startsWith('Templates/')
-        ? s.defaultTemplate
-        : `Templates/${s.defaultTemplate}`;
-    migrated.templateMappings['/'] = defaultPath;
-  }
-
-  // Templates folder
-  if ('templatesFolder' in s && typeof s.templatesFolder === 'string') {
-    migrated.templatesFolder = s.templatesFolder;
-  }
-
-  // Date format
-  if ('dateFormat' in s && typeof s.dateFormat === 'string') {
-    migrated.dateFormat = s.dateFormat;
-  }
-
-  // Time format
-  if ('timeFormat' in s && typeof s.timeFormat === 'string') {
-    migrated.timeFormat = s.timeFormat;
-  }
-
-  return migrated;
+  // Otherwise, return default settings
+  return { ...DEFAULT_SETTINGS };
 }
 
 /**
