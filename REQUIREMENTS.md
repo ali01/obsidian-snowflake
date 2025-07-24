@@ -161,8 +161,6 @@ Each requirement has a unique ID (like REQ-001) for easy reference.
 
 **REQ-023**: The Snowflake plugin shall allow users to configure these settings:
 - **templateMappings**: Which folders use which templates
-- **defaultTemplate**: Fallback template for unmapped folders
-- **enableAutoTemplating**: Turn automatic templating on/off
 - **templatesFolder**: Where to look for template files (default: "Templates")
 
 *All stored in data.json for persistence across sessions.*
