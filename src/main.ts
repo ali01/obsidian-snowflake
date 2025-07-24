@@ -75,7 +75,11 @@ export default class SnowflakePlugin extends Plugin {
   async saveSettings(): Promise<void> {
     // Validate before saving
     this.validateSettings();
-    await this.saveData(this.settings);
+
+    // Write settings with exactly one trailing newline
+    const configPath = this.manifest.dir + '/data.json';
+    const content = JSON.stringify(this.settings, null, 2) + '\n';
+    await this.app.vault.adapter.write(configPath, content);
 
     // Update file creation handler with new settings
     if (this.fileCreationHandler !== undefined) {
