@@ -22,14 +22,35 @@ export function createDefaultSettings(): SnowflakeSettings {
  * @param value - Value to check
  * @returns True if value is a valid template mapping
  */
-function isValidTemplateMapping(value: unknown): value is Record<string, string> {
+function isValidTemplateMapping(
+  value: unknown
+): value is Record<string, string | { templatePath: string; excludePatterns?: string[] }> {
   if (value === null || value === undefined || typeof value !== 'object') {
     return false;
   }
 
-  return Object.entries(value).every(
-    ([key, val]) => typeof key === 'string' && typeof val === 'string'
-  );
+  return Object.entries(value).every(([key, val]) => {
+    if (typeof key !== 'string') return false;
+
+    // Allow string values (backwards compatible)
+    if (typeof val === 'string') return true;
+
+    // Allow TemplateMappingConfig objects
+    if (typeof val === 'object' && val !== null && 'templatePath' in val) {
+      const config = val as { templatePath: unknown; excludePatterns?: unknown };
+      if (typeof config.templatePath !== 'string') return false;
+
+      // If excludePatterns exists, it must be an array of strings
+      if ('excludePatterns' in config) {
+        if (!Array.isArray(config.excludePatterns)) return false;
+        return config.excludePatterns.every((p: unknown) => typeof p === 'string');
+      }
+
+      return true;
+    }
+
+    return false;
+  });
 }
 
 /**
@@ -124,6 +145,73 @@ export function normalizeTemplatePath(path: string): string {
 }
 
 /**
+ * Helper function to validate required fields
+ *
+ * @param s - Settings record to check
+ * @param errors - Array to collect errors
+ */
+function validateRequiredFields(s: Record<string, unknown>, errors: string[]): void {
+  const requiredFields = ['templateMappings', 'templatesFolder', 'dateFormat', 'timeFormat'];
+  for (const field of requiredFields) {
+    if (!(field in s)) {
+      errors.push(`Missing required field: ${field}`);
+    }
+  }
+}
+
+/**
+ * Helper function to validate field types
+ *
+ * @param s - Settings record to check
+ * @param errors - Array to collect errors
+ */
+function validateFieldTypes(s: Record<string, unknown>, errors: string[]): void {
+  if ('templateMappings' in s && !isValidTemplateMapping(s.templateMappings)) {
+    errors.push('templateMappings must be an object');
+  }
+  if ('templatesFolder' in s && typeof s.templatesFolder !== 'string') {
+    errors.push('templatesFolder must be a string');
+  }
+  if ('dateFormat' in s && typeof s.dateFormat !== 'string') {
+    errors.push('dateFormat must be a string');
+  }
+  if ('timeFormat' in s && typeof s.timeFormat !== 'string') {
+    errors.push('timeFormat must be a string');
+  }
+}
+
+/**
+ * Helper function to validate template mapping values
+ *
+ * @param templateMappings - Template mappings to validate
+ * @param errors - Array to collect errors
+ */
+function validateTemplateMappingValues(templateMappings: unknown, errors: string[]): void {
+  if (
+    templateMappings !== null &&
+    templateMappings !== undefined &&
+    typeof templateMappings === 'object'
+  ) {
+    for (const [key, value] of Object.entries(templateMappings)) {
+      if (typeof value === 'string') {
+        // String value is valid
+        continue;
+      } else if (typeof value === 'object' && value !== null && 'templatePath' in value) {
+        const config = value as { templatePath?: unknown; excludePatterns?: unknown };
+        if (typeof config.templatePath !== 'string') {
+          errors.push(`Template mapping for "${key}" must have a valid templatePath`);
+        }
+        if ('excludePatterns' in config && !Array.isArray(config.excludePatterns)) {
+          errors.push(`Template mapping for "${key}" excludePatterns must be an array`);
+        }
+      } else {
+        errors.push(`Template mapping for "${key}" must be a string or config object`);
+      }
+    }
+  }
+}
+
+/**
  * Validates settings and returns validation results
  *
  * @param settings - Settings to validate
@@ -138,46 +226,9 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
 
   const s = settings as Record<string, unknown>;
 
-  // Check required fields
-  if (!('templateMappings' in s)) {
-    errors.push('Missing required field: templateMappings');
-  }
-  if (!('templatesFolder' in s)) {
-    errors.push('Missing required field: templatesFolder');
-  }
-  if (!('dateFormat' in s)) {
-    errors.push('Missing required field: dateFormat');
-  }
-  if (!('timeFormat' in s)) {
-    errors.push('Missing required field: timeFormat');
-  }
-
-  // Check types
-  if ('templateMappings' in s && !isValidTemplateMapping(s.templateMappings)) {
-    errors.push('templateMappings must be an object');
-  }
-  if ('templatesFolder' in s && typeof s.templatesFolder !== 'string') {
-    errors.push('templatesFolder must be a string');
-  }
-  if ('dateFormat' in s && typeof s.dateFormat !== 'string') {
-    errors.push('dateFormat must be a string');
-  }
-  if ('timeFormat' in s && typeof s.timeFormat !== 'string') {
-    errors.push('timeFormat must be a string');
-  }
-
-  // Validate template mapping values
-  if (
-    s.templateMappings !== null &&
-    s.templateMappings !== undefined &&
-    typeof s.templateMappings === 'object'
-  ) {
-    for (const [key, value] of Object.entries(s.templateMappings)) {
-      if (typeof value !== 'string') {
-        errors.push(`Template mapping for "${key}" must be a string`);
-      }
-    }
-  }
+  validateRequiredFields(s, errors);
+  validateFieldTypes(s, errors);
+  validateTemplateMappingValues(s.templateMappings, errors);
 
   return { isValid: errors.length === 0, errors };
 }

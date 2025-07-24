@@ -9,15 +9,16 @@
  * shall immediately use it for new files in that folder.
  */
 
-import { PluginSettingTab, Setting, Notice, TFile, Modal } from 'obsidian';
+import { PluginSettingTab, Setting, Notice, TFile } from 'obsidian';
 import type { App } from 'obsidian';
 // eslint-disable-next-line @typescript-eslint/naming-convention
 import type SnowflakePlugin from '../main';
 import { FolderInputSuggest } from './folder-input-suggest';
-import { AddMappingModal } from './add-mapping-modal';
+import { TemplateMappingModal } from './template-mapping-modal';
 import { ConfirmationModal } from './confirmation-modal';
+import { TemplatePreviewModal } from './template-preview-modal';
 import { ErrorHandler } from '../error-handler';
-import type { ErrorContext } from '../types';
+import type { ErrorContext, TemplateMappingConfig } from '../types';
 import type { SnowflakeCommands } from '../commands';
 
 /**
@@ -73,6 +74,12 @@ export class SnowflakeSettingTab extends PluginSettingTab {
             this.plugin.settings.templatesFolder = value || 'Templates';
             await this.plugin.saveSettings();
           });
+
+        // Prevent auto-focus when opening settings
+        setTimeout(() => {
+          text.inputEl.blur();
+        }, 0);
+
         return text;
       });
   }
@@ -181,22 +188,41 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     });
   }
 
-  private showExistingMappings(containerEl: HTMLElement, mappings: [string, string][]): void {
+  private showExistingMappings(
+    containerEl: HTMLElement,
+    mappings: [string, string | TemplateMappingConfig][]
+  ): void {
     mappings.sort((a, b) => a[0].localeCompare(b[0]));
 
-    mappings.forEach(([folderPath, templatePath]) => {
-      this.createMappingSetting(containerEl, folderPath, templatePath);
+    mappings.forEach(([folderPath, config]) => {
+      this.createMappingSetting(containerEl, folderPath, config);
     });
   }
 
   private createMappingSetting(
     containerEl: HTMLElement,
     folderPath: string,
-    templatePath: string
+    config: string | TemplateMappingConfig
   ): void {
-    const setting = new Setting(containerEl)
-      .setName(folderPath || '/ (root folder)')
-      .setDesc(templatePath);
+    // Extract template path and exclusions
+    const templatePath = typeof config === 'string' ? config : config.templatePath;
+    const excludePatterns = typeof config === 'object' ? config.excludePatterns : undefined;
+
+    // Create setting
+    const setting = new Setting(containerEl);
+
+    // Set name with exclusion count if applicable
+    const nameEl = setting.nameEl;
+    nameEl.createSpan({ text: folderPath || '/ (root folder)' });
+    if (excludePatterns && excludePatterns.length > 0) {
+      nameEl.createSpan({
+        text: ` (${String(excludePatterns.length)} exclusion${excludePatterns.length > 1 ? 's' : ''})`,
+        cls: 'snowflake-exclusion-count'
+      });
+    }
+
+    // Set description to just the template path
+    setting.setDesc(templatePath);
 
     setting.addButton((button) =>
       button
@@ -213,6 +239,15 @@ export class SnowflakeSettingTab extends PluginSettingTab {
         .setTooltip('Apply template to all notes in folder')
         .onClick(async () => {
           await this.commands.applyTemplateToFolderPath(folderPath);
+        })
+    );
+
+    setting.addButton((button) =>
+      button
+        .setIcon('pencil')
+        .setTooltip('Edit mapping')
+        .onClick(() => {
+          this.showEditMappingDialog(folderPath, config);
         })
     );
 
@@ -283,23 +318,88 @@ export class SnowflakeSettingTab extends PluginSettingTab {
    * Show dialog to add a new folder mapping
    */
   private showAddMappingDialog(): void {
-    new AddMappingModal(
+    new TemplateMappingModal(
       this.app,
       this.plugin.settings.templatesFolder,
-      (folderPath: string, templatePath: string) => {
-        // Check if already mapped
-        if (folderPath in this.plugin.settings.templateMappings) {
+      (
+        folderPath: string,
+        templatePath: string,
+        excludePatterns?: string[],
+        originalFolderPath?: string
+      ) => {
+        // Check if already mapped (only for new mappings)
+        if (!originalFolderPath && folderPath in this.plugin.settings.templateMappings) {
           new Notice('This folder already has a template mapping');
           return;
         }
 
         // Add the mapping
-        this.plugin.settings.templateMappings[folderPath] = templatePath;
+        if (excludePatterns && excludePatterns.length > 0) {
+          this.plugin.settings.templateMappings[folderPath] = {
+            templatePath,
+            excludePatterns
+          };
+        } else {
+          this.plugin.settings.templateMappings[folderPath] = templatePath;
+        }
+
         // eslint-disable-next-line no-void
         void this.plugin.saveSettings();
         this.display();
 
         new Notice(`Mapped ${folderPath || 'root folder'} to ${templatePath}`);
+      }
+    ).open();
+  }
+
+  /**
+   * Show dialog to edit an existing folder mapping
+   */
+  private showEditMappingDialog(folderPath: string, config: string | TemplateMappingConfig): void {
+    new TemplateMappingModal(
+      this.app,
+      this.plugin.settings.templatesFolder,
+      (
+        newFolderPath: string,
+        templatePath: string,
+        excludePatterns?: string[],
+        originalFolderPath?: string
+      ) => {
+        // If folder path changed, check if new path is already mapped
+        if (
+          originalFolderPath &&
+          newFolderPath !== originalFolderPath &&
+          newFolderPath in this.plugin.settings.templateMappings
+        ) {
+          new Notice('This folder already has a template mapping');
+          return;
+        }
+
+        // Remove old mapping if folder path changed
+        if (originalFolderPath && newFolderPath !== originalFolderPath) {
+          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+          delete this.plugin.settings.templateMappings[originalFolderPath];
+        }
+
+        // Update the mapping
+        if (excludePatterns && excludePatterns.length > 0) {
+          this.plugin.settings.templateMappings[newFolderPath] = {
+            templatePath,
+            excludePatterns
+          };
+        } else {
+          this.plugin.settings.templateMappings[newFolderPath] = templatePath;
+        }
+
+        // eslint-disable-next-line no-void
+        void this.plugin.saveSettings();
+        this.display();
+
+        new Notice(`Updated mapping for ${newFolderPath || 'root folder'}`);
+      },
+      {
+        folderPath,
+        config
       }
     ).open();
   }
@@ -380,59 +480,5 @@ export class SnowflakeSettingTab extends PluginSettingTab {
         // User cancelled - do nothing
       }
     ).open();
-  }
-}
-
-/**
- * Modal for previewing template content
- */
-class TemplatePreviewModal extends Modal {
-  private readonly templatePath: string;
-  private readonly content: string;
-
-  constructor(app: App, templatePath: string, content: string) {
-    super(app);
-    this.templatePath = templatePath;
-    this.content = content;
-  }
-
-  onOpen(): void {
-    const { contentEl } = this;
-
-    contentEl.createEl('h2', { text: `Preview: ${this.templatePath}` });
-
-    // Create a pre element for the content
-    const pre = contentEl.createEl('pre', {
-      cls: 'template-preview-content'
-    });
-
-    // Create code element with markdown syntax highlighting
-    pre.createEl('code', {
-      cls: 'language-markdown',
-      text: this.content
-    });
-
-    // Add some basic styling
-    pre.style.maxHeight = '400px';
-    pre.style.overflow = 'auto';
-    pre.style.backgroundColor = 'var(--background-secondary)';
-    pre.style.padding = '1em';
-    pre.style.borderRadius = '4px';
-
-    // Close button
-    const buttonContainer = contentEl.createDiv({ cls: 'modal-button-container' });
-    buttonContainer
-      .createEl('button', {
-        text: 'Close',
-        cls: 'mod-cta'
-      })
-      .addEventListener('click', () => {
-        this.close();
-      });
-  }
-
-  onClose(): void {
-    const { contentEl } = this;
-    contentEl.empty();
   }
 }

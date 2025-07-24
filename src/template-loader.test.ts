@@ -188,6 +188,108 @@ describe('TemplateLoader', () => {
       const templatePath = loader.getTemplateForFile(file);
       expect(templatePath).toBe('Templates/root.md');
     });
+
+    test('Should exclude files matching exclusion patterns', () => {
+      // Update settings to include exclusion patterns
+      settings.templateMappings = {
+        Projects: {
+          templatePath: 'project.md',
+          excludePatterns: ['*.tmp', 'draft-*', 'README.md']
+        },
+        '': 'root.md'
+      };
+      loader.updateSettings(settings);
+
+      // Test excluded files
+      const excludedFiles = [
+        { basename: 'temp.tmp', path: 'Projects/temp.tmp', parent: { path: 'Projects' } },
+        { basename: 'draft-post', path: 'Projects/draft-post.md', parent: { path: 'Projects' } },
+        { basename: 'README', path: 'Projects/README.md', parent: { path: 'Projects' } }
+      ];
+
+      excludedFiles.forEach((file) => {
+        const templatePath = loader.getTemplateForFile(file as MarkdownFile);
+        expect(templatePath).toBeNull();
+      });
+
+      // Test non-excluded files
+      const includedFile = {
+        basename: 'normal',
+        path: 'Projects/normal.md',
+        parent: { path: 'Projects' }
+      } as MarkdownFile;
+
+      const templatePath = loader.getTemplateForFile(includedFile);
+      expect(templatePath).toBe('Templates/project.md');
+    });
+
+    test('Should handle exclusion patterns in nested folders', () => {
+      settings.templateMappings = {
+        Projects: {
+          templatePath: 'project.md',
+          excludePatterns: ['**/README.md', 'temp/**']
+        }
+      };
+      loader.updateSettings(settings);
+
+      // Should exclude README.md in any subfolder
+      const readme = {
+        basename: 'README',
+        path: 'Projects/subdir/deep/README.md',
+        parent: { path: 'Projects/subdir/deep' }
+      } as MarkdownFile;
+      expect(loader.getTemplateForFile(readme)).toBeNull();
+
+      // Should exclude files in temp directory
+      const tempFile = {
+        basename: 'file',
+        path: 'Projects/temp/file.md',
+        parent: { path: 'Projects/temp' }
+      } as MarkdownFile;
+      expect(loader.getTemplateForFile(tempFile)).toBeNull();
+
+      // Should not exclude other files
+      const normalFile = {
+        basename: 'doc',
+        path: 'Projects/docs/doc.md',
+        parent: { path: 'Projects/docs' }
+      } as MarkdownFile;
+      expect(loader.getTemplateForFile(normalFile)).toBe('Templates/project.md');
+    });
+
+    test('Should handle string mappings (backward compatibility)', () => {
+      settings.templateMappings = {
+        Projects: 'project.md', // String mapping - no exclusions
+        Daily: {
+          templatePath: 'daily.md',
+          excludePatterns: ['archive-*']
+        }
+      };
+      loader.updateSettings(settings);
+
+      // String mapping should work normally
+      const projectFile = {
+        basename: 'anything',
+        path: 'Projects/anything.md',
+        parent: { path: 'Projects' }
+      } as MarkdownFile;
+      expect(loader.getTemplateForFile(projectFile)).toBe('Templates/project.md');
+
+      // Config mapping with exclusions
+      const archivedDaily = {
+        basename: 'archive-2024',
+        path: 'Daily/archive-2024.md',
+        parent: { path: 'Daily' }
+      } as MarkdownFile;
+      expect(loader.getTemplateForFile(archivedDaily)).toBeNull();
+
+      const normalDaily = {
+        basename: 'today',
+        path: 'Daily/today.md',
+        parent: { path: 'Daily' }
+      } as MarkdownFile;
+      expect(loader.getTemplateForFile(normalDaily)).toBe('Templates/daily.md');
+    });
   });
 
   describe('templateExists', () => {
@@ -366,6 +468,67 @@ describe('TemplateLoader', () => {
 
       expect(chain.templates).toHaveLength(1);
       expect(chain.templates[0].folderPath).toBe('');
+    });
+
+    test('Should respect exclusions when building template chain', () => {
+      const file = {
+        basename: 'README',
+        path: 'Projects/Web/README.md',
+        parent: { path: 'Projects/Web' }
+      } as MarkdownFile;
+
+      // Set up mappings with exclusions
+      loader.updateSettings({
+        ...settings,
+        templateMappings: {
+          '': 'root.md',
+          Projects: {
+            templatePath: 'project.md',
+            excludePatterns: ['README.md'] // Exclude README at Projects level
+          },
+          'Projects/Web': 'web.md' // No exclusions at Web level
+        }
+      });
+
+      const chain = loader.getTemplateChain(file);
+
+      // Should only have root and web templates (Projects excluded due to pattern)
+      expect(chain.templates).toHaveLength(2);
+      expect(chain.templates[0].path).toBe('Templates/root.md');
+      expect(chain.templates[1].path).toBe('Templates/web.md');
+      // Projects template should be excluded
+      expect(chain.templates.find((t) => t.folderPath === 'Projects')).toBeUndefined();
+    });
+
+    test('Should handle multiple exclusions in chain', () => {
+      const file = {
+        basename: 'draft-README',
+        path: 'Projects/Web/Frontend/draft-README.md',
+        parent: { path: 'Projects/Web/Frontend' }
+      } as MarkdownFile;
+
+      loader.updateSettings({
+        ...settings,
+        templateMappings: {
+          '': {
+            templatePath: 'root.md',
+            excludePatterns: ['draft-*'] // Exclude drafts at root
+          },
+          Projects: 'project.md',
+          'Projects/Web': {
+            templatePath: 'web.md',
+            excludePatterns: ['*README*'] // Exclude README files
+          },
+          'Projects/Web/Frontend': 'frontend.md'
+        }
+      });
+
+      const chain = loader.getTemplateChain(file);
+
+      // Should only have Projects and Frontend templates
+      expect(chain.templates).toHaveLength(2);
+      expect(chain.templates[0].path).toBe('Templates/project.md');
+      expect(chain.templates[1].path).toBe('Templates/frontend.md');
     });
   });
 

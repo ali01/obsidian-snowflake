@@ -8,6 +8,21 @@
 import type { TFile } from 'obsidian';
 
 /**
+ * TemplateMappingConfig: Configuration for a single template mapping
+ *
+ * Purpose: Stores the template path and optional exclusion patterns for
+ * a folder mapping.
+ *
+ * Fields:
+ * - templatePath: Path to the template file (relative to templates folder)
+ * - excludePatterns: Optional array of patterns to exclude from template application
+ */
+export interface TemplateMappingConfig {
+  templatePath: string;
+  excludePatterns?: string[];
+}
+
+/**
  * TemplateMapping: Core configuration type for folder-to-template
  * associations
  *
@@ -18,11 +33,18 @@ import type { TFile } from 'obsidian';
  * template mapping, the plugin shall automatically apply that folder's
  * template to the file.
  *
+ * Values can be either:
+ * - string: Just the template path (backwards compatible)
+ * - TemplateMappingConfig: Full configuration with exclusions
+ *
  * Example:
- * { "Projects": "Templates/project.md", "Daily Notes": "Templates/daily.md" }
+ * {
+ *   "Projects": "project.md",
+ *   "Daily Notes": { templatePath: "daily.md", excludePatterns: ["*.tmp"] }
+ * }
  */
 export interface TemplateMapping {
-  [folderPath: string]: string; // folder path -> template path
+  [folderPath: string]: string | TemplateMappingConfig;
 }
 
 /**

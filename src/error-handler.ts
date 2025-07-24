@@ -54,7 +54,6 @@ export class ErrorHandler {
    * Get singleton instance
    */
   static getInstance(): ErrorHandler {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     ErrorHandler.instance ??= new ErrorHandler();
     return ErrorHandler.instance;
   }

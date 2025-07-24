@@ -8,7 +8,8 @@ import {
   migrateSettings,
   updateTemplateMappings,
   removeTemplateMapping,
-  isValidTemplatePath
+  isValidTemplatePath,
+  areSettingsValid
 } from './settings-utils';
 import { SnowflakeSettings } from './types';
 
@@ -24,6 +25,48 @@ describe('Settings Utilities', () => {
         dateFormat: 'YYYY-MM-DD',
         timeFormat: 'HH:mm'
       });
+    });
+  });
+
+  describe('areSettingsValid', () => {
+    test('Should return true for valid settings', () => {
+      const settings: SnowflakeSettings = {
+        templateMappings: {
+          Projects: 'project.md',
+          Daily: {
+            templatePath: 'daily.md',
+            excludePatterns: ['archive-*']
+          }
+        },
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
+      };
+
+      expect(areSettingsValid(settings)).toBe(true);
+    });
+
+    test('Should return false for invalid settings', () => {
+      expect(areSettingsValid(null)).toBe(false);
+      expect(areSettingsValid(undefined)).toBe(false);
+      expect(areSettingsValid({})).toBe(false);
+      expect(areSettingsValid({ templateMappings: {} })).toBe(false);
+    });
+
+    test('Should validate new TemplateMappingConfig format', () => {
+      const settings: SnowflakeSettings = {
+        templateMappings: {
+          Projects: {
+            templatePath: 'project.md',
+            excludePatterns: ['*.tmp', 'draft-*']
+          }
+        },
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
+      };
+
+      expect(areSettingsValid(settings)).toBe(true);
     });
   });
 
@@ -85,7 +128,55 @@ describe('Settings Utilities', () => {
 
       const result = validateSettings(settings);
       expect(result.isValid).toBe(false);
-      expect(result.errors).toContain('Template mapping for "Invalid" must be a string');
+      expect(result.errors).toContain(
+        'Template mapping for "Invalid" must be a string or config object'
+      );
+    });
+
+    test('Should validate TemplateMappingConfig format', () => {
+      const settings: SnowflakeSettings = {
+        templateMappings: {
+          Projects: 'project.md', // Valid string
+          Daily: {
+            // Valid config
+            templatePath: 'daily.md',
+            excludePatterns: ['archive-*', '*.tmp']
+          },
+          Invalid1: {
+            // Missing templatePath
+            excludePatterns: ['*.tmp']
+          } as any,
+          Invalid2: {
+            // Invalid templatePath type
+            templatePath: 123,
+            excludePatterns: ['*.tmp']
+          } as any,
+          Invalid3: {
+            // Invalid excludePatterns type
+            templatePath: 'template.md',
+            excludePatterns: 'not-an-array'
+          } as any
+        },
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
+      };
+
+      const result = validateSettings(settings);
+      expect(result.isValid).toBe(false);
+      // Since isValidTemplateMapping returns false for invalid entries,
+      // the whole templateMappings is considered invalid
+      expect(result.errors).toContain('templateMappings must be an object');
+      // The detailed validation happens after the type check
+      expect(result.errors).toContain(
+        'Template mapping for "Invalid1" must be a string or config object'
+      );
+      expect(result.errors).toContain(
+        'Template mapping for "Invalid2" must have a valid templatePath'
+      );
+      expect(result.errors).toContain(
+        'Template mapping for "Invalid3" excludePatterns must be an array'
+      );
     });
   });
 

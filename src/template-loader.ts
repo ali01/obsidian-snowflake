@@ -18,8 +18,10 @@ import type {
   MarkdownFile,
   ErrorContext,
   TemplateChain,
-  TemplateChainItem
+  TemplateChainItem,
+  TemplateMappingConfig
 } from './types';
+import { matchesExclusionPattern } from './pattern-matcher';
 import { ErrorHandler } from './error-handler';
 
 /**
@@ -85,25 +87,34 @@ export class TemplateLoader {
     const folderPath = file.parent?.path ?? '';
 
     // Check for exact folder match first
-    if (this.settings.templateMappings[folderPath]) {
-      return this.resolveTemplatePath(this.settings.templateMappings[folderPath]);
+    const mapping = this.settings.templateMappings[folderPath];
+    if (mapping !== undefined) {
+      if (this.isFileExcluded(file, folderPath, mapping)) {
+        return null;
+      }
+      return this.resolveTemplatePathFromMapping(mapping);
     }
 
     // Check parent folders (for nested folder support)
     let currentPath = folderPath;
     while (currentPath.includes('/')) {
       currentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
-      if (this.settings.templateMappings[currentPath]) {
-        return this.resolveTemplatePath(this.settings.templateMappings[currentPath]);
+      const parentMapping = this.settings.templateMappings[currentPath];
+      if (parentMapping !== undefined) {
+        if (this.isFileExcluded(file, currentPath, parentMapping)) {
+          return null;
+        }
+        return this.resolveTemplatePathFromMapping(parentMapping);
       }
     }
 
     // Check root folder mapping (both empty string and "/")
-    if (this.settings.templateMappings['']) {
-      return this.resolveTemplatePath(this.settings.templateMappings['']);
-    }
-    if (this.settings.templateMappings['/']) {
-      return this.resolveTemplatePath(this.settings.templateMappings['/']);
+    const rootMapping = this.settings.templateMappings[''] ?? this.settings.templateMappings['/'];
+    if (rootMapping !== undefined) {
+      if (this.isFileExcluded(file, '', rootMapping)) {
+        return null;
+      }
+      return this.resolveTemplatePathFromMapping(rootMapping);
     }
 
     // No mapping found
@@ -184,27 +195,32 @@ export class TemplateLoader {
     // Check each folder for template mappings (root to leaf order)
     for (let i = 0; i < folderPaths.length; i++) {
       const folderPath = folderPaths[i];
-      const templatePath = this.settings.templateMappings[folderPath];
+      const mapping = this.settings.templateMappings[folderPath];
 
-      if (templatePath) {
-        templates.push({
-          path: this.resolveTemplatePath(templatePath),
-          folderPath: folderPath,
-          depth: i
-        });
+      if (mapping !== undefined) {
+        // Check if file is excluded at this level
+        if (!this.isFileExcluded(file, folderPath, mapping)) {
+          templates.push({
+            path: this.resolveTemplatePathFromMapping(mapping),
+            folderPath: folderPath,
+            depth: i
+          });
+        }
       }
     }
 
     // If no folder mappings found, check for root mapping
     if (templates.length === 0) {
-      const rootTemplate =
-        this.settings.templateMappings[''] || this.settings.templateMappings['/'];
-      if (rootTemplate) {
-        templates.push({
-          path: this.resolveTemplatePath(rootTemplate),
-          folderPath: '',
-          depth: 0
-        });
+      const rootMapping = this.settings.templateMappings[''] ?? this.settings.templateMappings['/'];
+      if (rootMapping !== undefined) {
+        // Check if file is excluded at root level
+        if (!this.isFileExcluded(file, '', rootMapping)) {
+          templates.push({
+            path: this.resolveTemplatePathFromMapping(rootMapping),
+            folderPath: '',
+            depth: 0
+          });
+        }
       }
     }
 
@@ -276,18 +292,50 @@ export class TemplateLoader {
   }
 
   /**
-   * Resolve a template path by prepending the templates folder if needed
+   * Check if a file is excluded by the mapping's exclusion patterns
    *
-   * @param templatePath - The template path (relative or absolute)
-   * @returns Full template path
+   * @param file - The file to check
+   * @param mappingFolderPath - The folder path of the mapping
+   * @param mapping - The template mapping configuration
+   * @returns True if the file should be excluded
    */
-  private resolveTemplatePath(templatePath: string): string {
-    // If the path already starts with the templates folder, return as-is (backwards compatibility)
-    if (templatePath.startsWith(this.settings.templatesFolder + '/')) {
-      return templatePath;
+  private isFileExcluded(
+    file: MarkdownFile,
+    mappingFolderPath: string,
+    mapping: string | TemplateMappingConfig
+  ): boolean {
+    // String mappings have no exclusions
+    if (typeof mapping === 'string') {
+      return false;
     }
 
-    // Otherwise, treat it as relative to the templates folder
+    // Check if there are exclusion patterns
+    if (!mapping.excludePatterns || mapping.excludePatterns.length === 0) {
+      return false;
+    }
+
+    // Get the file path relative to the mapping folder
+    const filePath = file.path;
+    let relativePath: string;
+    if (mappingFolderPath === '') {
+      relativePath = filePath;
+    } else if (filePath.startsWith(mappingFolderPath + '/')) {
+      relativePath = filePath.slice(mappingFolderPath.length + 1);
+    } else {
+      relativePath = file.name;
+    }
+
+    return matchesExclusionPattern(relativePath, mapping.excludePatterns);
+  }
+
+  /**
+   * Resolve template path from a mapping
+   *
+   * @param mapping - The template mapping (string or config object)
+   * @returns Resolved template path
+   */
+  private resolveTemplatePathFromMapping(mapping: string | TemplateMappingConfig): string {
+    const templatePath = typeof mapping === 'string' ? mapping : mapping.templatePath;
     return `${this.settings.templatesFolder}/${templatePath}`;
   }
 }
