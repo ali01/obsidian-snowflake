@@ -9,7 +9,8 @@ import {
   updateTemplateMappings,
   removeTemplateMapping,
   isValidTemplatePath,
-  areSettingsValid
+  areSettingsValid,
+  cleanSettings
 } from './settings-utils';
 import { SnowflakeSettings } from './types';
 
@@ -228,7 +229,7 @@ describe('Settings Utilities', () => {
       });
     });
 
-    test('Should return default settings for partial settings', () => {
+    test('Should migrate partial settings by preserving valid fields', () => {
       const partialSettings = {
         templateMappings: { Projects: 'project.md' }
         // Missing required fields
@@ -237,10 +238,10 @@ describe('Settings Utilities', () => {
       const migrated = migrateSettings(partialSettings as any);
 
       expect(migrated).toEqual({
-        templateMappings: {},
-        templatesFolder: 'Templates',
-        dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        templateMappings: { Projects: 'project.md' }, // Valid field is preserved
+        templatesFolder: 'Templates', // Default value
+        dateFormat: 'YYYY-MM-DD', // Default value
+        timeFormat: 'HH:mm' // Default value
       });
     });
   });
@@ -351,6 +352,69 @@ describe('Settings Utilities', () => {
       expect(isValidTemplatePath('template.MD')).toBe(false); // Case sensitive
       expect(isValidTemplatePath('template.md.txt')).toBe(false);
       expect(isValidTemplatePath('template.markdown')).toBe(false);
+    });
+  });
+
+  describe('cleanSettings', () => {
+    test('Should remove old/deprecated fields', () => {
+      const settingsWithOldFields = {
+        templateMappings: { Projects: 'project.md' },
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm',
+        // Old fields that should be removed
+        defaultTemplate: 'default.md',
+        enableAutoTemplating: true,
+        excludePatterns: ['*.tmp'],
+        someOtherOldField: 'value'
+      } as any;
+
+      const cleaned = cleanSettings(settingsWithOldFields);
+
+      expect(cleaned).toEqual({
+        templateMappings: { Projects: 'project.md' },
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
+      });
+
+      // Ensure old fields are not present
+      expect('defaultTemplate' in cleaned).toBe(false);
+      expect('enableAutoTemplating' in cleaned).toBe(false);
+      expect('excludePatterns' in cleaned).toBe(false);
+      expect('someOtherOldField' in cleaned).toBe(false);
+    });
+
+    test('Should preserve all valid fields', () => {
+      const validSettings: SnowflakeSettings = {
+        templateMappings: {
+          Projects: 'project.md',
+          Daily: { templatePath: 'daily.md', excludePatterns: ['*.tmp'] }
+        },
+        templatesFolder: 'MyTemplates',
+        dateFormat: 'DD/MM/YYYY',
+        timeFormat: 'h:mm A'
+      };
+
+      const cleaned = cleanSettings(validSettings);
+
+      expect(cleaned).toEqual(validSettings);
+    });
+
+    test('Should use default values for missing date/time formats', () => {
+      const settingsWithoutFormats = {
+        templateMappings: {},
+        templatesFolder: 'Templates'
+      } as any;
+
+      const cleaned = cleanSettings(settingsWithoutFormats);
+
+      expect(cleaned).toEqual({
+        templateMappings: {},
+        templatesFolder: 'Templates',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm'
+      });
     });
   });
 });

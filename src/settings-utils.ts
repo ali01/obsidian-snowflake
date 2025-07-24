@@ -240,13 +240,61 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
  * @returns Settings in current format
  */
 export function migrateSettings(settings: unknown): SnowflakeSettings {
-  // If settings are already valid, return them as-is
+  // If settings are already valid, clean and return them
   if (areSettingsValid(settings)) {
-    return settings;
+    return cleanSettings(settings);
+  }
+
+  // If settings is an object, try to salvage what we can
+  if (settings !== null && settings !== undefined && typeof settings === 'object') {
+    const s = settings as Record<string, unknown>;
+    const migrated: SnowflakeSettings = { ...DEFAULT_SETTINGS };
+
+    // Migrate templateMappings if present and valid
+    if ('templateMappings' in s && isValidTemplateMapping(s.templateMappings)) {
+      migrated.templateMappings = s.templateMappings;
+    }
+
+    // Migrate templatesFolder if present and valid
+    if (
+      'templatesFolder' in s &&
+      typeof s.templatesFolder === 'string' &&
+      s.templatesFolder.trim() !== ''
+    ) {
+      migrated.templatesFolder = s.templatesFolder;
+    }
+
+    // Migrate date/time formats if present and valid
+    if ('dateFormat' in s && typeof s.dateFormat === 'string' && s.dateFormat.trim() !== '') {
+      migrated.dateFormat = s.dateFormat;
+    }
+    if ('timeFormat' in s && typeof s.timeFormat === 'string' && s.timeFormat.trim() !== '') {
+      migrated.timeFormat = s.timeFormat;
+    }
+
+    return migrated;
   }
 
   // Otherwise, return default settings
   return { ...DEFAULT_SETTINGS };
+}
+
+/**
+ * Removes old/deprecated fields from settings to keep data.json clean
+ *
+ * @param settings - Valid settings that may contain old fields
+ * @returns Settings with only current fields
+ */
+export function cleanSettings(settings: SnowflakeSettings): SnowflakeSettings {
+  // Create a new object with only the fields we want to keep
+  const cleaned: SnowflakeSettings = {
+    templateMappings: settings.templateMappings,
+    templatesFolder: settings.templatesFolder,
+    dateFormat: settings.dateFormat || DEFAULT_SETTINGS.dateFormat,
+    timeFormat: settings.timeFormat || DEFAULT_SETTINGS.timeFormat
+  };
+
+  return cleaned;
 }
 
 /**

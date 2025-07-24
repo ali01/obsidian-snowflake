@@ -64,6 +64,7 @@ export class TemplateMappingModal extends Modal {
     }
   }
 
+  // eslint-disable-next-line max-lines-per-function
   onOpen(): void {
     const { contentEl } = this;
 

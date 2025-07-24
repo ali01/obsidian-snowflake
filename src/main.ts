@@ -16,7 +16,7 @@
 import { Plugin } from 'obsidian';
 import type { SnowflakeSettings } from './types';
 import { SnowflakeSettingTab } from './ui/settings-tab';
-import { migrateSettings, areSettingsValid } from './settings-utils';
+import { migrateSettings, areSettingsValid, cleanSettings } from './settings-utils';
 import { FileCreationHandler } from './file-creation-handler';
 import { SnowflakeCommands } from './commands';
 
@@ -70,9 +70,16 @@ export default class SnowflakePlugin extends Plugin {
 
     // Validate settings to ensure they're properly formed
     this.validateSettings();
+
+    // Clean settings and save to remove old fields
+    // This ensures users with old config files get them cleaned up
+    await this.saveSettings();
   }
 
   async saveSettings(): Promise<void> {
+    // Clean settings to remove any old fields
+    this.settings = cleanSettings(this.settings);
+
     // Validate before saving
     this.validateSettings();
 
