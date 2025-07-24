@@ -39,9 +39,14 @@ export default class SnowflakePlugin extends Plugin {
     // Add settings tab to Obsidian settings (after commands are initialized)
     this.addSettingTab(new SnowflakeSettingTab(this.app, this, this.commands));
 
-    // Initialize file creation handler
+    // Initialize file creation handler but don't start it yet
     this.fileCreationHandler = new FileCreationHandler(this, this.app.vault, this.settings);
-    this.fileCreationHandler.start();
+
+    // Only start listening for file creation after workspace is ready
+    // This prevents applying templates to existing files during startup
+    this.app.workspace.onLayoutReady(() => {
+      this.fileCreationHandler?.start();
+    });
   }
 
   onunload(): void {
