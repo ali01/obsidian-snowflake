@@ -1,157 +1,146 @@
-# Snowflake: Unique IDs for Obsidian
+# Snowflake: Automatic Templates for Obsidian
 
-A lightweight Obsidian plugin that automatically adds unique IDs to your notes' frontmatter. This helps maintain stable references across your knowledge base, even when notes are renamed or moved.
+An Obsidian plugin that automatically applies templates to new notes based on their folder location. Create consistent note structures with dynamic variables like dates, times, and unique IDs.
 
 ## Features
 
-- **Automatic ID Generation**: Newly created notes in configured folders automatically receive unique IDs
-- **Folder-Specific Configuration**: Choose which folders should have automatic ID addition
-- **Manual ID Addition**: Add IDs to existing notes with a simple command
-- **Bulk Addition**: Add IDs to all notes in a selected folder at once
-- **Collision-Resistant**: Uses Nano ID algorithm for extremely low collision probability
-- **Fast & Lightweight**: Minimal performance impact with efficient implementation
+- **Automatic Templates**: Assign templates to folders. New files get those templates automatically.
+- **Template Inheritance**: Nested folders inherit templates from parent folders
+- **Dynamic Variables**: Insert current date, time, note title, and unique IDs
+- **Smart Merging**: Safely merges templates with existing content without data loss
+- **Manual Commands**: Apply templates on-demand to existing notes
+- **Bulk Operations**: Apply templates to all notes in a folder at once
 
-## Why Snowflake?
 
-When building a knowledge management system, you often need stable references between notes. Using note titles or file paths as references breaks when you rename or reorganize files. Snowflake solves this by adding permanent unique IDs to your notes' frontmatter:
+## Quick Start
 
-```yaml
----
-id: x8K2n5pQ7A
----
+1. **Create a templates folder** (default: "Templates")
+2. **Create template files** in that folder (e.g., `project-template.md`, `meeting-template.md`)
+3. **Configure folder mappings** in Settings → Snowflake
+4. **Create new notes** in mapped folders to see templates applied automatically
 
-Note Contents
-```
-
-These IDs:
-- Persist across file renames and moves
-- Are short (10 characters) and URL-safe
-- Have virtually zero collision probability (even with 50k+ notes)
-- Can be used in links, databases, or external systems
-
-### Manual Installation
-
-1. Download the latest release from the [Releases](https://github.com/ali01/obsidian-snowflake/releases) page
-2. Extract the files to your vault's plugins folder: `VaultFolder/.obsidian/plugins/obsidian-snowflake/`
-3. Reload Obsidian
-4. Enable the plugin in Settings → Community plugins
-
-## Usage
-
-### Automatic ID Addition
+### Configuring Folder Mappings
 
 1. Open Settings → Snowflake
-2. Click "Add folder" and select folders where new notes should automatically get IDs
-3. Toggle "Enable automatic ID addition" to turn the feature on/off
+2. Click "Add folder mapping"
+3. Select a folder and its corresponding template
+4. Notes created in that folder will now use the template
 
-When you create a new note in a configured folder, it will automatically receive a unique ID in its frontmatter.
+### Template Inheritance
+
+Templates inherit from parent folders automatically:
+
+```
+Projects/              → uses: project-template.md
+  └── Web/             → uses: web-template.md
+      └── Frontend/    → inherits both templates with smart merging
+```
 
 ### Manual Commands
 
-Access these commands via the Command Palette (Ctrl/Cmd + P):
+Access via Command Palette (Ctrl/Cmd + P):
 
-- **Add ID to current note**: Adds a unique ID to the active note
-- **Add IDs to all notes in folder**: Opens a folder selector, then adds IDs to all notes in that folder
+- **Apply template to current note**: Applies the appropriate template based on the note's location
+- **Apply specific template**: Choose any template to apply to the current note
+- **Apply templates to folder**: Bulk apply templates to all notes in a selected folder
 
-### Configuration
+## Advanced Features
 
-The plugin settings allow you to:
-- Enable/disable automatic ID addition globally
-- Manage which folders have automatic ID addition
-- View and remove configured folders
+### Template Variables
 
-## How It Works
+Snowflake supports the following dynamic variables that are replaced when templates are applied:
 
-Snowflake uses the [Nano ID](https://github.com/ai/nanoid) algorithm to generate unique identifiers:
+- **`{{title}}`** - The filename without the .md extension
+  - Example: "Meeting Notes.md" → "Meeting Notes"
+- **`{{date}}`** - Current date (format customizable in settings)
+  - Default format: YYYY-MM-DD (e.g., "2024-01-15")
+- **`{{time}}`** - Current time (format customizable in settings)
+  - Default format: HH:mm (e.g., "14:30")
+- **`{{snowflake_id}}`** - A unique 10-character alphanumeric ID
+  - Format: Mix of letters and numbers (e.g., "x8K2n5pQ7A")
+  - Uses cryptographically secure random generation
+  - Multiple instances in the same template receive the same ID
 
-- **Format**: 10 alphanumeric characters (e.g., `x8K2n5pQ7A`)
-- **Alphabet**: `0-9`, `a-z`, `A-Z` (62 characters)
-- **Randomness**: Cryptographically secure via `crypto.getRandomValues()`
-- **Collision Probability**: Negligible (1 in 10^15 for 10-character IDs)
+Example template with variables:
+```markdown
+---
+id: {{snowflake_id}}
+created: {{date}} {{time}}
+modified: {{date}} {{time}}
+---
 
+# {{title}}
+
+Created on {{date}} at {{time}}
+```
+
+### Custom Date/Time Formats
+
+In settings, customize formats using moment.js syntax:
+- Date: `DD/MM/YYYY`, `MMM DD, YYYY`, etc.
+- Time: `h:mm A`, `HH:mm:ss`, etc.
+
+### Exclusion Lists
+
+- Specify files that should be excluded from template application
+- Use regex patterns (e.g. `*.tmp` or `draft-*`) to match multiple files
 
 ## Development
 
-The plugin is now built using TypeScript with a modular architecture. The code is organized into separate modules for better maintainability and type safety.
-
-### Project Structure
+Built with TypeScript:
 
 ```
-obsidian-snowflake/
-├── src/                    # TypeScript source files
-│   ├── main.ts             # Main plugin class
-│   ├── types.ts            # Type definitions
-│   ├── constants.ts        # Configuration constants
-│   ├── nanoid.ts           # ID generation module
-│   ├── frontmatter.ts      # Frontmatter utilities
-│   ├── file-processor.ts   # File processing logic
-│   └── ui/                 # UI components
-│       ├── folder-modal.ts # Folder selection modal
-│       └── settings-tab.ts # Settings interface
-├── main.js                 # Compiled output (generated)
-├── manifest.json           # Plugin metadata
-├── package.json            # NPM configuration
-├── tsconfig.json           # TypeScript configuration
-├── esbuild.config.mjs      # Build configuration
-├── README.md               # Documentation
-└── LICENSE                 # MIT license
+src/
+├── main.ts                    # Plugin entry point
+├── template-applicator.ts     # Core template logic
+├── template-loader.ts         # Template file management
+├── template-variables.ts      # Variable replacement
+├── frontmatter-merger.ts      # YAML merging logic
+├── commands.ts                # Command registration
+└── ui/                        # Settings and modals
 ```
 
 ### Development Setup
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/ali01/obsidian-snowflake.git
-   cd obsidian-snowflake
-   ```
+```bash
+# Clone and install
+git clone https://github.com/ali01/obsidian-snowflake.git
+cd obsidian-snowflake
+npm install
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+# Development (with watch)
+npm run dev
 
-3. **Start development mode** (watches for changes)
-   ```bash
-   npm run dev
-   ```
+# Production build
+npm run build
 
-4. **Build for production**
-   ```bash
-   npm run build
-   ```
+# Run tests
+npm test
 
-### Development Workflow
-
-1. Make changes to TypeScript files in the `src/` directory
-2. The development build will automatically recompile on changes
-3. Reload Obsidian or disable/enable the plugin to test changes
-4. Use the browser developer console (Ctrl/Cmd+Shift+I) for debugging
-
-### Code Organization
-
-- **types.ts**: TypeScript interfaces and type definitions
-- **constants.ts**: Default settings and configuration values
-- **nanoid.ts**: Nano ID generation algorithm
-- **frontmatter.ts**: YAML frontmatter parsing and manipulation
-- **file-processor.ts**: Core logic for processing files and folders
-- **ui/folder-modal.ts**: Folder selection modal component
-- **ui/settings-tab.ts**: Plugin settings interface
-- **main.ts**: Main plugin class with lifecycle methods
-
+# Quality checks
+npm run check
+```
 
 ## Compatibility
 
 - Requires Obsidian v0.12.0 or higher
 - Works with all themes and other plugins
-- No external dependencies required
+- No external dependencies
 
+## Community
+
+- **Issues**: [GitHub Issues](https://github.com/ali01/obsidian-snowflake/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/ali01/obsidian-snowflake/discussions)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file
+
+## Acknowledgments
+
+- Built for the [Obsidian](https://obsidian.md) community
+- ID generation inspired by [Nano ID](https://github.com/ai/nanoid)
 
 ## Author
 
 **Ali Yahya**
-
-## Acknowledgments
-
-- Inspired by the need for stable note references in large knowledge bases
-- Uses concepts from the [Nano ID](https://github.com/ai/nanoid) project
-- Built for the [Obsidian](https://obsidian.md) community
