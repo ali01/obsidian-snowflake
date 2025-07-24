@@ -77,9 +77,15 @@ export default class SnowflakePlugin extends Plugin {
     this.validateSettings();
 
     // Write settings with exactly one trailing newline
-    const configPath = this.manifest.dir + '/data.json';
-    const content = JSON.stringify(this.settings, null, 2) + '\n';
-    await this.app.vault.adapter.write(configPath, content);
+    const configDir = this.manifest.dir;
+    if (configDir !== undefined && configDir !== '') {
+      const configPath = `${configDir}/data.json`;
+      const content = JSON.stringify(this.settings, null, 2) + '\n';
+      await this.app.vault.adapter.write(configPath, content);
+    } else {
+      // Fallback to standard saveData if manifest.dir is not available
+      await this.saveData(this.settings);
+    }
 
     // Update file creation handler with new settings
     if (this.fileCreationHandler !== undefined) {
