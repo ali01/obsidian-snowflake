@@ -74,8 +74,6 @@ export class TemplateApplicator {
     context: CommandContext = { isManualCommand: false },
     editor?: Editor
   ): Promise<ApplyResult> {
-    // Always apply templates (automatic templating is the core purpose of this plugin)
-
     // Get template chain for inheritance support
     const chain = this.loader.getTemplateChain(file);
     if (chain.templates.length === 0) {

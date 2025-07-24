@@ -62,17 +62,20 @@ describe('FileCreationHandler', () => {
   });
 
   describe('start/stop', () => {
-    test('Should register event handler on start', () => {
+    test('Should register event handlers on start', () => {
       handler.start();
 
       expect(mockVault.on).toHaveBeenCalledWith('create', expect.any(Function));
+      expect(mockVault.on).toHaveBeenCalledWith('rename', expect.any(Function));
+      expect(mockPlugin.registerEvent).toHaveBeenCalledTimes(2);
       expect(mockPlugin.registerEvent).toHaveBeenCalledWith('event-ref');
     });
 
-    test('Should unregister event handler on stop', () => {
+    test('Should unregister event handlers on stop', () => {
       handler.start();
       handler.stop();
 
+      expect(mockVault.offref).toHaveBeenCalledTimes(2);
       expect(mockVault.offref).toHaveBeenCalledWith('event-ref');
     });
 
@@ -120,14 +123,16 @@ describe('FileCreationHandler', () => {
       });
     });
 
-    test('Should skip files with existing content', async () => {
+    test('Should apply template even to files with existing content', async () => {
       const file = createMockFile('test.md', 'Projects');
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
       (mockVault.read as jest.Mock).mockResolvedValue('Existing content'); // Non-empty content
 
       await handleFileCreation(file);
 
-      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
+        isManualCommand: false
+      });
     });
 
     test('Should skip if file was deleted during processing', async () => {
@@ -214,6 +219,126 @@ describe('FileCreationHandler', () => {
       // Should be done processing
       expect(handler.isProcessing(file.path)).toBe(false);
       expect(handler.getProcessingCount()).toBe(0);
+    });
+  });
+
+  describe('handleFileMove', () => {
+    let handleFileMove: (file: TFile, oldPath: string) => Promise<void>;
+
+    beforeEach(() => {
+      handler.start();
+      // Get the registered handler function for rename events
+      const renameCalls = (mockVault.on as jest.Mock).mock.calls.filter(
+        (call) => call[0] === 'rename'
+      );
+      handleFileMove = renameCalls[0][1];
+    });
+
+    test('Should apply template when empty file moved to mapped directory', async () => {
+      const file = createMockFile('test.md', 'Projects');
+      const oldPath = 'Documents/test.md';
+
+      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
+
+      await handleFileMove(file, oldPath);
+
+      expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith('Projects/test.md');
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
+        isManualCommand: false
+      });
+    });
+
+    test('Should not apply template when file moved within same directory', async () => {
+      const file = createMockFile('renamed.md', 'Projects');
+      const oldPath = 'Projects/test.md'; // Same directory, just renamed
+
+      await handleFileMove(file, oldPath);
+
+      expect(mockVault.read).not.toHaveBeenCalled();
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+    });
+
+    test('Should apply template even when file has content', async () => {
+      const file = createMockFile('test.md', 'Projects');
+      const oldPath = 'Documents/test.md';
+
+      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue('Existing content');
+
+      await handleFileMove(file, oldPath);
+
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
+        isManualCommand: false
+      });
+    });
+
+    test('Should not apply template when moved to unmapped directory', async () => {
+      const file = createMockFile('test.md', 'UnmappedFolder');
+      const oldPath = 'Documents/test.md';
+
+      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue('');
+
+      // Template applicator will return false for unmapped directories
+      mockTemplateApplicator.applyTemplate.mockResolvedValue({
+        success: false,
+        message: 'No template configured for this location'
+      });
+
+      await handleFileMove(file, oldPath);
+
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalled();
+    });
+
+    test('Should not apply template to non-markdown files', async () => {
+      const file = Object.assign(new TFile(), {
+        name: 'test.txt',
+        basename: 'test',
+        extension: 'txt',
+        path: 'Projects/test.txt'
+      });
+      const oldPath = 'Documents/test.txt';
+
+      await handleFileMove(file, oldPath);
+
+      expect(mockVault.read).not.toHaveBeenCalled();
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+    });
+
+    test('Should handle nested folder mappings correctly', async () => {
+      // Add a nested folder mapping
+      settings.templateMappings['Projects/Subfolder'] = 'Templates/subfolder.md';
+      handler.updateSettings(settings);
+
+      const file = createMockFile('test.md', 'Projects/Subfolder');
+      const oldPath = 'Documents/test.md';
+
+      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
+
+      await handleFileMove(file, oldPath);
+
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
+        isManualCommand: false
+      });
+    });
+
+    test('Should handle root folder mapping', async () => {
+      settings.templateMappings['/'] = 'Templates/default.md';
+      handler.updateSettings(settings);
+
+      const file = createMockFile('test.md', '');
+      const oldPath = 'Documents/test.md';
+
+      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
+
+      await handleFileMove(file, oldPath);
+
+      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
+        isManualCommand: false
+      });
     });
   });
 });
