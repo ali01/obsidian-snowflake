@@ -26,7 +26,7 @@ describe('ErrorHandler', () => {
     it('should categorize file not found errors correctly', () => {
       const context: ErrorContext = {
         operation: 'load_template',
-        templatePath: 'Templates/test.md'
+        templatePath: 'test.md'
       };
 
       const errors = [
@@ -45,7 +45,7 @@ describe('ErrorHandler', () => {
     it('should categorize permission errors correctly', () => {
       const context: ErrorContext = {
         operation: 'load_template',
-        templatePath: 'Templates/test.md'
+        templatePath: 'test.md'
       };
 
       const errors = [
@@ -64,7 +64,7 @@ describe('ErrorHandler', () => {
     it('should categorize template syntax errors correctly', () => {
       const context: ErrorContext = {
         operation: 'apply_template',
-        templatePath: 'Templates/test.md'
+        templatePath: 'test.md'
       };
 
       const errors = [
@@ -82,7 +82,7 @@ describe('ErrorHandler', () => {
     it('should categorize variable errors correctly', () => {
       const context: ErrorContext = {
         operation: 'apply_template',
-        templatePath: 'Templates/test.md'
+        templatePath: 'test.md'
       };
 
       const errors = [
@@ -115,26 +115,26 @@ describe('ErrorHandler', () => {
     it('should provide user-friendly message for missing template (REQ-026)', () => {
       const context: ErrorContext = {
         operation: 'load_template',
-        templatePath: 'Templates/daily.md'
+        templatePath: 'daily.md'
       };
 
       const error = new Error('File not found');
       const message = errorHandler.handleErrorSilently(error, context);
 
-      expect(message).toBe('Template file not found: Templates/daily.md');
+      expect(message).toBe('Template file not found: daily.md');
     });
 
     it('should provide permission denied message (REQ-029)', () => {
       const context: ErrorContext = {
         operation: 'load_template',
-        templatePath: 'Templates/restricted.md'
+        templatePath: 'restricted.md'
       };
 
       const error = new Error('Permission denied');
       const message = errorHandler.handleErrorSilently(error, context);
 
       expect(message).toBe(
-        'Cannot read template (permission denied): Templates/restricted.md. ' +
+        'Cannot read template (permission denied): restricted.md. ' +
           'Creating file without template.'
       );
     });
@@ -142,28 +142,28 @@ describe('ErrorHandler', () => {
     it('should provide invalid syntax message (REQ-027)', () => {
       const context: ErrorContext = {
         operation: 'apply_template',
-        templatePath: 'Templates/broken.md'
+        templatePath: 'broken.md'
       };
 
       const error = new Error('Invalid template syntax');
       const message = errorHandler.handleErrorSilently(error, context);
 
       expect(message).toBe(
-        'Template contains invalid syntax and will be used as-is: ' + 'Templates/broken.md'
+        'Template contains invalid syntax and will be used as-is: ' + 'broken.md'
       );
     });
 
     it('should provide invalid variable message (REQ-028)', () => {
       const context: ErrorContext = {
         operation: 'apply_template',
-        templatePath: 'Templates/custom.md'
+        templatePath: 'custom.md'
       };
 
       const error = new Error('Unknown variable: {{custom}}');
       const message = errorHandler.handleErrorSilently(error, context);
 
       expect(message).toBe(
-        'Template contains invalid variables that will be left unchanged: ' + 'Templates/custom.md'
+        'Template contains invalid variables that will be left unchanged: ' + 'custom.md'
       );
     });
 
@@ -187,7 +187,7 @@ describe('ErrorHandler', () => {
       const context: ErrorContext = {
         operation: 'apply_template',
         filePath: 'test.md',
-        templatePath: 'Templates/test.md'
+        templatePath: 'test.md'
       };
 
       const error = new Error('Test error');
@@ -271,7 +271,7 @@ describe('ErrorHandler', () => {
     it('should create ExtendedError with context', () => {
       const context: ErrorContext = {
         operation: 'load_template',
-        templatePath: 'Templates/test.md'
+        templatePath: 'test.md'
       };
 
       const originalError = new Error('Original error');
@@ -293,7 +293,7 @@ describe('ErrorHandler', () => {
     it('should correctly identify error types', () => {
       const context: ErrorContext = {
         operation: 'load_template',
-        templatePath: 'Templates/test.md'
+        templatePath: 'test.md'
       };
 
       const extendedError = errorHandler.createError(

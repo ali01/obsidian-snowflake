@@ -41,7 +41,7 @@ describe('FileCreationHandler', () => {
     // Default settings
     settings = {
       templateMappings: {
-        Projects: 'Templates/project.md'
+        Projects: 'project.md'
       },
 
       templatesFolder: 'Templates',
@@ -308,7 +308,7 @@ describe('FileCreationHandler', () => {
 
     test('Should handle nested folder mappings correctly', async () => {
       // Add a nested folder mapping
-      settings.templateMappings['Projects/Subfolder'] = 'Templates/subfolder.md';
+      settings.templateMappings['Projects/Subfolder'] = 'subfolder.md';
       handler.updateSettings(settings);
 
       const file = createMockFile('test.md', 'Projects/Subfolder');
@@ -325,7 +325,7 @@ describe('FileCreationHandler', () => {
     });
 
     test('Should handle root folder mapping', async () => {
-      settings.templateMappings['/'] = 'Templates/default.md';
+      settings.templateMappings['/'] = 'default.md';
       handler.updateSettings(settings);
 
       const file = createMockFile('test.md', '');

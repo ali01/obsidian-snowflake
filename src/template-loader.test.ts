@@ -73,9 +73,9 @@ describe('TemplateLoader', () => {
     mockVault = new MockVault();
     settings = {
       templateMappings: {
-        Projects: 'Templates/project.md',
-        Daily: 'Templates/daily.md',
-        '': 'Templates/root.md' // Root folder mapping
+        Projects: 'project.md',
+        Daily: 'daily.md',
+        '': 'root.md' // Root folder mapping
       },
 
       templatesFolder: 'Templates',
@@ -207,7 +207,7 @@ describe('TemplateLoader', () => {
       const newSettings: SnowflakeSettings = {
         ...settings,
         templateMappings: {
-          '/': 'Templates/new-default.md'
+          '/': 'new-default.md'
         }
       };
 
@@ -234,10 +234,10 @@ describe('TemplateLoader', () => {
       loader.updateSettings({
         ...settings,
         templateMappings: {
-          '': 'Templates/root.md', // Root mapping
-          Projects: 'Templates/project.md',
-          'Projects/Web': 'Templates/web.md',
-          'Projects/Web/Frontend': 'Templates/frontend.md'
+          '': 'root.md', // Root mapping
+          Projects: 'project.md',
+          'Projects/Web': 'web.md',
+          'Projects/Web/Frontend': 'frontend.md'
         }
       });
 
@@ -279,8 +279,8 @@ describe('TemplateLoader', () => {
       loader.updateSettings({
         ...settings,
         templateMappings: {
-          Projects: 'Templates/project.md',
-          'Projects/Web/Frontend': 'Templates/frontend.md'
+          Projects: 'project.md',
+          'Projects/Web/Frontend': 'frontend.md'
         }
       });
 
@@ -302,8 +302,8 @@ describe('TemplateLoader', () => {
       loader.updateSettings({
         ...settings,
         templateMappings: {
-          Projects: 'Templates/project.md',
-          Daily: 'Templates/daily.md'
+          Projects: 'project.md',
+          Daily: 'daily.md'
         }
       });
 
@@ -358,7 +358,7 @@ describe('TemplateLoader', () => {
       loader.updateSettings({
         ...settings,
         templateMappings: {
-          '': 'Templates/root.md'
+          '': 'root.md'
         }
       });
 

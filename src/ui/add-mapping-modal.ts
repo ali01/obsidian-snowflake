@@ -58,7 +58,7 @@ export class AddMappingModal extends Modal {
       .addText((text) => {
         new FileInputSuggest(this.app, text.inputEl, 'md', this.templatesFolder);
         text
-          .setPlaceholder('Example: Templates/project.md')
+          .setPlaceholder('Example: project.md')
           .setValue(this.templatePath)
           .onChange((value) => {
             this.templatePath = value;

@@ -81,7 +81,12 @@ export class FileInputSuggest extends AbstractInputSuggest<TFile> {
   }
 
   selectSuggestion(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
-    this.inputEl.value = file.path;
+    // If we have a root folder and the file is within it, return relative path
+    if (this.rootFolder !== undefined && file.path.startsWith(this.rootFolder + '/')) {
+      this.inputEl.value = file.path.slice(this.rootFolder.length + 1);
+    } else {
+      this.inputEl.value = file.path;
+    }
     this.inputEl.trigger('input');
     this.close();
   }

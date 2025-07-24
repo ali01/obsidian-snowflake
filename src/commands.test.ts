@@ -67,7 +67,7 @@ describe('SnowflakeCommands', () => {
     // Default settings
     settings = {
       templateMappings: {
-        Projects: 'Templates/project.md'
+        Projects: 'project.md'
       },
       templatesFolder: 'Templates',
       dateFormat: 'YYYY-MM-DD',

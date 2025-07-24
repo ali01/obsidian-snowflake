@@ -30,7 +30,7 @@ describe('Settings Utilities', () => {
   describe('validateSettings', () => {
     test('Should validate correct settings', () => {
       const settings: SnowflakeSettings = {
-        templateMappings: { Projects: 'Templates/project.md' },
+        templateMappings: { Projects: 'project.md' },
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
@@ -74,7 +74,7 @@ describe('Settings Utilities', () => {
     test('Should validate template mapping values', () => {
       const settings: SnowflakeSettings = {
         templateMappings: {
-          Projects: 'Templates/project.md',
+          Projects: 'project.md',
           Invalid: 123 as any
         },
 
@@ -92,7 +92,7 @@ describe('Settings Utilities', () => {
   describe('migrateSettings', () => {
     test('Should return valid settings unchanged', () => {
       const currentSettings: SnowflakeSettings = {
-        templateMappings: { Projects: 'Templates/project.md' },
+        templateMappings: { Projects: 'project.md' },
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
         timeFormat: 'HH:mm'
@@ -157,45 +157,45 @@ describe('Settings Utilities', () => {
   describe('updateTemplateMappings', () => {
     test('Should add new mapping', () => {
       const settings: SnowflakeSettings = {
-        templateMappings: { Projects: 'Templates/project.md' },
+        templateMappings: { Projects: 'project.md' },
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
         timeFormat: 'HH:mm'
       };
 
-      const updated = updateTemplateMappings(settings, 'Daily', 'Templates/daily.md');
+      const updated = updateTemplateMappings(settings, 'Daily', 'daily.md');
 
       expect(updated.templateMappings).toEqual({
-        Projects: 'Templates/project.md',
-        Daily: 'Templates/daily.md'
+        Projects: 'project.md',
+        Daily: 'daily.md'
       });
     });
 
     test('Should update existing mapping', () => {
       const settings: SnowflakeSettings = {
-        templateMappings: { Projects: 'Templates/old-project.md' },
+        templateMappings: { Projects: 'old-project.md' },
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
         timeFormat: 'HH:mm'
       };
 
-      const updated = updateTemplateMappings(settings, 'Projects', 'Templates/new-project.md');
+      const updated = updateTemplateMappings(settings, 'Projects', 'new-project.md');
 
-      expect(updated.templateMappings['Projects']).toBe('Templates/new-project.md');
+      expect(updated.templateMappings['Projects']).toBe('new-project.md');
     });
 
     test('Should create new object to maintain immutability', () => {
       const settings: SnowflakeSettings = {
-        templateMappings: { Projects: 'Templates/project.md' },
+        templateMappings: { Projects: 'project.md' },
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
         timeFormat: 'HH:mm'
       };
 
-      const updated = updateTemplateMappings(settings, 'Daily', 'Templates/daily.md');
+      const updated = updateTemplateMappings(settings, 'Daily', 'daily.md');
 
       expect(updated).not.toBe(settings);
       expect(updated.templateMappings).not.toBe(settings.templateMappings);
@@ -206,8 +206,8 @@ describe('Settings Utilities', () => {
     test('Should remove existing mapping', () => {
       const settings: SnowflakeSettings = {
         templateMappings: {
-          Projects: 'Templates/project.md',
-          Daily: 'Templates/daily.md'
+          Projects: 'project.md',
+          Daily: 'daily.md'
         },
 
         templatesFolder: 'Templates',
@@ -218,13 +218,13 @@ describe('Settings Utilities', () => {
       const updated = removeTemplateMapping(settings, 'Daily');
 
       expect(updated.templateMappings).toEqual({
-        Projects: 'Templates/project.md'
+        Projects: 'project.md'
       });
     });
 
     test('Should handle non-existent mapping', () => {
       const settings: SnowflakeSettings = {
-        templateMappings: { Projects: 'Templates/project.md' },
+        templateMappings: { Projects: 'project.md' },
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',

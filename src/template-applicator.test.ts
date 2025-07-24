@@ -83,7 +83,7 @@ describe('TemplateApplicator', () => {
     // Default settings
     settings = {
       templateMappings: {
-        Projects: 'Templates/project.md'
+        Projects: 'project.md'
       },
 
       templatesFolder: 'Templates',

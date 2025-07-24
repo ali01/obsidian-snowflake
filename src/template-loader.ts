@@ -86,7 +86,7 @@ export class TemplateLoader {
 
     // Check for exact folder match first
     if (this.settings.templateMappings[folderPath]) {
-      return this.settings.templateMappings[folderPath];
+      return this.resolveTemplatePath(this.settings.templateMappings[folderPath]);
     }
 
     // Check parent folders (for nested folder support)
@@ -94,16 +94,16 @@ export class TemplateLoader {
     while (currentPath.includes('/')) {
       currentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
       if (this.settings.templateMappings[currentPath]) {
-        return this.settings.templateMappings[currentPath];
+        return this.resolveTemplatePath(this.settings.templateMappings[currentPath]);
       }
     }
 
     // Check root folder mapping (both empty string and "/")
     if (this.settings.templateMappings['']) {
-      return this.settings.templateMappings[''];
+      return this.resolveTemplatePath(this.settings.templateMappings['']);
     }
     if (this.settings.templateMappings['/']) {
-      return this.settings.templateMappings['/'];
+      return this.resolveTemplatePath(this.settings.templateMappings['/']);
     }
 
     // No mapping found
@@ -188,7 +188,7 @@ export class TemplateLoader {
 
       if (templatePath) {
         templates.push({
-          path: templatePath,
+          path: this.resolveTemplatePath(templatePath),
           folderPath: folderPath,
           depth: i
         });
@@ -201,7 +201,7 @@ export class TemplateLoader {
         this.settings.templateMappings[''] || this.settings.templateMappings['/'];
       if (rootTemplate) {
         templates.push({
-          path: rootTemplate,
+          path: this.resolveTemplatePath(rootTemplate),
           folderPath: '',
           depth: 0
         });
@@ -273,5 +273,21 @@ export class TemplateLoader {
     }
 
     return paths;
+  }
+
+  /**
+   * Resolve a template path by prepending the templates folder if needed
+   *
+   * @param templatePath - The template path (relative or absolute)
+   * @returns Full template path
+   */
+  private resolveTemplatePath(templatePath: string): string {
+    // If the path already starts with the templates folder, return as-is (backwards compatibility)
+    if (templatePath.startsWith(this.settings.templatesFolder + '/')) {
+      return templatePath;
+    }
+
+    // Otherwise, treat it as relative to the templates folder
+    return `${this.settings.templatesFolder}/${templatePath}`;
   }
 }

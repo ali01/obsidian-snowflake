@@ -308,10 +308,15 @@ export class SnowflakeSettingTab extends PluginSettingTab {
    * Preview a template file
    */
   private async previewTemplate(templatePath: string): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(templatePath);
+    // Resolve the template path to include the templates folder if needed
+    const fullPath = templatePath.startsWith(this.plugin.settings.templatesFolder + '/')
+      ? templatePath
+      : `${this.plugin.settings.templatesFolder}/${templatePath}`;
+
+    const file = this.app.vault.getAbstractFileByPath(fullPath);
 
     if (!file || !(file instanceof TFile)) {
-      new Notice(`Template not found: ${templatePath}`);
+      new Notice(`Template not found: ${fullPath}`);
       return;
     }
 
