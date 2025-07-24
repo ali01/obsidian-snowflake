@@ -43,6 +43,19 @@ Access via Command Palette (Ctrl/Cmd + P):
 - **Apply template to current note**: Applies the appropriate template based on the note's location
 - **Apply specific template**: Choose any template to apply to the current note
 - **Apply templates to folder**: Bulk apply templates to all notes in a selected folder
+- **Create new note in folder**: Creates a new note in the selected folder and applies all mapped templates
+
+### Keyboard Shortcuts
+
+You can assign keyboard shortcuts to any Snowflake command:
+
+1. Go to Settings → Hotkeys
+2. Search for "Snowflake"
+3. Click the + icon next to any command
+4. Press your desired key combination
+
+**Tip**: Replace Obsidian's default "New note" behavior:
+Assign `Cmd/Ctrl + N` to "Snowflake: Create new note in folder." This gives you folder selection and automatic template application. The original Obsidian behavior can still be accessed via the Command Palette.
 
 ## Advanced Features
 

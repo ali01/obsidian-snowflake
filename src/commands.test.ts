@@ -8,11 +8,13 @@ import { SnowflakeSettings } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { ConfirmationModal } from './ui/confirmation-modal';
 import { TemplateSelectionModal } from './ui/template-selection-modal';
+import { FolderSuggestModal } from './ui/folder-modal';
 
 // Mock the dependencies
 jest.mock('./template-applicator');
 jest.mock('./ui/confirmation-modal');
 jest.mock('./ui/template-selection-modal');
+jest.mock('./ui/folder-modal');
 jest.mock('obsidian', () => ({
   ...jest.requireActual('obsidian'),
   Notice: jest.fn()
@@ -59,7 +61,10 @@ describe('SnowflakeCommands', () => {
     // Mock plugin
     mockPlugin = {
       app: {
-        vault: {} as any
+        vault: {
+          getAbstractFileByPath: jest.fn(),
+          create: jest.fn()
+        } as any
       },
       addCommand: jest.fn()
     } as any;
@@ -90,7 +95,7 @@ describe('SnowflakeCommands', () => {
     test('Should register all commands', () => {
       commands.registerCommands();
 
-      expect(mockPlugin.addCommand).toHaveBeenCalledTimes(4);
+      expect(mockPlugin.addCommand).toHaveBeenCalledTimes(5);
 
       // Check the commands
       expect(mockPlugin.addCommand).toHaveBeenCalledWith({
@@ -115,6 +120,12 @@ describe('SnowflakeCommands', () => {
         id: 'apply-specific-template',
         name: 'Apply specific template',
         editorCallback: expect.any(Function)
+      });
+
+      expect(mockPlugin.addCommand).toHaveBeenCalledWith({
+        id: 'create-note-in-folder',
+        name: 'Create new note in folder',
+        callback: expect.any(Function)
       });
     });
   });
@@ -773,6 +784,138 @@ describe('SnowflakeCommands', () => {
       await mockTemplateSelectionModal.onChoose(mockTemplateFile);
 
       expect(Notice).toHaveBeenCalledWith('Error applying template: Application error');
+    });
+  });
+
+  describe('Create new note in folder command', () => {
+    let callback: () => void;
+    let mockFolderSuggestModal: any;
+
+    beforeEach(() => {
+      commands.registerCommands();
+      // Get the registered callback for create-note-in-folder command
+      callback = (mockPlugin.addCommand as jest.Mock).mock.calls[4][0].callback;
+
+      // Mock FolderSuggestModal
+      mockFolderSuggestModal = {
+        open: jest.fn(),
+        onChoose: null as any
+      };
+      (FolderSuggestModal as jest.Mock).mockImplementation((app, onChoose) => {
+        mockFolderSuggestModal.onChoose = onChoose;
+        return mockFolderSuggestModal;
+      });
+
+      // Reset workspace mock
+      mockPlugin.app.workspace = {
+        getLeaf: jest.fn().mockReturnValue({
+          openFile: jest.fn()
+        }),
+        getActiveViewOfType: jest.fn()
+      } as any;
+
+      // Reset Notice mock
+      (Notice as jest.Mock).mockClear();
+    });
+
+    test('Should open folder selection modal', () => {
+      callback();
+
+      expect(FolderSuggestModal).toHaveBeenCalledWith(mockPlugin.app, expect.any(Function));
+      expect(mockFolderSuggestModal.open).toHaveBeenCalled();
+    });
+
+    test('Should create new note with Untitled name in selected folder', async () => {
+      const mockFolder = {
+        path: 'Projects',
+        name: 'Projects'
+      } as TFolder;
+
+      const mockFile = {
+        path: 'Projects/Untitled.md',
+        basename: 'Untitled',
+        extension: 'md'
+      } as TFile;
+
+      (mockPlugin.app.vault.getAbstractFileByPath as jest.Mock).mockReturnValue(null);
+      (mockPlugin.app.vault.create as jest.Mock).mockResolvedValue(mockFile);
+
+      callback();
+
+      // Simulate user selecting folder
+      await mockFolderSuggestModal.onChoose(mockFolder);
+
+      // Wait for the async operations to complete
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(mockPlugin.app.vault.create).toHaveBeenCalledWith('Projects/Untitled.md', '');
+      expect(mockPlugin.app.workspace.getLeaf().openFile).toHaveBeenCalledWith(mockFile);
+    });
+
+    test('Should increment Untitled number if file exists', async () => {
+      const mockFolder = {
+        path: 'Projects',
+        name: 'Projects'
+      } as TFolder;
+
+      const mockFile = {
+        path: 'Projects/Untitled 1.md',
+        basename: 'Untitled 1',
+        extension: 'md'
+      } as TFile;
+
+      // First call returns existing file, second call returns null
+      (mockPlugin.app.vault.getAbstractFileByPath as jest.Mock)
+        .mockReturnValueOnce({ path: 'Projects/Untitled.md' })
+        .mockReturnValueOnce(null);
+
+      (mockPlugin.app.vault.create as jest.Mock).mockResolvedValue(mockFile);
+
+      callback();
+
+      await mockFolderSuggestModal.onChoose(mockFolder);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(mockPlugin.app.vault.create).toHaveBeenCalledWith('Projects/Untitled 1.md', '');
+    });
+
+    test('Should handle root folder correctly', async () => {
+      const mockFolder = {
+        path: '',
+        name: '/'
+      } as TFolder;
+
+      const mockFile = {
+        path: 'Untitled.md',
+        basename: 'Untitled',
+        extension: 'md'
+      } as TFile;
+
+      (mockPlugin.app.vault.getAbstractFileByPath as jest.Mock).mockReturnValue(null);
+      (mockPlugin.app.vault.create as jest.Mock).mockResolvedValue(mockFile);
+
+      callback();
+
+      await mockFolderSuggestModal.onChoose(mockFolder);
+
+      expect(mockPlugin.app.vault.create).toHaveBeenCalledWith('Untitled.md', '');
+    });
+
+    test('Should handle errors during note creation', async () => {
+      const mockFolder = {
+        path: 'Projects',
+        name: 'Projects'
+      } as TFolder;
+
+      const error = new Error('Creation failed');
+      (mockPlugin.app.vault.getAbstractFileByPath as jest.Mock).mockReturnValue(null);
+      (mockPlugin.app.vault.create as jest.Mock).mockRejectedValue(error);
+
+      callback();
+
+      await mockFolderSuggestModal.onChoose(mockFolder);
+
+      expect(Notice).toHaveBeenCalledWith('Error applying template: Creation failed');
     });
   });
 });

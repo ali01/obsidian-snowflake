@@ -23,8 +23,8 @@
  * the plugin shall still apply the template.
  */
 
-import { Notice, TFile, TFolder } from 'obsidian';
-import type { Plugin, Editor, MarkdownView, MarkdownFileInfo } from 'obsidian';
+import { Notice, TFile, TFolder, MarkdownView } from 'obsidian';
+import type { Plugin, Editor, MarkdownFileInfo } from 'obsidian';
 import { isMarkdownFile } from './types';
 import type {
   SnowflakeSettings,
@@ -36,6 +36,7 @@ import type {
 import { TemplateApplicator } from './template-applicator';
 import { ConfirmationModal } from './ui/confirmation-modal';
 import { TemplateSelectionModal } from './ui/template-selection-modal';
+import { FolderSuggestModal } from './ui/folder-modal';
 import { ErrorHandler } from './error-handler';
 
 /**
@@ -96,6 +97,15 @@ export class SnowflakeCommands {
       name: 'Apply specific template',
       editorCallback: (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
         this.applyAnyTemplateToCurrentNote(editor, view);
+      }
+    });
+
+    // Command to create a new note in a selected folder
+    this.plugin.addCommand({
+      id: 'create-note-in-folder',
+      name: 'Create new note in folder',
+      callback: () => {
+        this.createNoteInFolder();
       }
     });
   }
@@ -397,6 +407,73 @@ export class SnowflakeCommands {
         operation: 'apply_template',
         filePath: file.path,
         templatePath: templateFile.path
+      };
+      this.errorHandler.handleError(error, errorContext);
+    }
+  }
+
+  /**
+   * Create a new note in a user-selected folder
+   */
+  private createNoteInFolder(): void {
+    const modal = new FolderSuggestModal(this.plugin.app, (folder: TFolder) => {
+      this.createNoteInFolderHandler(folder).catch(() => {
+        // Error is handled in the method
+      });
+    });
+    modal.open();
+  }
+
+  /**
+   * Handle creation of a new note in the specified folder
+   *
+   * @param folder - The folder to create the note in
+   */
+  private async createNoteInFolderHandler(folder: TFolder): Promise<void> {
+    try {
+      // Generate a unique filename
+      let fileName = 'Untitled';
+      let counter = 1;
+      let filePath = folder.path ? `${folder.path}/${fileName}.md` : `${fileName}.md`;
+
+      // Check if file exists and increment counter if needed
+      while (this.plugin.app.vault.getAbstractFileByPath(filePath)) {
+        fileName = `Untitled ${String(counter)}`;
+        filePath = folder.path ? `${folder.path}/${fileName}.md` : `${fileName}.md`;
+        counter++;
+      }
+
+      // Create the new file
+      const file = await this.plugin.app.vault.create(filePath, '');
+
+      // Open the newly created file
+      const leaf = this.plugin.app.workspace.getLeaf();
+      await leaf.openFile(file);
+
+      // Focus on the title field after a short delay to ensure the file is rendered
+      setTimeout(() => {
+        // Get the active view
+        const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
+        if (view) {
+          // Focus on the title container
+          const titleEl = view.containerEl.querySelector('.inline-title') as HTMLElement;
+          if (titleEl) {
+            titleEl.focus();
+            // Select all text for easy replacement
+            const range = document.createRange();
+            range.selectNodeContents(titleEl);
+            const selection = window.getSelection();
+            if (selection) {
+              selection.removeAllRanges();
+              selection.addRange(range);
+            }
+          }
+        }
+      }, 100);
+    } catch (error) {
+      const errorContext: ErrorContext = {
+        operation: 'apply_template',
+        filePath: folder.path || '/'
       };
       this.errorHandler.handleError(error, errorContext);
     }
