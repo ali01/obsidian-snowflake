@@ -49,7 +49,11 @@ describe('TemplateApplicator', () => {
     merge: jest.fn(),
     mergeWithFile: jest.fn(),
     applyToFile: jest.fn(),
-    mergeFrontmatter: jest.fn()
+    mergeFrontmatter: jest.fn(),
+    processWithDeleteList: jest.fn(),
+    applyDeleteList: jest.fn(),
+    extractDeleteList: jest.fn(),
+    mergeWithDeleteList: jest.fn()
   };
 
   const mockErrorHandler = {
@@ -60,6 +64,7 @@ describe('TemplateApplicator', () => {
   beforeEach(() => {
     // Clear all mocks
     jest.clearAllMocks();
+    jest.resetAllMocks();
 
     // Mock console.error to prevent noise in tests
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
@@ -116,6 +121,26 @@ describe('TemplateApplicator', () => {
       hasSnowflakeId: false
     });
     mockFrontmatterMerger.applyToFile.mockImplementation((content, merged) => content);
+    mockFrontmatterMerger.processWithDeleteList.mockReturnValue({
+      processedContent: '',
+      newDeleteList: []
+    });
+    mockFrontmatterMerger.applyDeleteList.mockImplementation((content) => content);
+    mockFrontmatterMerger.extractDeleteList.mockReturnValue(null);
+    mockFrontmatterMerger.mergeFrontmatter.mockReturnValue({
+      merged: '',
+      conflicts: [],
+      added: []
+    });
+    mockFrontmatterMerger.mergeWithDeleteList.mockImplementation(
+      (accumulated, current, deleteList) => {
+        // Default implementation that just returns accumulated
+        return {
+          mergedFrontmatter: accumulated || current || '',
+          updatedDeleteList: deleteList || []
+        };
+      }
+    );
 
     mockErrorHandler.handleError.mockReturnValue('Error occurred');
 
@@ -551,7 +576,7 @@ Template`;
 
       expect(result.success).toBe(true);
       expect(consoleInfoSpy).toHaveBeenCalledWith(
-        'Snowflake: Template applied to Projects/test.md'
+        'Snowflake: Template(s) "Templates/default.md" applied to Projects/test.md'
       );
     });
 
@@ -706,7 +731,7 @@ title: test
       expect(result.success).toBe(true);
       expect(mockVault.modify).toHaveBeenCalledWith(mockFile, expect.any(String));
       expect(consoleInfoSpy).toHaveBeenCalledWith(
-        'Snowflake: Template applied to Projects/test.md'
+        'Snowflake: Template "Templates/specific.md" applied to Projects/test.md'
       );
     });
 
@@ -831,6 +856,23 @@ title: test
         merged: 'author: John\ntitle: Project\ntags: [base, project]'
       });
 
+      // Mock processWithDeleteList for each template
+      mockFrontmatterMerger.processWithDeleteList
+        .mockReturnValueOnce({
+          processedContent: 'author: John\ntags: [base]',
+          newDeleteList: []
+        })
+        .mockReturnValueOnce({
+          processedContent: 'title: Project\ntags: [project]',
+          newDeleteList: []
+        });
+
+      mockFrontmatterMerger.mergeFrontmatter.mockReturnValue({
+        merged: 'author: John\ntitle: Project\ntags: [base, project]'
+      });
+
+      mockFrontmatterMerger.applyDeleteList.mockImplementation((content) => content);
+
       mockVariableProcessor.processTemplate.mockImplementation((content) => ({
         content: content,
         variables: {},
@@ -849,9 +891,10 @@ title: test
       const result = await applicator.applyTemplate(mockFile);
 
       expect(result.success).toBe(true);
-      expect(mockFrontmatterMerger.mergeFrontmatter).toHaveBeenCalledWith(
+      expect(mockFrontmatterMerger.mergeWithDeleteList).toHaveBeenCalledWith(
         'author: John\ntags: [base]',
-        'title: Project\ntags: [project]'
+        'title: Project\ntags: [project]',
+        []
       );
     });
 
@@ -888,15 +931,31 @@ title: test
         hasInheritance: true
       });
 
-      // First merge: base + project
-      mockFrontmatterMerger.mergeFrontmatter
+      // Mock processWithDeleteList for each template
+      mockFrontmatterMerger.processWithDeleteList
         .mockReturnValueOnce({
-          merged: 'tags: [base, global, project]\naliases: [doc, proj]\nstatus: active'
+          processedContent: 'tags: [base, global]\naliases: [doc]',
+          newDeleteList: []
         })
-        // Second merge: (base+project) + dev
         .mockReturnValueOnce({
-          merged:
-            'tags: [base, global, project, dev, code]\naliases: [doc, proj, development]\nstatus: active'
+          processedContent: 'tags: [project]\naliases: [proj]\nstatus: active',
+          newDeleteList: []
+        })
+        .mockReturnValueOnce({
+          processedContent: 'tags: [dev, code]\naliases: [development]',
+          newDeleteList: []
+        });
+
+      // Mock mergeWithDeleteList for template merging
+      mockFrontmatterMerger.mergeWithDeleteList
+        .mockReturnValueOnce({
+          mergedFrontmatter: 'tags: [base, global, project]\naliases: [doc, proj]\nstatus: active',
+          updatedDeleteList: []
+        })
+        .mockReturnValueOnce({
+          mergedFrontmatter:
+            'tags: [base, global, project, dev, code]\naliases: [doc, proj, development]\nstatus: active',
+          updatedDeleteList: []
         });
 
       mockVariableProcessor.processTemplate.mockImplementation((content) => ({
@@ -918,7 +977,7 @@ title: test
       const result = await applicator.applyTemplate(mockFile);
 
       expect(result.success).toBe(true);
-      expect(mockFrontmatterMerger.mergeFrontmatter).toHaveBeenCalledTimes(2);
+      expect(mockFrontmatterMerger.mergeWithDeleteList).toHaveBeenCalledTimes(2);
 
       // Verify final content includes all parts
       const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
@@ -974,6 +1033,9 @@ title: test
     });
 
     test('Should handle mix of templates with and without frontmatter', async () => {
+      // Reset all mocks to clear any previous state
+      jest.clearAllMocks();
+
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
           { path: 'Templates/with-fm.md', folderPath: 'Notes', depth: 0 },
@@ -998,6 +1060,14 @@ title: test
         ],
         hasInheritance: true
       });
+
+      // Mock processWithDeleteList for the template with frontmatter
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValueOnce({
+        processedContent: 'title: Test',
+        newDeleteList: []
+      });
+
+      // No mergeWithDeleteList call expected when second template has no frontmatter
 
       mockVariableProcessor.processTemplate.mockImplementation((content) => ({
         content: content,
@@ -1026,6 +1096,9 @@ title: test
     });
 
     test('Should handle empty templates in chain', async () => {
+      // Reset all mocks to clear any previous state
+      jest.clearAllMocks();
+
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
           { path: 'Templates/empty.md', folderPath: 'Notes', depth: 0 },
@@ -1049,6 +1122,12 @@ title: test
           }
         ],
         hasInheritance: true
+      });
+
+      // Mock processWithDeleteList for non-empty template
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValueOnce({
+        processedContent: 'title: Content',
+        newDeleteList: []
       });
 
       mockVariableProcessor.processTemplate.mockImplementation((content) => ({
@@ -1102,9 +1181,16 @@ title: test
         hasInheritance: true
       });
 
-      // First merge: base + project templates
-      mockFrontmatterMerger.mergeFrontmatter.mockReturnValue({
-        merged: 'tags: [base, global, project]\naliases: [doc, proj]'
+      // Mock processWithDeleteList for first template
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValueOnce({
+        processedContent: 'tags: [base, global]\naliases: [doc]',
+        newDeleteList: []
+      });
+
+      // Mock mergeWithDeleteList for second template
+      mockFrontmatterMerger.mergeWithDeleteList.mockReturnValueOnce({
+        mergedFrontmatter: 'tags: [base, global, project]\naliases: [doc, proj]',
+        updatedDeleteList: []
       });
 
       mockVariableProcessor.processTemplate.mockImplementation((content) => ({
@@ -1134,6 +1220,327 @@ title: test
         existingFileContent,
         'tags: [base, global, project]\naliases: [doc, proj]'
       );
+    });
+  });
+
+  describe('Delete List Template Inheritance', () => {
+    const mockFile: MarkdownFile = {
+      basename: 'test',
+      extension: 'md' as const,
+      path: 'Notes/test.md',
+      name: 'test.md',
+      parent: { path: 'Notes' },
+      vault: {} as any,
+      stat: {
+        ctime: Date.now(),
+        mtime: Date.now(),
+        size: 0
+      }
+    } as MarkdownFile;
+
+    test('REQ-034: Should exclude properties from delete list in single template', async () => {
+      // Reset all mocks to clear any previous state
+      jest.clearAllMocks();
+
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/with-delete.md', folderPath: 'Notes', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/with-delete.md',
+            folderPath: 'Notes',
+            depth: 0,
+            content: '---\nauthor: John\ndate: 2024-01-01\ndelete: [author]\n---\nContent'
+          }
+        ],
+        hasInheritance: false
+      });
+
+      // Set up processWithDeleteList to remove delete property but keep everything else
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValue({
+        processedContent: 'author: John\ndate: 2024-01-01',
+        newDeleteList: ['author']
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+      mockVault.read.mockResolvedValue('');
+
+      // Mock mergeWithFile to return the processed frontmatter
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'author: John\ndate: 2024-01-01',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation((_, fm) => `---\n${fm}\n---\nContent`);
+
+      const result = await applicator.applyTemplate(mockFile);
+      expect(result.success).toBe(true);
+
+      // Verify the delete property is removed but date remains
+      const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
+      expect(processedArg).toContain('date: 2024-01-01');
+      expect(processedArg).not.toContain('delete:');
+      expect(processedArg).toContain('author: John'); // Still there because it's explicitly defined
+    });
+
+    test('REQ-035: Should handle cumulative delete list through inheritance chain', async () => {
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 },
+          { path: 'Templates/dev.md', folderPath: 'Projects/Dev', depth: 2 }
+        ],
+        hasInheritance: true
+      });
+
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/base.md',
+            folderPath: '/',
+            depth: 0,
+            content: '---\nauthor: John\ndate: 2024-01-01\ntags: [base]\n---\nBase'
+          },
+          {
+            path: 'Templates/project.md',
+            folderPath: 'Projects',
+            depth: 1,
+            content: '---\ndelete: [author, tags]\ncategory: project\n---\nProject'
+          },
+          {
+            path: 'Templates/dev.md',
+            folderPath: 'Projects/Dev',
+            depth: 2,
+            content: '---\nauthor: Jane\ntags: [dev]\n---\nDev'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      // Mock the first template processing
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValueOnce({
+        processedContent: 'author: John\ndate: 2024-01-01\ntags: [base]',
+        newDeleteList: []
+      });
+
+      // Mock subsequent merges with delete list
+      mockFrontmatterMerger.mergeWithDeleteList
+        .mockReturnValueOnce({
+          mergedFrontmatter: 'date: 2024-01-01\ncategory: project',
+          updatedDeleteList: ['author', 'tags']
+        })
+        .mockReturnValueOnce({
+          mergedFrontmatter: 'date: 2024-01-01\ncategory: project\nauthor: Jane\ntags: [dev]',
+          updatedDeleteList: [] // author and tags removed from delete list because redefined
+        });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+      mockVault.read.mockResolvedValue('');
+
+      const result = await applicator.applyTemplate(mockFile);
+      expect(result.success).toBe(true);
+
+      // Final result should have Jane as author and [dev] as tags (re-added in dev template)
+      const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
+      expect(processedArg).toContain('author: Jane');
+      expect(processedArg).toContain('tags: [dev]');
+      expect(processedArg).toContain('date: 2024-01-01');
+      expect(processedArg).toContain('category: project');
+      expect(processedArg).not.toContain('delete:');
+    });
+
+    test('REQ-036: Should never include delete property in final output', async () => {
+      // Clear specific mocks
+      mockFrontmatterMerger.processWithDeleteList.mockClear();
+      mockFrontmatterMerger.mergeWithDeleteList.mockClear();
+
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/t1.md', folderPath: 'A', depth: 0 },
+          { path: 'Templates/t2.md', folderPath: 'A/B', depth: 1 }
+        ],
+        hasInheritance: true
+      });
+
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/t1.md',
+            folderPath: 'A',
+            depth: 0,
+            content: '---\ndelete: [prop1]\nprop1: value1\nprop2: value2\n---\nT1'
+          },
+          {
+            path: 'Templates/t2.md',
+            folderPath: 'A/B',
+            depth: 1,
+            content: '---\ndelete: [prop2]\nprop3: value3\n---\nT2'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValueOnce({
+        processedContent: 'prop1: value1\nprop2: value2',
+        newDeleteList: ['prop1']
+      });
+
+      mockFrontmatterMerger.mergeWithDeleteList.mockReturnValueOnce({
+        mergedFrontmatter: 'prop1: value1\nprop3: value3',
+        updatedDeleteList: ['prop1', 'prop2']
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+      mockVault.read.mockResolvedValue('');
+
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'prop1: value1\nprop3: value3',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation((_, fm) => `---\n${fm}\n---\nT1\n\nT2`);
+
+      const result = await applicator.applyTemplate(mockFile);
+      expect(result.success).toBe(true);
+
+      const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
+      expect(processedArg).not.toContain('delete:');
+      expect(processedArg).toContain('prop1: value1');
+      expect(processedArg).toContain('prop3: value3');
+    });
+
+    test('REQ-037: Should keep properties that are both in delete list and explicitly defined', async () => {
+      // Reset all mocks to clear any previous state
+      jest.clearAllMocks();
+
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/override.md', folderPath: 'Notes', depth: 0 }],
+        hasInheritance: false
+      });
+
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/override.md',
+            folderPath: 'Notes',
+            depth: 0,
+            content:
+              '---\ndelete: [tags, author]\ntags: [important]\nauthor: System\ntitle: Note\n---\nContent'
+          }
+        ],
+        hasInheritance: false
+      });
+
+      // Set up processWithDeleteList to keep explicitly defined properties
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValue({
+        processedContent: 'tags: [important]\nauthor: System\ntitle: Note',
+        newDeleteList: []
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+      mockVault.read.mockResolvedValue('');
+
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'tags: [important]\nauthor: System\ntitle: Note',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation((_, fm) => `---\n${fm}\n---\nContent`);
+
+      const result = await applicator.applyTemplate(mockFile);
+      expect(result.success).toBe(true);
+
+      // tags and author should remain because they are explicitly defined
+      const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
+      expect(processedArg).toContain('tags: [important]');
+      expect(processedArg).toContain('author: System');
+      expect(processedArg).toContain('title: Note');
+      expect(processedArg).not.toContain('delete:');
+    });
+
+    test('Should handle array concatenation with delete lists', async () => {
+      // Clear specific mocks
+      mockFrontmatterMerger.processWithDeleteList.mockClear();
+      mockFrontmatterMerger.mergeWithDeleteList.mockClear();
+
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { path: 'Templates/child.md', folderPath: '/Sub', depth: 1 }
+        ],
+        hasInheritance: true
+      });
+
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/base.md',
+            folderPath: '/',
+            depth: 0,
+            content: '---\ntags: [base, template]\naliases: [doc]\nauthor: BaseAuthor\n---\nBase'
+          },
+          {
+            path: 'Templates/child.md',
+            folderPath: '/Sub',
+            depth: 1,
+            content: '---\ndelete: [author]\ntags: [child, specific]\naliases: [subdoc]\n---\nChild'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      // Mock processWithDeleteList for base template
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValueOnce({
+        processedContent: 'tags: [base, template]\naliases: [doc]\nauthor: BaseAuthor',
+        newDeleteList: []
+      });
+
+      // Mock mergeWithDeleteList for child template with delete list
+      mockFrontmatterMerger.mergeWithDeleteList.mockReturnValueOnce({
+        mergedFrontmatter: 'tags: [base, template, child, specific]\naliases: [doc, subdoc]',
+        updatedDeleteList: ['author']
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content,
+        variables: {},
+        hasSnowflakeId: false
+      }));
+      mockVault.read.mockResolvedValue('');
+
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'tags: [base, template, child, specific]\naliases: [doc, subdoc]',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---\n${fm}\n---\nBase\n\nChild`
+      );
+
+      const result = await applicator.applyTemplate(mockFile);
+      expect(result.success).toBe(true);
+
+      const processedArg = mockVariableProcessor.processTemplate.mock.calls[0][0];
+      // Arrays should be concatenated
+      expect(processedArg).toContain('tags: [base, template, child, specific]');
+      expect(processedArg).toContain('aliases: [doc, subdoc]');
+      // Author should be excluded
+      expect(processedArg).not.toContain('author:');
+      expect(processedArg).not.toContain('delete:');
     });
   });
 });

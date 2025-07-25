@@ -496,4 +496,188 @@ export class FrontmatterMerger {
       return false;
     }
   }
+
+  /**
+   * Extract delete list from frontmatter content
+   *
+   * REQ-034: Templates can have delete: [prop1, prop2] to exclude properties
+   * REQ-037: The delete property defines exclusions for inheritance
+   *
+   * @param frontmatterContent - The frontmatter YAML content
+   * @returns Array of property names to exclude, or null if no delete list
+   */
+  extractDeleteList(frontmatterContent: string): string[] | null {
+    const data = this.parseYaml(frontmatterContent);
+    const deleteValue = data['delete'];
+
+    // If no delete property, return null
+    if (deleteValue === undefined) {
+      return null;
+    }
+
+    // Ensure delete value is an array
+    if (!Array.isArray(deleteValue)) {
+      // Invalid delete list - treat as empty
+      return null;
+    }
+
+    // Filter to only string values and return
+    const validProperties = deleteValue.filter(
+      (item) => typeof item === 'string' && item.trim() !== ''
+    );
+
+    return validProperties.length > 0 ? validProperties : null;
+  }
+
+  /**
+   * Apply delete list exclusions to frontmatter
+   *
+   * REQ-034: Remove properties listed in delete list
+   * REQ-036: Always remove the "delete" property itself
+   * REQ-037: Don't remove properties that are explicitly defined
+   *
+   * @param frontmatterContent - The frontmatter YAML content
+   * @param deleteList - Array of property names to exclude
+   * @param explicitlyDefined - Optional set of properties defined in current template
+   * @returns Frontmatter with exclusions applied
+   */
+  applyDeleteList(
+    frontmatterContent: string,
+    deleteList: string[],
+    explicitlyDefined?: Set<string>
+  ): string {
+    const data = this.parseYaml(frontmatterContent);
+    const processedData: Record<string, unknown> = {};
+
+    // Process each property
+    for (const [key, value] of Object.entries(data)) {
+      // REQ-036: Always exclude the "delete" property itself
+      if (key === 'delete') {
+        continue;
+      }
+
+      // REQ-037: Keep properties that are explicitly defined
+      if (explicitlyDefined && explicitlyDefined.has(key)) {
+        processedData[key] = value;
+        continue;
+      }
+
+      // REQ-034: Exclude properties in the delete list
+      if (deleteList.includes(key)) {
+        continue;
+      }
+
+      // Keep all other properties
+      processedData[key] = value;
+    }
+
+    return this.dataToYaml(processedData);
+  }
+
+  /**
+   * Process frontmatter with delete list handling during template inheritance
+   *
+   * REQ-034: Apply delete list exclusions
+   * REQ-035: Handle cumulative exclusions with override capability
+   * REQ-036: Remove "delete" property from result
+   * REQ-037: Explicit definitions override exclusions
+   *
+   * @param frontmatter - The frontmatter content to process
+   * @param cumulativeDeleteList - Cumulative delete list from parent templates
+   * @returns Processed result with delete list tracking
+   */
+  processWithDeleteList(
+    frontmatter: string,
+    cumulativeDeleteList: string[] = []
+  ): { processedContent: string; newDeleteList: string[] } {
+    // Extract current template's delete list
+    const currentDeleteList = this.extractDeleteList(frontmatter) || [];
+
+    // Parse frontmatter to identify explicitly defined properties
+    const data = this.parseYaml(frontmatter);
+    const explicitlyDefined = new Set<string>();
+
+    // All properties in current template are explicitly defined
+    for (const key of Object.keys(data)) {
+      if (key !== 'delete') {
+        explicitlyDefined.add(key);
+      }
+    }
+
+    // Apply cumulative delete list with explicit overrides
+    const processedContent = this.applyDeleteList(
+      frontmatter,
+      cumulativeDeleteList,
+      explicitlyDefined
+    );
+
+    // Update cumulative delete list
+    const newDeleteList = [...cumulativeDeleteList];
+    for (const prop of currentDeleteList) {
+      if (!explicitlyDefined.has(prop) && !newDeleteList.includes(prop)) {
+        newDeleteList.push(prop);
+      }
+    }
+
+    return { processedContent, newDeleteList };
+  }
+
+  /**
+   * Merge template frontmatter with accumulated frontmatter considering delete lists
+   *
+   * This method handles the complete merge process including:
+   * - Extracting and managing cumulative delete lists
+   * - Tracking explicitly defined properties
+   * - Applying delete lists after merging
+   *
+   * @param accumulatedFrontmatter - The accumulated frontmatter from parent templates
+   * @param currentTemplateFrontmatter - The current template's frontmatter
+   * @param cumulativeDeleteList - The cumulative delete list from parent templates
+   * @returns Object containing merged frontmatter and updated delete list
+   */
+  mergeWithDeleteList(
+    accumulatedFrontmatter: string,
+    currentTemplateFrontmatter: string,
+    cumulativeDeleteList: string[]
+  ): { mergedFrontmatter: string; updatedDeleteList: string[] } {
+    // Extract current template's delete list
+    const currentDeleteList = this.extractDeleteList(currentTemplateFrontmatter);
+
+    // Parse frontmatter to identify explicitly defined properties
+    const data = this.parseYaml(currentTemplateFrontmatter);
+    const explicitlyDefined = new Set(Object.keys(data).filter((k) => k !== 'delete'));
+
+    // Remove properties from cumulative delete list if they are explicitly redefined
+    const updatedDeleteList = cumulativeDeleteList.filter((prop) => !explicitlyDefined.has(prop));
+
+    // Add current template's delete list items
+    if (currentDeleteList) {
+      for (const prop of currentDeleteList) {
+        if (!explicitlyDefined.has(prop) && !updatedDeleteList.includes(prop)) {
+          updatedDeleteList.push(prop);
+        }
+      }
+    }
+
+    // Process current template with cumulative delete list
+    const deleteResult = this.processWithDeleteList(
+      currentTemplateFrontmatter,
+      cumulativeDeleteList
+    );
+
+    // Merge accumulated with processed current template
+    const mergeResult = this.mergeFrontmatter(
+      accumulatedFrontmatter,
+      deleteResult.processedContent
+    );
+
+    // Apply the cumulative delete list to the merged result
+    const mergedFrontmatter = this.applyDeleteList(
+      mergeResult.merged,
+      updatedDeleteList,
+      explicitlyDefined
+    );
+
+    return { mergedFrontmatter, updatedDeleteList };
+  }
 }

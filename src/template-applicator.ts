@@ -86,19 +86,15 @@ export class TemplateApplicator {
       return { success: false, message: 'No templates could be loaded' };
     }
 
-    // If multiple templates, merge them first
-    let finalTemplateContent: string;
-    if (loadedChain.hasInheritance) {
-      finalTemplateContent = this.mergeTemplates(loadedChain.templates);
-    } else {
-      finalTemplateContent = loadedChain.templates[0].content ?? '';
-    }
+    // Always use mergeTemplates to ensure delete list processing
+    const finalTemplateContent = this.mergeTemplates(loadedChain.templates);
 
     // Process variables and apply
     const result = await this.applyProcessedTemplateContent(file, finalTemplateContent, editor);
 
     if (result.success && context.isBatchOperation !== true) {
-      console.info(`Snowflake: Template applied to ${file.path}`);
+      const templateNames = loadedChain.templates.map((t) => t.path).join(' → ');
+      console.info(`Snowflake: Template(s) "${templateNames}" applied to ${file.path}`);
     }
 
     return result;
@@ -135,7 +131,7 @@ export class TemplateApplicator {
       const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
 
       if (result.success) {
-        console.info(`Snowflake: Template applied to ${file.path}`);
+        console.info(`Snowflake: Template "${templatePath}" applied to ${file.path}`);
       }
 
       return {
@@ -364,16 +360,18 @@ export class TemplateApplicator {
       return '';
     }
 
-    if (templates.length === 1 && templates[0].content !== undefined) {
-      return templates[0].content;
-    }
-
+    // Always use accumulateTemplateContent to ensure delete list processing
     const { frontmatter, body } = this.accumulateTemplateContent(templates);
     return this.formatMergedContent(frontmatter, body);
   }
 
   /**
    * Accumulate frontmatter and body content from templates
+   *
+   * REQ-034: Apply delete list exclusions from templates
+   * REQ-035: Track cumulative delete list through inheritance chain
+   * REQ-036: Remove "delete" property from final result
+   * REQ-037: Allow explicit redefinition to override exclusions
    */
   private accumulateTemplateContent(templates: TemplateChainItem[]): {
     frontmatter: string;
@@ -381,6 +379,7 @@ export class TemplateApplicator {
   } {
     let accumulatedFrontmatter = '';
     let accumulatedBody = '';
+    let cumulativeDeleteList: string[] = [];
 
     for (const template of templates) {
       if (template.content === undefined || template.content === '') {
@@ -389,16 +388,26 @@ export class TemplateApplicator {
 
       const parts = this.splitContent(template.content);
 
-      // Merge frontmatter
+      // Process frontmatter with delete list handling
       if (parts.frontmatter !== null && parts.frontmatter.trim() !== '') {
         if (accumulatedFrontmatter === '') {
-          accumulatedFrontmatter = parts.frontmatter;
-        } else {
-          const mergeResult = this.frontmatterMerger.mergeFrontmatter(
-            accumulatedFrontmatter,
-            parts.frontmatter
+          // First template - process with empty delete list
+          const deleteResult = this.frontmatterMerger.processWithDeleteList(
+            parts.frontmatter,
+            cumulativeDeleteList
           );
-          accumulatedFrontmatter = mergeResult.merged;
+          accumulatedFrontmatter = deleteResult.processedContent;
+          cumulativeDeleteList = deleteResult.newDeleteList;
+        } else {
+          // Use the new mergeWithDeleteList method that handles all delete list logic
+          const result = this.frontmatterMerger.mergeWithDeleteList(
+            accumulatedFrontmatter,
+            parts.frontmatter,
+            cumulativeDeleteList
+          );
+
+          accumulatedFrontmatter = result.mergedFrontmatter;
+          cumulativeDeleteList = result.updatedDeleteList;
         }
       }
 

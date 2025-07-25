@@ -89,6 +89,30 @@ Each requirement has a unique ID (like REQ-001) for easy reference.
 *Example: If root template has `tags: [base]`, Projects template has `tags: [project]`, and Projects/Web template has `tags: [web, frontend]`, a file in Projects/Web gets `tags: [base, project, web, frontend]`*
 *Rationale: Template inheritance for lists should be additive, allowing each level to contribute its own values.*
 
+### Property Exclusion with "delete" Lists
+
+**REQ-034**: When a template contains a frontmatter property called "delete" with a list of property names, the Snowflake plugin shall exclude those properties from being inherited by files using that template.
+
+*Example: If a template has `delete: [author, date]`, then files using this template won't inherit the `author` or `date` properties from parent templates.*
+*Rationale: Allows templates to selectively override inheritance for specific properties.*
+
+**REQ-035**: When processing the "delete" list during template inheritance, the Snowflake plugin shall apply exclusions at each level of the inheritance chain, but allow child templates to re-add excluded properties.
+
+*Example scenario:*
+- *Template A has `author: John` and `date: 2024-01-01`*
+- *Template B inherits from A and has `delete: [author]` - excludes author*
+- *Template C inherits from B and has `author: Jane` - re-adds author*
+- *Result: Files using Template C will have `author: Jane` and `date: 2024-01-01`*
+
+**REQ-036**: The Snowflake plugin shall not include the "delete" property itself in the final merged frontmatter of files.
+
+*Rationale: The "delete" list is a template directive, not content that should appear in actual notes.*
+
+**REQ-037**: If a property is both defined in a template's frontmatter AND listed in its "delete" list, then the Snowflake plugin shall include the property (the explicit definition takes precedence over the delete list).
+
+*Example: If a template has `tags: [template-specific]` and `delete: [tags]`, the `tags: [template-specific]` will be included.*
+*Rationale: Explicit definitions should always win over exclusions.*
+
 
 ---
 

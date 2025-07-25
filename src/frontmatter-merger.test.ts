@@ -519,4 +519,129 @@ Content`;
       expect(result.added).toEqual(['title']);
     });
   });
+
+  describe('Delete List Functionality', () => {
+    describe('extractDeleteList', () => {
+      test('REQ-034: Should extract delete list from frontmatter', () => {
+        const frontmatter = `author: John
+date: 2024-01-01
+delete: [author, tags]
+category: blog`;
+
+        const deleteList = merger.extractDeleteList(frontmatter);
+        expect(deleteList).toEqual(['author', 'tags']);
+      });
+
+      test('Should return null when no delete property exists', () => {
+        const frontmatter = `author: John
+date: 2024-01-01`;
+
+        const deleteList = merger.extractDeleteList(frontmatter);
+        expect(deleteList).toBeNull();
+      });
+
+      test('Should handle empty delete list', () => {
+        const frontmatter = `delete: []`;
+        const deleteList = merger.extractDeleteList(frontmatter);
+        expect(deleteList).toBeNull();
+      });
+
+      test('Should handle invalid delete list (not an array)', () => {
+        const frontmatter = `delete: "not-an-array"`;
+        const deleteList = merger.extractDeleteList(frontmatter);
+        expect(deleteList).toBeNull();
+      });
+
+      test('Should filter out non-string values from delete list', () => {
+        const frontmatter = `delete: [author, 123, true, tags]`;
+        const deleteList = merger.extractDeleteList(frontmatter);
+        expect(deleteList).toEqual(['author', 'tags']);
+      });
+    });
+
+    describe('applyDeleteList', () => {
+      test('REQ-034: Should remove properties in delete list', () => {
+        const frontmatter = `author: John
+date: 2024-01-01
+tags: [blog, personal]
+category: tech`;
+
+        const result = merger.applyDeleteList(frontmatter, ['author', 'tags']);
+        const parsed = merger['parseYaml'](result);
+
+        expect(parsed.author).toBeUndefined();
+        expect(parsed.tags).toBeUndefined();
+        expect(parsed.date).toBe('2024-01-01');
+        expect(parsed.category).toBe('tech');
+      });
+
+      test('REQ-036: Should always remove delete property itself', () => {
+        const frontmatter = `author: John
+delete: [author]
+category: blog`;
+
+        const result = merger.applyDeleteList(frontmatter, []);
+        const parsed = merger['parseYaml'](result);
+
+        expect(parsed.delete).toBeUndefined();
+        expect(parsed.author).toBe('John');
+        expect(parsed.category).toBe('blog');
+      });
+
+      test('REQ-037: Should keep explicitly defined properties', () => {
+        const frontmatter = `author: John
+tags: [specific]
+category: blog`;
+
+        const explicitlyDefined = new Set(['author', 'tags']);
+        const result = merger.applyDeleteList(
+          frontmatter,
+          ['author', 'tags', 'category'],
+          explicitlyDefined
+        );
+        const parsed = merger['parseYaml'](result);
+
+        expect(parsed.author).toBe('John');
+        expect(parsed.tags).toEqual(['specific']);
+        expect(parsed.category).toBeUndefined();
+      });
+    });
+
+    describe('processWithDeleteList', () => {
+      test('REQ-035: Should handle cumulative delete list with overrides', () => {
+        const frontmatter = `author: Jane
+delete: [date, category]
+tags: [specific]`;
+
+        const cumulativeDeleteList = ['author', 'tags'];
+        const result = merger.processWithDeleteList(frontmatter, cumulativeDeleteList);
+        const parsed = merger['parseYaml'](result.processedContent);
+
+        // Author and tags are kept because they're explicitly defined
+        expect(parsed.author).toBe('Jane');
+        expect(parsed.tags).toEqual(['specific']);
+
+        // Delete property itself is removed
+        expect(parsed.delete).toBeUndefined();
+
+        // New delete list includes date and category but not author/tags (explicitly defined)
+        expect(result.newDeleteList).toContain('date');
+        expect(result.newDeleteList).toContain('category');
+        expect(result.newDeleteList.filter((item) => item === 'author').length).toBe(1);
+        expect(result.newDeleteList.filter((item) => item === 'tags').length).toBe(1);
+      });
+
+      test('Should update cumulative delete list correctly', () => {
+        const frontmatter = `delete: [newProp1, newProp2]
+existingProp: value`;
+
+        const result = merger.processWithDeleteList(frontmatter, ['oldProp']);
+
+        expect(result.newDeleteList).toContain('oldProp');
+        expect(result.newDeleteList).toContain('newProp1');
+        expect(result.newDeleteList).toContain('newProp2');
+        expect(result.newDeleteList).toHaveLength(3);
+      });
+    });
+  });
 });
