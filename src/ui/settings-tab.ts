@@ -11,7 +11,6 @@
 
 import { PluginSettingTab, Setting, Notice, TFile } from 'obsidian';
 import type { App } from 'obsidian';
-// eslint-disable-next-line @typescript-eslint/naming-convention
 import type SnowflakePlugin from '../main';
 import { FolderInputSuggest } from './folder-input-suggest';
 import { TemplateMappingModal } from './template-mapping-modal';
@@ -256,7 +255,6 @@ export class SnowflakeSettingTab extends PluginSettingTab {
         .setButtonText('Remove')
         .setWarning()
         .onClick(async () => {
-          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
           delete this.plugin.settings.templateMappings[folderPath];
           await this.plugin.saveSettings();
           this.display();
@@ -343,7 +341,6 @@ export class SnowflakeSettingTab extends PluginSettingTab {
           this.plugin.settings.templateMappings[folderPath] = templatePath;
         }
 
-        // eslint-disable-next-line no-void
         void this.plugin.saveSettings();
         this.display();
 
@@ -377,7 +374,6 @@ export class SnowflakeSettingTab extends PluginSettingTab {
 
         // Remove old mapping if folder path changed
         if (originalFolderPath && newFolderPath !== originalFolderPath) {
-          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
           delete this.plugin.settings.templateMappings[originalFolderPath];
         }
 
@@ -391,7 +387,6 @@ export class SnowflakeSettingTab extends PluginSettingTab {
           this.plugin.settings.templateMappings[newFolderPath] = templatePath;
         }
 
-        // eslint-disable-next-line no-void
         void this.plugin.saveSettings();
         this.display();
 
@@ -450,7 +445,6 @@ export class SnowflakeSettingTab extends PluginSettingTab {
       `This will apply templates to all notes in ${String(mappings.length)} mapped folder${mappings.length > 1 ? 's' : ''}. Are you sure you want to continue?`,
       () => {
         // Apply templates to all mapped folders without individual confirmations
-        // eslint-disable-next-line no-void
         void (async (): Promise<void> => {
           let totalSuccess = 0;
           let totalFiles = 0;

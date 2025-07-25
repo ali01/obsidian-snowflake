@@ -334,7 +334,6 @@ export function updateTemplateMappings(
   const mappings = { ...settings.templateMappings };
 
   if (template === null) {
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete mappings[folder];
   } else {
     mappings[folder] = template;

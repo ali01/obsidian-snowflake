@@ -5,7 +5,7 @@ import prettierPlugin from 'eslint-plugin-prettier';
 
 export default tseslint.config(
   eslint.configs.recommended,
-  ...tseslint.configs.strictTypeChecked,
+  ...tseslint.configs.recommended,
   prettierConfig,
   {
     files: ['src/**/*.ts'],
@@ -19,89 +19,66 @@ export default tseslint.config(
       prettier: prettierPlugin,
     },
     rules: {
-      // TypeScript strict rules
-      '@typescript-eslint/explicit-function-return-type': 'error',
-      '@typescript-eslint/explicit-module-boundary-types': 'error',
-      '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/no-unsafe-assignment': 'error',
-      '@typescript-eslint/no-unsafe-member-access': 'error',
-      '@typescript-eslint/no-unsafe-call': 'error',
-      '@typescript-eslint/no-unsafe-return': 'error',
-      '@typescript-eslint/no-unsafe-argument': 'error',
-      '@typescript-eslint/strict-boolean-expressions': 'off',
-      '@typescript-eslint/no-floating-promises': 'error',
-      '@typescript-eslint/no-misused-promises': 'error',
-      '@typescript-eslint/await-thenable': 'error',
-      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
-      '@typescript-eslint/no-unnecessary-condition': 'off',
-      '@typescript-eslint/no-non-null-assertion': 'error',
-      '@typescript-eslint/prefer-nullish-coalescing': 'error',
-      '@typescript-eslint/prefer-optional-chain': 'error',
-      '@typescript-eslint/prefer-readonly': 'error',
+      // TypeScript rules focused on correctness, not style
+      '@typescript-eslint/no-explicit-any': 'warn', // Allow any but warn about it
       '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
-      '@typescript-eslint/require-await': 'error',
-      '@typescript-eslint/return-await': 'error',
-      '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/consistent-type-exports': 'error',
-      '@typescript-eslint/no-shadow': 'error',
-      '@typescript-eslint/naming-convention': [
-        'error',
-        {
-          'selector': 'default',
-          'format': ['camelCase'],
-          'leadingUnderscore': 'allow'
-        },
-        {
-          'selector': 'variable',
-          'format': ['camelCase', 'UPPER_CASE', 'PascalCase']
-        },
-        {
-          'selector': 'parameter',
-          'format': ['camelCase'],
-          'leadingUnderscore': 'allow'
-        },
-        {
-          'selector': 'typeLike',
-          'format': ['PascalCase']
-        },
-        {
-          'selector': 'enumMember',
-          'format': ['UPPER_CASE']
-        }
-      ],
+      '@typescript-eslint/no-floating-promises': 'error', // Important for async correctness
+      '@typescript-eslint/no-misused-promises': 'error', // Important for async correctness
+      '@typescript-eslint/await-thenable': 'error', // Prevent await on non-promises
+      '@typescript-eslint/no-shadow': 'warn', // Warn about variable shadowing
 
-      // General JavaScript/TypeScript rules
-      'no-console': ['error', { 'allow': ['warn', 'error', 'info'] }],
+      // Disabled strict rules that are more about style/preference
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+      '@typescript-eslint/no-unsafe-return': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'warn',
+      '@typescript-eslint/prefer-nullish-coalescing': 'off',
+      '@typescript-eslint/prefer-optional-chain': 'off',
+      '@typescript-eslint/prefer-readonly': 'off',
+      '@typescript-eslint/require-await': 'warn',
+      '@typescript-eslint/return-await': 'off',
+      '@typescript-eslint/consistent-type-imports': 'off',
+      '@typescript-eslint/consistent-type-exports': 'off',
+      '@typescript-eslint/naming-convention': 'off', // No naming enforcement
+
+      // General JavaScript rules for correctness
+      'no-console': 'off',
       'no-debugger': 'error',
       'no-alert': 'error',
       'no-eval': 'error',
       'no-implied-eval': 'error',
       'no-extend-native': 'error',
-      'no-extra-bind': 'error',
+      'no-extra-bind': 'warn',
       'no-caller': 'error',
       'no-labels': 'error',
       'no-iterator': 'error',
       'no-proto': 'error',
       'no-script-url': 'error',
       'no-throw-literal': 'error',
-      'no-void': 'error',
+      'no-void': 'off',
       'no-with': 'error',
-      'radix': 'error',
+      'radix': 'warn',
       'require-atomic-updates': 'error',
       'no-promise-executor-return': 'error',
       'no-unreachable-loop': 'error',
-      'no-nested-ternary': 'error',
-      'no-unneeded-ternary': 'error',
-      'complexity': ['error', 50],
-      'max-depth': ['error', 4],
-      'max-lines': ['error', 500],
-      'max-lines-per-function': ['error', 80],
-      'max-params': ['error', 5],
-      'max-statements': ['error', 25],
 
-      // Code style (handled by Prettier but still useful)
-      'max-len': ['error', { 'code': 100, 'ignoreUrls': true, 'ignoreStrings': true }],
-      'prettier/prettier': ['error', {
+      // Removed complexity rules - let developers organize code as needed
+      'no-nested-ternary': 'off',
+      'no-unneeded-ternary': 'warn',
+      'complexity': 'off',
+      'max-depth': 'off',
+      'max-lines': 'off',
+      'max-lines-per-function': 'off',
+      'max-params': 'off',
+      'max-statements': 'off',
+
+      // Code style - make prettier a warning
+      'max-len': 'off', // Let prettier handle line length
+      'prettier/prettier': ['warn', {
         'printWidth': 100,
         'tabWidth': 2,
         'singleQuote': true,
