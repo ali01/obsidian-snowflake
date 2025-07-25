@@ -360,7 +360,11 @@ priority: medium`;
       const baseFrontmatter = 'tags: [project, important]';
       const incomingFrontmatter = 'tags: [template, default]';
 
-      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+      const result = FrontmatterMergerTestUtils.mergeFrontmatter(
+        merger,
+        baseFrontmatter,
+        incomingFrontmatter
+      );
 
       expect(result.merged).toContain(
         'tags:\n  - project\n  - important\n  - template\n  - default'
@@ -372,7 +376,11 @@ priority: medium`;
       const baseFrontmatter = 'tags: [project, shared, important]';
       const incomingFrontmatter = 'tags: [template, shared, project]';
 
-      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+      const result = FrontmatterMergerTestUtils.mergeFrontmatter(
+        merger,
+        baseFrontmatter,
+        incomingFrontmatter
+      );
 
       // Should maintain order: base first, then unique incoming
       expect(result.merged).toContain(
@@ -384,7 +392,11 @@ priority: medium`;
       const baseFrontmatter = 'mixed: [string, 123, true]';
       const incomingFrontmatter = 'mixed: [456, false, string]';
 
-      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+      const result = FrontmatterMergerTestUtils.mergeFrontmatter(
+        merger,
+        baseFrontmatter,
+        incomingFrontmatter
+      );
 
       expect(result.merged).toContain('mixed:\n  - string\n  - 123\n  - true\n  - 456\n  - false');
     });
@@ -411,7 +423,11 @@ tags:
       const baseFrontmatter = 'title: Base Title\ntags: not-an-array';
       const incomingFrontmatter = 'title: Incoming Title\ntags: [array]';
 
-      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+      const result = FrontmatterMergerTestUtils.mergeFrontmatter(
+        merger,
+        baseFrontmatter,
+        incomingFrontmatter
+      );
 
       // Non-array conflicts should use incoming value
       expect(result.merged).toContain('title: Incoming Title');
@@ -422,7 +438,11 @@ tags:
       const baseFrontmatter = 'tags: []';
       const incomingFrontmatter = 'tags: [template, default]';
 
-      const result = merger.mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+      const result = FrontmatterMergerTestUtils.mergeFrontmatter(
+        merger,
+        baseFrontmatter,
+        incomingFrontmatter
+      );
 
       // Empty arrays might have an empty item, so be more flexible
       expect(result.merged).toMatch(/tags:\n(  - \n)?  - template\n  - default/);
@@ -498,7 +518,7 @@ related:
       const baseFm = 'title: Base\ndate: 2024-01-01';
       const incomingFm = 'author: John\ndate: 2024-02-01';
 
-      const result = merger.mergeFrontmatter(baseFm, incomingFm);
+      const result = FrontmatterMergerTestUtils.mergeFrontmatter(merger, baseFm, incomingFm);
 
       expect(result.merged).toContain('title: Base');
       expect(result.merged).toContain('date: 2024-02-01'); // Incoming value used
@@ -530,7 +550,7 @@ date: 2024-01-01
 delete: [author, tags]
 category: blog`;
 
-        const deleteList = merger.extractDeleteList(frontmatter);
+        const deleteList = FrontmatterMergerTestUtils.extractDeleteList(merger, frontmatter);
         expect(deleteList).toEqual(['author', 'tags']);
       });
 
@@ -538,25 +558,25 @@ category: blog`;
         const frontmatter = `author: John
 date: 2024-01-01`;
 
-        const deleteList = merger.extractDeleteList(frontmatter);
+        const deleteList = FrontmatterMergerTestUtils.extractDeleteList(merger, frontmatter);
         expect(deleteList).toBeNull();
       });
 
       test('Should handle empty delete list', () => {
         const frontmatter = `delete: []`;
-        const deleteList = merger.extractDeleteList(frontmatter);
+        const deleteList = FrontmatterMergerTestUtils.extractDeleteList(merger, frontmatter);
         expect(deleteList).toBeNull();
       });
 
       test('Should handle invalid delete list (not an array)', () => {
         const frontmatter = `delete: "not-an-array"`;
-        const deleteList = merger.extractDeleteList(frontmatter);
+        const deleteList = FrontmatterMergerTestUtils.extractDeleteList(merger, frontmatter);
         expect(deleteList).toBeNull();
       });
 
       test('Should filter out non-string values from delete list', () => {
         const frontmatter = `delete: [author, 123, true, tags]`;
-        const deleteList = merger.extractDeleteList(frontmatter);
+        const deleteList = FrontmatterMergerTestUtils.extractDeleteList(merger, frontmatter);
         expect(deleteList).toEqual(['author', 'tags']);
       });
     });
@@ -568,8 +588,11 @@ date: 2024-01-01
 tags: [blog, personal]
 category: tech`;
 
-        const result = merger.applyDeleteList(frontmatter, ['author', 'tags']);
-        const parsed = merger['parseYaml'](result);
+        const result = FrontmatterMergerTestUtils.applyDeleteList(merger, frontmatter, [
+          'author',
+          'tags'
+        ]);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
 
         expect(parsed.author).toBeUndefined();
         expect(parsed.tags).toBeUndefined();
@@ -582,8 +605,8 @@ category: tech`;
 delete: [author]
 category: blog`;
 
-        const result = merger.applyDeleteList(frontmatter, []);
-        const parsed = merger['parseYaml'](result);
+        const result = FrontmatterMergerTestUtils.applyDeleteList(merger, frontmatter, []);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
 
         expect(parsed.delete).toBeUndefined();
         expect(parsed.author).toBe('John');
@@ -596,12 +619,13 @@ tags: [specific]
 category: blog`;
 
         const explicitlyDefined = new Set(['author', 'tags']);
-        const result = merger.applyDeleteList(
+        const result = FrontmatterMergerTestUtils.applyDeleteList(
+          merger,
           frontmatter,
           ['author', 'tags', 'category'],
           explicitlyDefined
         );
-        const parsed = merger['parseYaml'](result);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
 
         expect(parsed.author).toBe('John');
         expect(parsed.tags).toEqual(['specific']);
@@ -617,7 +641,7 @@ tags: [specific]`;
 
         const cumulativeDeleteList = ['author', 'tags'];
         const result = merger.processWithDeleteList(frontmatter, cumulativeDeleteList);
-        const parsed = merger['parseYaml'](result.processedContent);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result.processedContent);
 
         // Author and tags are kept because they're explicitly defined
         expect(parsed.author).toBe('Jane');

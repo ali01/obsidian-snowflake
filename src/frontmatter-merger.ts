@@ -47,7 +47,7 @@ export class FrontmatterMerger {
    * @param incomingFrontmatter - The incoming frontmatter to merge
    * @returns Merge result with conflicts and additions tracked
    */
-  public mergeFrontmatter(
+  private mergeFrontmatter(
     baseFrontmatter: string,
     incomingFrontmatter: string
   ): FrontmatterMergeResult {
@@ -509,7 +509,7 @@ export class FrontmatterMerger {
    * @param frontmatterContent - The frontmatter YAML content
    * @returns Array of property names to exclude, or null if no delete list
    */
-  public extractDeleteList(frontmatterContent: string): string[] | null {
+  private extractDeleteList(frontmatterContent: string): string[] | null {
     const data = this.parseYaml(frontmatterContent);
     const deleteValue = data['delete'];
 
@@ -544,7 +544,7 @@ export class FrontmatterMerger {
    * @param explicitlyDefined - Optional set of properties defined in current template
    * @returns Frontmatter with exclusions applied
    */
-  public applyDeleteList(
+  private applyDeleteList(
     frontmatterContent: string,
     deleteList: string[],
     explicitlyDefined?: Set<string>
@@ -692,5 +692,30 @@ export const FrontmatterMergerTestUtils = {
   validateYaml: (merger: FrontmatterMerger, yaml: string): boolean => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (merger as any).validateYaml(yaml);
+  },
+  mergeFrontmatter: (
+    merger: FrontmatterMerger,
+    baseFrontmatter: string,
+    incomingFrontmatter: string
+  ): FrontmatterMergeResult => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (merger as any).mergeFrontmatter(baseFrontmatter, incomingFrontmatter);
+  },
+  extractDeleteList: (merger: FrontmatterMerger, frontmatterContent: string): string[] | null => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (merger as any).extractDeleteList(frontmatterContent);
+  },
+  applyDeleteList: (
+    merger: FrontmatterMerger,
+    frontmatterContent: string,
+    deleteList: string[],
+    explicitlyDefined?: Set<string>
+  ): string => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (merger as any).applyDeleteList(frontmatterContent, deleteList, explicitlyDefined);
+  },
+  parseYaml: (merger: FrontmatterMerger, yaml: string): Record<string, unknown> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (merger as any).parseYaml(yaml);
   }
 };
