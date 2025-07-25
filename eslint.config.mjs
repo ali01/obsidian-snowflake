@@ -71,7 +71,7 @@ export default tseslint.config(
       ],
 
       // General JavaScript/TypeScript rules
-      'no-console': ['error', { 'allow': ['warn', 'error'] }],
+      'no-console': ['error', { 'allow': ['warn', 'error', 'info'] }],
       'no-debugger': 'error',
       'no-alert': 'error',
       'no-eval': 'error',

@@ -3,7 +3,7 @@
  */
 
 import { TemplateApplicator } from './template-applicator';
-import { Vault, Editor, Notice, TFile } from 'obsidian';
+import { Vault, Editor, TFile } from 'obsidian';
 import { SnowflakeSettings, MarkdownFile } from './types';
 import { TemplateLoader } from './template-loader';
 import { TemplateVariableProcessor } from './template-variables';
@@ -16,8 +16,7 @@ jest.mock('./template-variables');
 jest.mock('./frontmatter-merger');
 jest.mock('./error-handler');
 jest.mock('obsidian', () => ({
-  ...jest.requireActual('obsidian'),
-  Notice: jest.fn()
+  ...jest.requireActual('obsidian')
 }));
 
 describe('TemplateApplicator', () => {
@@ -28,6 +27,7 @@ describe('TemplateApplicator', () => {
   };
   let settings: SnowflakeSettings;
   let consoleErrorSpy: jest.SpyInstance;
+  let consoleInfoSpy: jest.SpyInstance;
 
   // Create mock instances
   const mockTemplateLoader = {
@@ -63,6 +63,7 @@ describe('TemplateApplicator', () => {
 
     // Mock console.error to prevent noise in tests
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
+    consoleInfoSpy = jest.spyOn(console, 'info').mockImplementation();
 
     // Setup mock implementations
     (TemplateLoader as jest.Mock).mockImplementation(() => mockTemplateLoader);
@@ -125,6 +126,7 @@ describe('TemplateApplicator', () => {
   afterEach(() => {
     // Restore console.error
     consoleErrorSpy.mockRestore();
+    consoleInfoSpy.mockRestore();
   });
 
   describe('applyTemplate', () => {
@@ -548,7 +550,9 @@ Template`;
       const result = await applicator.applyTemplate(mockFile, { isManualCommand: true });
 
       expect(result.success).toBe(true);
-      expect(Notice).toHaveBeenCalledWith('Template applied to test');
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        'Snowflake: Template applied to Projects/test.md'
+      );
     });
 
     test('Should handle vault read errors gracefully', async () => {
@@ -662,9 +666,9 @@ Template`;
     const mockFile: MarkdownFile = {
       basename: 'test',
       extension: 'md' as const,
-      path: 'test.md',
+      path: 'Projects/test.md',
       name: 'test.md',
-      parent: null,
+      parent: { path: 'Projects' },
       vault: {} as any,
       stat: {
         ctime: Date.now(),
@@ -701,7 +705,9 @@ title: test
 
       expect(result.success).toBe(true);
       expect(mockVault.modify).toHaveBeenCalledWith(mockFile, expect.any(String));
-      expect(Notice).toHaveBeenCalledWith('Template applied to test');
+      expect(consoleInfoSpy).toHaveBeenCalledWith(
+        'Snowflake: Template applied to Projects/test.md'
+      );
     });
 
     test('Should handle template not found', async () => {
@@ -711,7 +717,9 @@ title: test
 
       expect(result.success).toBe(false);
       expect(result.message).toContain('Template not found');
-      expect(Notice).toHaveBeenCalledWith('Template not found: Templates/missing.md');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Snowflake: Template not found: Templates/missing.md'
+      );
     });
 
     test('Should handle errors gracefully', async () => {

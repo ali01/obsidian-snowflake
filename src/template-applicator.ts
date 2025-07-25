@@ -10,7 +10,7 @@
  * REQ-025: Manual commands always apply templates regardless of other settings.
  */
 
-import { Notice } from 'obsidian';
+// import { Notice } from 'obsidian';
 import type { Vault, Editor } from 'obsidian';
 import type {
   MarkdownFile,
@@ -98,7 +98,7 @@ export class TemplateApplicator {
     const result = await this.applyProcessedTemplateContent(file, finalTemplateContent, editor);
 
     if (result.success && context.isBatchOperation !== true) {
-      new Notice(`Template applied to ${file.basename}`);
+      console.info(`Snowflake: Template applied to ${file.path}`);
     }
 
     return result;
@@ -121,7 +121,7 @@ export class TemplateApplicator {
       // Load the template
       const templateContent = await this.loader.loadTemplate(templatePath);
       if (templateContent === null) {
-        new Notice(`Template not found: ${templatePath}`);
+        console.error(`Snowflake: Template not found: ${templatePath}`);
         return {
           success: false,
           message: `Template not found: ${templatePath}`
@@ -135,7 +135,7 @@ export class TemplateApplicator {
       const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
 
       if (result.success) {
-        new Notice(`Template applied to ${file.basename}`);
+        console.info(`Snowflake: Template applied to ${file.path}`);
       }
 
       return {
