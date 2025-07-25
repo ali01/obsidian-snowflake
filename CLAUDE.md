@@ -195,15 +195,12 @@ npm run check
 ```
 
 This command will:
-1. Run ESLint with strict configuration (`npm run lint`)
-2. Check code formatting with Prettier (`npm run prettier`)
-3. Run all tests (`npm run test`)
+1. Run the type-checker (`npm run typecheck`)
+2. Run all tests (`npm run test`)
 
 If any issues are found:
-1. Fix all linting errors
-2. Fix all formatting issues
-3. Ensure all tests pass
-4. Run `npm run check` again to verify
+1. Fix all of the problems
+2. Run `npm run check` again to verify
 
 Only return control to the user when `npm run check` completes successfully with no errors or warnings.
 
