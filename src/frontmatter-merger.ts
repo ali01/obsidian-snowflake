@@ -47,7 +47,10 @@ export class FrontmatterMerger {
    * @param incomingFrontmatter - The incoming frontmatter to merge
    * @returns Merge result with conflicts and additions tracked
    */
-  mergeFrontmatter(baseFrontmatter: string, incomingFrontmatter: string): FrontmatterMergeResult {
+  public mergeFrontmatter(
+    baseFrontmatter: string,
+    incomingFrontmatter: string
+  ): FrontmatterMergeResult {
     // Parse both frontmatter sections
     const baseFm = this.parseYaml(baseFrontmatter);
     const incomingFm = this.parseYaml(incomingFrontmatter);
@@ -111,7 +114,7 @@ export class FrontmatterMerger {
    * @param templateFrontmatter - The template's frontmatter content
    * @returns Merge result with conflicts and additions tracked
    */
-  mergeWithFile(fileContent: string, templateFrontmatter: string): FrontmatterMergeResult {
+  public mergeWithFile(fileContent: string, templateFrontmatter: string): FrontmatterMergeResult {
     // Extract frontmatter from file
     const fileFm = this.parseFrontmatter(fileContent);
 
@@ -126,7 +129,7 @@ export class FrontmatterMerger {
    * @param mergedFrontmatter - The merged frontmatter YAML
    * @returns File content with updated frontmatter
    */
-  applyToFile(fileContent: string, mergedFrontmatter: string): string {
+  public applyToFile(fileContent: string, mergedFrontmatter: string): string {
     const parsed = this.parseFrontmatter(fileContent);
 
     // Format the frontmatter block
@@ -487,7 +490,7 @@ export class FrontmatterMerger {
    * @param yaml - YAML content to validate
    * @returns True if valid, false otherwise
    */
-  validateYaml(yaml: string): boolean {
+  public validateYaml(yaml: string): boolean {
     try {
       const parsed = this.parseYaml(yaml);
       // Basic validation - should have parsed at least something
@@ -506,7 +509,7 @@ export class FrontmatterMerger {
    * @param frontmatterContent - The frontmatter YAML content
    * @returns Array of property names to exclude, or null if no delete list
    */
-  extractDeleteList(frontmatterContent: string): string[] | null {
+  public extractDeleteList(frontmatterContent: string): string[] | null {
     const data = this.parseYaml(frontmatterContent);
     const deleteValue = data['delete'];
 
@@ -541,7 +544,7 @@ export class FrontmatterMerger {
    * @param explicitlyDefined - Optional set of properties defined in current template
    * @returns Frontmatter with exclusions applied
    */
-  applyDeleteList(
+  public applyDeleteList(
     frontmatterContent: string,
     deleteList: string[],
     explicitlyDefined?: Set<string>
@@ -586,7 +589,7 @@ export class FrontmatterMerger {
    * @param cumulativeDeleteList - Cumulative delete list from parent templates
    * @returns Processed result with delete list tracking
    */
-  processWithDeleteList(
+  public processWithDeleteList(
     frontmatter: string,
     cumulativeDeleteList: string[] = []
   ): { processedContent: string; newDeleteList: string[] } {
@@ -635,7 +638,7 @@ export class FrontmatterMerger {
    * @param cumulativeDeleteList - The cumulative delete list from parent templates
    * @returns Object containing merged frontmatter and updated delete list
    */
-  mergeWithDeleteList(
+  public mergeWithDeleteList(
     accumulatedFrontmatter: string,
     currentTemplateFrontmatter: string,
     cumulativeDeleteList: string[]

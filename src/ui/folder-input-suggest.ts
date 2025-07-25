@@ -15,7 +15,7 @@ export class FolderInputSuggest extends AbstractInputSuggest<TFolder> {
     this.inputEl = inputEl;
   }
 
-  getSuggestions(query: string): TFolder[] {
+  public getSuggestions(query: string): TFolder[] {
     const lowerQuery = query.toLowerCase();
     const allFolders = this.app.vault
       .getAllLoadedFiles()
@@ -56,12 +56,12 @@ export class FolderInputSuggest extends AbstractInputSuggest<TFolder> {
       .slice(0, 10);
   }
 
-  renderSuggestion(folder: TFolder, el: HTMLElement): void {
+  public renderSuggestion(folder: TFolder, el: HTMLElement): void {
     el.setText(folder.path);
     el.addClass('folder-suggestion-item');
   }
 
-  selectSuggestion(folder: TFolder, _evt: MouseEvent | KeyboardEvent): void {
+  public selectSuggestion(folder: TFolder, _evt: MouseEvent | KeyboardEvent): void {
     this.inputEl.value = folder.path;
     this.inputEl.trigger('input');
     this.close();

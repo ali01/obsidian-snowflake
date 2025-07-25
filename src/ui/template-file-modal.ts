@@ -63,14 +63,14 @@ export class TemplateFileSuggestModal extends FuzzySuggestModal<TFile> {
   /**
    * Get all items for the suggester
    */
-  getItems(): TFile[] {
+  public getItems(): TFile[] {
     return this.templateFiles;
   }
 
   /**
    * Get the text to display for each item
    */
-  getItemText(file: TFile): string {
+  public getItemText(file: TFile): string {
     // Show relative path from templates folder for clarity
     if (file.path.startsWith(this.templatesFolder + '/')) {
       return file.path.substring(this.templatesFolder.length + 1);
@@ -81,7 +81,7 @@ export class TemplateFileSuggestModal extends FuzzySuggestModal<TFile> {
   /**
    * Render each item in the suggestion list
    */
-  renderSuggestion(match: FuzzyMatch<TFile>, el: HTMLElement): void {
+  public renderSuggestion(match: FuzzyMatch<TFile>, el: HTMLElement): void {
     el.createEl('div', { text: this.getItemText(match.item) });
     el.createEl('small', {
       text: match.item.path,
@@ -92,7 +92,7 @@ export class TemplateFileSuggestModal extends FuzzySuggestModal<TFile> {
   /**
    * Handle item selection
    */
-  onChooseItem(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
+  public onChooseItem(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
     this.onChoose(file);
   }
 }

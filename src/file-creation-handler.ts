@@ -48,7 +48,7 @@ export class FileCreationHandler {
   /**
    * Start listening for file creation and rename/move events
    */
-  start(): void {
+  public start(): void {
     // Register the create event handler
     this.createEventRef = this.vault.on('create', (file: TAbstractFile) => {
       if (file instanceof TFile) {
@@ -73,7 +73,7 @@ export class FileCreationHandler {
   /**
    * Stop listening for file events
    */
-  stop(): void {
+  public stop(): void {
     if (this.createEventRef !== null) {
       this.vault.offref(this.createEventRef);
       this.createEventRef = null;
@@ -175,7 +175,7 @@ export class FileCreationHandler {
    *
    * @param settings - New settings
    */
-  updateSettings(settings: SnowflakeSettings): void {
+  public updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
     this.templateApplicator.updateSettings(settings);
   }
@@ -186,7 +186,7 @@ export class FileCreationHandler {
    * @param filePath - Path to check
    * @returns True if file is in processing queue
    */
-  isProcessing(filePath: string): boolean {
+  public isProcessing(filePath: string): boolean {
     return this.processingQueue.has(filePath);
   }
 
@@ -195,7 +195,7 @@ export class FileCreationHandler {
    *
    * @returns Number of files in processing queue
    */
-  getProcessingCount(): number {
+  public getProcessingCount(): number {
     return this.processingQueue.size;
   }
 }

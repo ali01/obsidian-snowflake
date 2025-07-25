@@ -69,7 +69,7 @@ export class TemplateApplicator {
    * @param editor - Optional editor for cursor position
    * @returns Application result
    */
-  async applyTemplate(
+  public async applyTemplate(
     file: MarkdownFile,
     context: CommandContext = { isManualCommand: false },
     editor?: Editor
@@ -108,7 +108,7 @@ export class TemplateApplicator {
    * @param editor - Optional editor for cursor position
    * @returns Application result
    */
-  async applySpecificTemplate(
+  public async applySpecificTemplate(
     file: MarkdownFile,
     templatePath: string,
     editor?: Editor
@@ -339,7 +339,7 @@ export class TemplateApplicator {
    *
    * @param settings - New settings
    */
-  updateSettings(settings: SnowflakeSettings): void {
+  public updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
     this.loader.updateSettings(settings);
     this.variableProcessor.setDateFormat(settings.dateFormat);

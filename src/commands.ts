@@ -61,7 +61,7 @@ export class SnowflakeCommands {
   /**
    * Register all commands with Obsidian
    */
-  registerCommands(): void {
+  public registerCommands(): void {
     // REQ-017: Command to apply template to current note
     this.plugin.addCommand({
       id: 'apply-template-to-current-note',
@@ -196,7 +196,7 @@ export class SnowflakeCommands {
    *
    * @param folderPath - Path to the folder to process
    */
-  async applyTemplateToFolderPath(
+  public async applyTemplateToFolderPath(
     folderPath: string,
     skipConfirmation = false
   ): Promise<BatchResult | null> {
@@ -318,7 +318,7 @@ export class SnowflakeCommands {
    *
    * @param settings - New settings
    */
-  updateSettings(settings: SnowflakeSettings): void {
+  public updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
     this.templateApplicator.updateSettings(settings);
   }

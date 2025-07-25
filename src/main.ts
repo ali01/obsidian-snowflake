@@ -24,11 +24,11 @@ import { SnowflakeCommands } from './commands';
  * Main plugin class for Snowflake
  */
 export default class SnowflakePlugin extends Plugin {
-  settings!: SnowflakeSettings;
+  public settings!: SnowflakeSettings;
   private fileCreationHandler?: FileCreationHandler;
   private commands?: SnowflakeCommands;
 
-  async onload(): Promise<void> {
+  public async onload(): Promise<void> {
     // Load saved settings or use defaults
     await this.loadSettings();
 
@@ -49,14 +49,14 @@ export default class SnowflakePlugin extends Plugin {
     });
   }
 
-  onunload(): void {
+  public onunload(): void {
     // Stop file creation handler
     if (this.fileCreationHandler !== undefined) {
       this.fileCreationHandler.stop();
     }
   }
 
-  async loadSettings(): Promise<void> {
+  public async loadSettings(): Promise<void> {
     const data = (await this.loadData()) as unknown;
 
     // Use the settings utilities to properly merge with defaults
@@ -76,7 +76,7 @@ export default class SnowflakePlugin extends Plugin {
     await this.saveSettings();
   }
 
-  async saveSettings(): Promise<void> {
+  public async saveSettings(): Promise<void> {
     // Clean settings to remove any old fields
     this.settings = cleanSettings(this.settings);
 
@@ -110,7 +110,7 @@ export default class SnowflakePlugin extends Plugin {
    *
    * REQ-023: Ensures all required settings exist with valid values
    */
-  validateSettings(): void {
+  public validateSettings(): void {
     // Ensure templateMappings is an object (not null or array)
     if (
       typeof this.settings.templateMappings !== 'object' ||

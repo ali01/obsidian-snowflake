@@ -53,7 +53,7 @@ export class ErrorHandler {
   /**
    * Get singleton instance
    */
-  static getInstance(): ErrorHandler {
+  public static getInstance(): ErrorHandler {
     ErrorHandler.instance ??= new ErrorHandler();
     return ErrorHandler.instance;
   }
@@ -61,7 +61,7 @@ export class ErrorHandler {
   /**
    * Enable/disable debug mode
    */
-  setDebugMode(enabled: boolean): void {
+  public setDebugMode(enabled: boolean): void {
     this.debugMode = enabled;
   }
 
@@ -72,7 +72,7 @@ export class ErrorHandler {
    * @param context - Context about where the error occurred
    * @returns User-friendly error message
    */
-  handleError(error: unknown, context: ErrorContext): string {
+  public handleError(error: unknown, context: ErrorContext): string {
     const errorType = this.categorizeError(error);
     const userMessage = this.getUserMessage(errorType, context, error);
 
@@ -88,7 +88,7 @@ export class ErrorHandler {
   /**
    * Handle error without showing notice (for cases where caller handles UI)
    */
-  handleErrorSilently(error: unknown, context: ErrorContext): string {
+  public handleErrorSilently(error: unknown, context: ErrorContext): string {
     const errorType = this.categorizeError(error);
     const userMessage = this.getUserMessage(errorType, context, error);
 
@@ -261,7 +261,7 @@ export class ErrorHandler {
   /**
    * Create an ExtendedError with context
    */
-  createError(
+  public createError(
     message: string,
     type: ErrorType,
     context: ErrorContext,
@@ -277,7 +277,7 @@ export class ErrorHandler {
   /**
    * Check if an error is a specific type
    */
-  isErrorType(error: unknown, type: ErrorType): boolean {
+  public isErrorType(error: unknown, type: ErrorType): boolean {
     if (error !== null && error !== undefined && typeof error === 'object' && 'type' in error) {
       return (error as ExtendedError).type === type;
     }

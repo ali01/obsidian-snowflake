@@ -26,7 +26,7 @@ export class ConfirmationModal extends Modal {
     this.onCancel = onCancel;
   }
 
-  onOpen(): void {
+  public onOpen(): void {
     const { contentEl } = this;
 
     contentEl.createEl('h2', { text: this.title });
@@ -50,7 +50,7 @@ export class ConfirmationModal extends Modal {
       );
   }
 
-  onClose(): void {
+  public onClose(): void {
     const { contentEl } = this;
     contentEl.empty();
   }

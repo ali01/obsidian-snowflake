@@ -24,7 +24,7 @@ import type { SnowflakeCommands } from '../commands';
  * Settings tab for configuring the Snowflake plugin
  */
 export class SnowflakeSettingTab extends PluginSettingTab {
-  plugin: SnowflakePlugin;
+  public plugin: SnowflakePlugin;
   private readonly errorHandler: ErrorHandler;
   private readonly commands: SnowflakeCommands;
 
@@ -35,7 +35,7 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     this.commands = commands;
   }
 
-  display(): void {
+  public display(): void {
     const { containerEl } = this;
     containerEl.empty();
 

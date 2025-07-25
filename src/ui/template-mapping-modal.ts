@@ -64,7 +64,7 @@ export class TemplateMappingModal extends Modal {
     }
   }
 
-  onOpen(): void {
+  public onOpen(): void {
     const { contentEl } = this;
 
     contentEl.createEl('h2', {
@@ -187,7 +187,7 @@ export class TemplateMappingModal extends Modal {
     this.close();
   }
 
-  onClose(): void {
+  public onClose(): void {
     const { contentEl } = this;
     contentEl.empty();
   }

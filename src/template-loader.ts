@@ -49,7 +49,7 @@ export class TemplateLoader {
    * @param templatePath - Path to the template file
    * @returns Template content or null if not found
    */
-  async loadTemplate(templatePath: string): Promise<string | null> {
+  public async loadTemplate(templatePath: string): Promise<string | null> {
     try {
       // Get the template file
       const templateFile = this.vault.getAbstractFileByPath(templatePath);
@@ -82,7 +82,7 @@ export class TemplateLoader {
    * @param file - The file to get template for
    * @returns Template path or null if no template configured
    */
-  getTemplateForFile(file: MarkdownFile): string | null {
+  public getTemplateForFile(file: MarkdownFile): string | null {
     // Get the folder path
     const folderPath = file.parent?.path ?? '';
 
@@ -127,7 +127,7 @@ export class TemplateLoader {
    * @param templatePath - Path to validate
    * @returns True if template exists
    */
-  templateExists(templatePath: string): boolean {
+  public templateExists(templatePath: string): boolean {
     const file = this.vault.getAbstractFileByPath(templatePath);
     return file instanceof TFile;
   }
@@ -137,7 +137,7 @@ export class TemplateLoader {
    *
    * @returns Array of template file paths
    */
-  getAvailableTemplates(): string[] {
+  public getAvailableTemplates(): string[] {
     const templates: string[] = [];
     const templatesFolder = this.settings.templatesFolder;
 
@@ -173,7 +173,7 @@ export class TemplateLoader {
    *
    * @param settings - New settings object
    */
-  updateSettings(settings: SnowflakeSettings): void {
+  public updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
   }
 
@@ -186,7 +186,7 @@ export class TemplateLoader {
    * @param file - The file to get template chain for
    * @returns Template chain with all applicable templates
    */
-  getTemplateChain(file: MarkdownFile): TemplateChain {
+  public getTemplateChain(file: MarkdownFile): TemplateChain {
     const templates: TemplateChainItem[] = [];
 
     // Get all folder paths from file location to root
@@ -238,7 +238,7 @@ export class TemplateLoader {
    * @param chain - Template chain to load
    * @returns Template chain with content populated
    */
-  async loadTemplateChain(chain: TemplateChain): Promise<TemplateChain> {
+  public async loadTemplateChain(chain: TemplateChain): Promise<TemplateChain> {
     const loadedTemplates: TemplateChainItem[] = [];
 
     for (const template of chain.templates) {

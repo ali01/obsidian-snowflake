@@ -15,7 +15,7 @@ export class TemplatePreviewModal extends Modal {
     this.content = content;
   }
 
-  onOpen(): void {
+  public onOpen(): void {
     const { contentEl } = this;
 
     contentEl.createEl('h2', { text: `Preview: ${this.templatePath}` });
@@ -50,7 +50,7 @@ export class TemplatePreviewModal extends Modal {
       });
   }
 
-  onClose(): void {
+  public onClose(): void {
     const { contentEl } = this;
     contentEl.empty();
   }

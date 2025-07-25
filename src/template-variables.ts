@@ -66,7 +66,7 @@ export class TemplateVariableProcessor {
    * @param file - The markdown file being created
    * @returns Processed content with variables replaced
    */
-  processTemplate(templateContent: string, file: MarkdownFile): TemplateProcessResult {
+  public processTemplate(templateContent: string, file: MarkdownFile): TemplateProcessResult {
     // Check if template contains snowflake_id variable
     const hasSnowflakeId = templateContent.includes('{{snowflake_id}}');
 
@@ -152,7 +152,7 @@ export class TemplateVariableProcessor {
    *
    * @param format - New date format
    */
-  setDateFormat(format: string): void {
+  public setDateFormat(format: string): void {
     this.dateFormat = format !== '' ? format : DEFAULT_DATE_FORMAT;
   }
 
@@ -163,7 +163,7 @@ export class TemplateVariableProcessor {
    *
    * @param format - New time format
    */
-  setTimeFormat(format: string): void {
+  public setTimeFormat(format: string): void {
     this.timeFormat = format !== '' ? format : DEFAULT_TIME_FORMAT;
   }
 
@@ -176,7 +176,7 @@ export class TemplateVariableProcessor {
    * @param templateContent - The template to validate
    * @returns Array of invalid variable names found
    */
-  validateTemplate(templateContent: string): string[] {
+  public validateTemplate(templateContent: string): string[] {
     const invalidVars: string[] = [];
     const matches = templateContent.matchAll(VARIABLE_REGEX);
 
@@ -196,7 +196,7 @@ export class TemplateVariableProcessor {
    *
    * @returns Array of variable names
    */
-  getAvailableVariables(): string[] {
+  public getAvailableVariables(): string[] {
     return Object.keys(VARIABLE_HANDLERS);
   }
 }
@@ -234,11 +234,11 @@ export class ExtensibleVariableRegistry implements VariableRegistry {
     this.registerBuiltins();
   }
 
-  register(handler: VariableHandlerDef): void {
+  public register(handler: VariableHandlerDef): void {
     this.handlers.set(handler.name, handler);
   }
 
-  process(varName: string, context: unknown): string | undefined {
+  public process(varName: string, context: unknown): string | undefined {
     const handler = this.handlers.get(varName);
     if (handler === undefined) {
       return undefined;

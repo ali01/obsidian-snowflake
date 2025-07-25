@@ -24,7 +24,7 @@ export class FileInputSuggest extends AbstractInputSuggest<TFile> {
     this.rootFolder = rootFolder;
   }
 
-  getSuggestions(query: string): TFile[] {
+  public getSuggestions(query: string): TFile[] {
     const lowerQuery = query.toLowerCase();
     let allFiles = this.app.vault
       .getAllLoadedFiles()
@@ -73,14 +73,14 @@ export class FileInputSuggest extends AbstractInputSuggest<TFile> {
       });
   }
 
-  renderSuggestion(file: TFile, el: HTMLElement): void {
+  public renderSuggestion(file: TFile, el: HTMLElement): void {
     el.createDiv({ cls: 'suggestion-content' }, (contentEl) => {
       contentEl.createDiv({ cls: 'suggestion-title', text: file.basename });
       contentEl.createDiv({ cls: 'suggestion-path', text: file.path });
     });
   }
 
-  selectSuggestion(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
+  public selectSuggestion(file: TFile, _evt: MouseEvent | KeyboardEvent): void {
     // If we have a root folder and the file is within it, return relative path
     if (this.rootFolder !== undefined && file.path.startsWith(this.rootFolder + '/')) {
       this.inputEl.value = file.path.slice(this.rootFolder.length + 1);

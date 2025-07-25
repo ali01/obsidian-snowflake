@@ -21,7 +21,7 @@ export class TemplateSelectionModal extends FuzzySuggestModal<TFile> {
   /**
    * Get all template files from the templates folder
    */
-  getItems(): TFile[] {
+  public getItems(): TFile[] {
     const templateFolder = this.app.vault.getAbstractFileByPath(this.templatesFolder);
     if (!templateFolder || !(templateFolder instanceof TFolder)) {
       new Notice(`Templates folder not found: ${this.templatesFolder}`);
@@ -43,7 +43,7 @@ export class TemplateSelectionModal extends FuzzySuggestModal<TFile> {
   /**
    * Get display text for a template
    */
-  getItemText(template: TFile): string {
+  public getItemText(template: TFile): string {
     // Show relative path from templates folder
     const relativePath = template.path.startsWith(this.templatesFolder + '/')
       ? template.path.slice(this.templatesFolder.length + 1)
@@ -54,7 +54,7 @@ export class TemplateSelectionModal extends FuzzySuggestModal<TFile> {
   /**
    * Handle template selection
    */
-  onChooseItem(template: TFile, _evt: MouseEvent | KeyboardEvent): void {
+  public onChooseItem(template: TFile, _evt: MouseEvent | KeyboardEvent): void {
     this.onSelect(template);
   }
 }

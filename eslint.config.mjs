@@ -44,6 +44,16 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'off',
       '@typescript-eslint/consistent-type-exports': 'off',
       '@typescript-eslint/naming-convention': 'off', // No naming enforcement
+      
+      // Require explicit member accessibility modifiers
+      '@typescript-eslint/explicit-member-accessibility': ['error', {
+        accessibility: 'explicit',
+        overrides: {
+          constructors: 'no-public',
+          properties: 'explicit',
+          parameterProperties: 'explicit'
+        }
+      }],
 
       // General JavaScript rules for correctness
       'no-console': 'off',

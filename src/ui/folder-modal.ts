@@ -16,7 +16,7 @@ export class FolderSuggestModal extends FuzzySuggestModal<TFolder> {
     this.onChoose = onChoose;
   }
 
-  getItems(): TFolder[] {
+  public getItems(): TFolder[] {
     const folders: TFolder[] = [];
     const rootFolder = this.app.vault.getRoot();
     folders.push(rootFolder);
@@ -34,11 +34,11 @@ export class FolderSuggestModal extends FuzzySuggestModal<TFolder> {
     return folders;
   }
 
-  getItemText(folder: TFolder): string {
+  public getItemText(folder: TFolder): string {
     return folder.path || '/';
   }
 
-  onChooseItem(folder: TFolder, _evt: MouseEvent | KeyboardEvent): void {
+  public onChooseItem(folder: TFolder, _evt: MouseEvent | KeyboardEvent): void {
     this.onChoose(folder);
   }
 }
