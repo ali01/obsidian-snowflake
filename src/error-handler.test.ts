@@ -1,4 +1,4 @@
-import { ErrorHandler, ErrorType } from './error-handler';
+import { ErrorHandler, ErrorType, ErrorHandlerTestUtils } from './error-handler';
 import { ErrorContext } from './types';
 import { Notice } from 'obsidian';
 
@@ -225,7 +225,7 @@ describe('ErrorHandler', () => {
     });
 
     it('should log additional details in debug mode', () => {
-      errorHandler.setDebugMode(true);
+      ErrorHandlerTestUtils.setDebugMode(errorHandler, true);
 
       const context: ErrorContext = {
         operation: 'apply_template',
@@ -237,7 +237,7 @@ describe('ErrorHandler', () => {
 
       expect(consoleErrorSpy).toHaveBeenCalledWith('[Snowflake Debug] Full error details:', error);
 
-      errorHandler.setDebugMode(false);
+      ErrorHandlerTestUtils.setDebugMode(errorHandler, false);
     });
   });
 
@@ -275,7 +275,8 @@ describe('ErrorHandler', () => {
       };
 
       const originalError = new Error('Original error');
-      const extendedError = errorHandler.createError(
+      const extendedError = ErrorHandlerTestUtils.createError(
+        errorHandler,
         'Extended error message',
         ErrorType.FILE_NOT_FOUND,
         context,
@@ -296,20 +297,27 @@ describe('ErrorHandler', () => {
         templatePath: 'test.md'
       };
 
-      const extendedError = errorHandler.createError(
+      const extendedError = ErrorHandlerTestUtils.createError(
+        errorHandler,
         'Test error',
         ErrorType.TEMPLATE_NOT_FOUND,
         context
       );
 
-      expect(errorHandler.isErrorType(extendedError, ErrorType.TEMPLATE_NOT_FOUND)).toBe(true);
-      expect(errorHandler.isErrorType(extendedError, ErrorType.FILE_NOT_FOUND)).toBe(false);
+      expect(
+        ErrorHandlerTestUtils.isErrorType(errorHandler, extendedError, ErrorType.TEMPLATE_NOT_FOUND)
+      ).toBe(true);
+      expect(
+        ErrorHandlerTestUtils.isErrorType(errorHandler, extendedError, ErrorType.FILE_NOT_FOUND)
+      ).toBe(false);
     });
 
     it('should handle non-error objects', () => {
-      expect(errorHandler.isErrorType(null, ErrorType.UNKNOWN)).toBe(false);
-      expect(errorHandler.isErrorType('string', ErrorType.UNKNOWN)).toBe(false);
-      expect(errorHandler.isErrorType({}, ErrorType.UNKNOWN)).toBe(false);
+      expect(ErrorHandlerTestUtils.isErrorType(errorHandler, null, ErrorType.UNKNOWN)).toBe(false);
+      expect(ErrorHandlerTestUtils.isErrorType(errorHandler, 'string', ErrorType.UNKNOWN)).toBe(
+        false
+      );
+      expect(ErrorHandlerTestUtils.isErrorType(errorHandler, {}, ErrorType.UNKNOWN)).toBe(false);
     });
   });
 

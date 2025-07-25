@@ -176,7 +176,7 @@ export class TemplateVariableProcessor {
    * @param templateContent - The template to validate
    * @returns Array of invalid variable names found
    */
-  public validateTemplate(templateContent: string): string[] {
+  private validateTemplate(templateContent: string): string[] {
     const invalidVars: string[] = [];
     const matches = templateContent.matchAll(VARIABLE_REGEX);
 
@@ -196,7 +196,7 @@ export class TemplateVariableProcessor {
    *
    * @returns Array of variable names
    */
-  public getAvailableVariables(): string[] {
+  private getAvailableVariables(): string[] {
     return Object.keys(VARIABLE_HANDLERS);
   }
 }
@@ -296,3 +296,17 @@ export function createTemplateProcessor(
 ): TemplateVariableProcessor {
   return new TemplateVariableProcessor(dateFormat, timeFormat);
 }
+
+/**
+ * Test-only exports
+ */
+export const TemplateVariableProcessorTestUtils = {
+  validateTemplate: (processor: TemplateVariableProcessor, templateContent: string): string[] => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (processor as any).validateTemplate(templateContent);
+  },
+  getAvailableVariables: (processor: TemplateVariableProcessor): string[] => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (processor as any).getAvailableVariables();
+  }
+};

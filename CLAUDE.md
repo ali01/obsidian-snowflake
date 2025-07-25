@@ -186,6 +186,40 @@ After automated tests pass, perform manual testing within Obsidian:
 - Follow TypeScript strict mode requirements
 - **Enforce Line Length Limits**: Make sure all TypeScript lines of code are under 100 characters in length
 
+### Method Visibility Guidelines
+
+- **All methods should be private by default** unless they are part of the public API
+- Mark methods as `public` only when they are:
+  - Called from other classes in production code
+  - Part of a required interface (e.g., Obsidian Plugin API)
+  - Intended for external use by plugin consumers
+- For methods that need to be tested but aren't part of the public API:
+  - Keep them private
+  - Create a test utility export at the end of the file
+  - Use the pattern shown below to provide test-only access
+
+#### Test Access Pattern for Private Methods
+
+When you need to test private methods, add a test utility export at the end of the file:
+
+```typescript
+/**
+ * Test-only exports
+ */
+export const ClassNameTestUtils = {
+  privateMethodName: (instance: ClassName, ...args: Parameters<ClassName['privateMethodName']>): ReturnType<ClassName['privateMethodName']> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (instance as any).privateMethodName(...args);
+  }
+};
+```
+
+This pattern:
+- Maintains proper encapsulation in production code
+- Provides type-safe access for tests
+- Makes it clear which exports are for testing only
+- Uses localized eslint-disable comments for the necessary type assertions
+
 ## Quality Assurance
 
 **IMPORTANT**: On completing any changes to TypeScript code ALWAYS run:

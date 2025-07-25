@@ -2,7 +2,7 @@
  * Tests for Template Loader
  */
 
-import { TemplateLoader } from './template-loader';
+import { TemplateLoader, TemplateLoaderTestUtils } from './template-loader';
 import { Vault, TFile, TFolder } from 'obsidian';
 import { SnowflakeSettings, MarkdownFile } from './types';
 
@@ -125,7 +125,7 @@ describe('TemplateLoader', () => {
         parent: { path: 'Projects' }
       } as MarkdownFile;
 
-      const templatePath = loader.getTemplateForFile(file);
+      const templatePath = TemplateLoaderTestUtils.getTemplateForFile(loader, file);
       expect(templatePath).toBe('Templates/project.md');
     });
 
@@ -135,7 +135,7 @@ describe('TemplateLoader', () => {
         parent: { path: 'Projects/Subfolder/Deep' }
       } as MarkdownFile;
 
-      const templatePath = loader.getTemplateForFile(file);
+      const templatePath = TemplateLoaderTestUtils.getTemplateForFile(loader, file);
       expect(templatePath).toBe('Templates/project.md');
     });
 
@@ -153,7 +153,7 @@ describe('TemplateLoader', () => {
         parent: { path: 'Other/Folder' }
       } as MarkdownFile;
 
-      const templatePath = loaderNoMappings.getTemplateForFile(file);
+      const templatePath = TemplateLoaderTestUtils.getTemplateForFile(loaderNoMappings, file);
       expect(templatePath).toBe(null);
     });
 
@@ -163,7 +163,7 @@ describe('TemplateLoader', () => {
         parent: { path: '' }
       } as MarkdownFile;
 
-      const templatePath = loader.getTemplateForFile(file);
+      const templatePath = TemplateLoaderTestUtils.getTemplateForFile(loader, file);
       expect(templatePath).toBe('Templates/root.md');
     });
 
@@ -175,7 +175,7 @@ describe('TemplateLoader', () => {
         parent: { path: 'Some/Folder' }
       } as MarkdownFile;
 
-      const templatePath = loader.getTemplateForFile(file);
+      const templatePath = TemplateLoaderTestUtils.getTemplateForFile(loader, file);
       expect(templatePath).toBeNull();
     });
 
@@ -185,7 +185,7 @@ describe('TemplateLoader', () => {
         parent: null
       } as MarkdownFile;
 
-      const templatePath = loader.getTemplateForFile(file);
+      const templatePath = TemplateLoaderTestUtils.getTemplateForFile(loader, file);
       expect(templatePath).toBe('Templates/root.md');
     });
 
@@ -208,7 +208,10 @@ describe('TemplateLoader', () => {
       ];
 
       excludedFiles.forEach((file) => {
-        const templatePath = loader.getTemplateForFile(file as MarkdownFile);
+        const templatePath = TemplateLoaderTestUtils.getTemplateForFile(
+          loader,
+          file as MarkdownFile
+        );
         expect(templatePath).toBeNull();
       });
 
@@ -219,7 +222,7 @@ describe('TemplateLoader', () => {
         parent: { path: 'Projects' }
       } as MarkdownFile;
 
-      const templatePath = loader.getTemplateForFile(includedFile);
+      const templatePath = TemplateLoaderTestUtils.getTemplateForFile(loader, includedFile);
       expect(templatePath).toBe('Templates/project.md');
     });
 
@@ -238,7 +241,7 @@ describe('TemplateLoader', () => {
         path: 'Projects/subdir/deep/README.md',
         parent: { path: 'Projects/subdir/deep' }
       } as MarkdownFile;
-      expect(loader.getTemplateForFile(readme)).toBeNull();
+      expect(TemplateLoaderTestUtils.getTemplateForFile(loader, readme)).toBeNull();
 
       // Should exclude files in temp directory
       const tempFile = {
@@ -246,7 +249,7 @@ describe('TemplateLoader', () => {
         path: 'Projects/temp/file.md',
         parent: { path: 'Projects/temp' }
       } as MarkdownFile;
-      expect(loader.getTemplateForFile(tempFile)).toBeNull();
+      expect(TemplateLoaderTestUtils.getTemplateForFile(loader, tempFile)).toBeNull();
 
       // Should not exclude other files
       const normalFile = {
@@ -254,7 +257,9 @@ describe('TemplateLoader', () => {
         path: 'Projects/docs/doc.md',
         parent: { path: 'Projects/docs' }
       } as MarkdownFile;
-      expect(loader.getTemplateForFile(normalFile)).toBe('Templates/project.md');
+      expect(TemplateLoaderTestUtils.getTemplateForFile(loader, normalFile)).toBe(
+        'Templates/project.md'
+      );
     });
 
     test('Should handle string mappings (backward compatibility)', () => {
@@ -273,7 +278,9 @@ describe('TemplateLoader', () => {
         path: 'Projects/anything.md',
         parent: { path: 'Projects' }
       } as MarkdownFile;
-      expect(loader.getTemplateForFile(projectFile)).toBe('Templates/project.md');
+      expect(TemplateLoaderTestUtils.getTemplateForFile(loader, projectFile)).toBe(
+        'Templates/project.md'
+      );
 
       // Config mapping with exclusions
       const archivedDaily = {
@@ -281,25 +288,27 @@ describe('TemplateLoader', () => {
         path: 'Daily/archive-2024.md',
         parent: { path: 'Daily' }
       } as MarkdownFile;
-      expect(loader.getTemplateForFile(archivedDaily)).toBeNull();
+      expect(TemplateLoaderTestUtils.getTemplateForFile(loader, archivedDaily)).toBeNull();
 
       const normalDaily = {
         basename: 'today',
         path: 'Daily/today.md',
         parent: { path: 'Daily' }
       } as MarkdownFile;
-      expect(loader.getTemplateForFile(normalDaily)).toBe('Templates/daily.md');
+      expect(TemplateLoaderTestUtils.getTemplateForFile(loader, normalDaily)).toBe(
+        'Templates/daily.md'
+      );
     });
   });
 
   describe('templateExists', () => {
     test('Should return true for existing template', async () => {
-      const exists = await loader.templateExists('Templates/project.md');
+      const exists = await TemplateLoaderTestUtils.templateExists(loader, 'Templates/project.md');
       expect(exists).toBe(true);
     });
 
     test('Should return false for non-existent template', async () => {
-      const exists = await loader.templateExists('Templates/missing.md');
+      const exists = await TemplateLoaderTestUtils.templateExists(loader, 'Templates/missing.md');
       expect(exists).toBe(false);
     });
   });
@@ -320,7 +329,7 @@ describe('TemplateLoader', () => {
         parent: { path: 'Unknown' }
       } as MarkdownFile;
 
-      const templatePath = loader.getTemplateForFile(file);
+      const templatePath = TemplateLoaderTestUtils.getTemplateForFile(loader, file);
       expect(templatePath).toBe('Templates/new-default.md');
     });
   });

@@ -2,7 +2,7 @@
  * Tests for File Creation Handler
  */
 
-import { FileCreationHandler } from './file-creation-handler';
+import { FileCreationHandler, FileCreationHandlerTestUtils } from './file-creation-handler';
 import { TFile, TFolder, Vault, Plugin } from 'obsidian';
 import { SnowflakeSettings } from './types';
 import { TemplateApplicator } from './template-applicator';
@@ -86,10 +86,10 @@ describe('FileCreationHandler', () => {
 
       // Manually add to queue to test clearing
       (handler as any).processingQueue.add(file.path);
-      expect(handler.isProcessing(file.path)).toBe(true);
+      expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(true);
 
       handler.stop();
-      expect(handler.isProcessing(file.path)).toBe(false);
+      expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(false);
     });
   });
 
@@ -168,7 +168,7 @@ describe('FileCreationHandler', () => {
       await expect(handler['handleFileCreation'](file)).resolves.not.toThrow();
 
       // Should still remove from queue
-      expect(handler.isProcessing(file.path)).toBe(false);
+      expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(false);
     });
   });
 
@@ -196,8 +196,8 @@ describe('FileCreationHandler', () => {
     test('Should track processing state', async () => {
       const file = createMockFile('test.md', 'Projects');
 
-      expect(handler.isProcessing(file.path)).toBe(false);
-      expect(handler.getProcessingCount()).toBe(0);
+      expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(false);
+      expect(FileCreationHandlerTestUtils.getProcessingCount(handler)).toBe(0);
 
       // Start processing
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
@@ -208,8 +208,8 @@ describe('FileCreationHandler', () => {
       const processPromise = handleFileCreation(file);
 
       // Should be processing now
-      expect(handler.isProcessing(file.path)).toBe(true);
-      expect(handler.getProcessingCount()).toBe(1);
+      expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(true);
+      expect(FileCreationHandlerTestUtils.getProcessingCount(handler)).toBe(1);
 
       await processPromise;
 
@@ -217,8 +217,8 @@ describe('FileCreationHandler', () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Should be done processing
-      expect(handler.isProcessing(file.path)).toBe(false);
-      expect(handler.getProcessingCount()).toBe(0);
+      expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(false);
+      expect(FileCreationHandlerTestUtils.getProcessingCount(handler)).toBe(0);
     });
   });
 

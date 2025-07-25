@@ -186,7 +186,7 @@ export class FileCreationHandler {
    * @param filePath - Path to check
    * @returns True if file is in processing queue
    */
-  public isProcessing(filePath: string): boolean {
+  private isProcessing(filePath: string): boolean {
     return this.processingQueue.has(filePath);
   }
 
@@ -195,7 +195,21 @@ export class FileCreationHandler {
    *
    * @returns Number of files in processing queue
    */
-  public getProcessingCount(): number {
+  private getProcessingCount(): number {
     return this.processingQueue.size;
   }
 }
+
+/**
+ * Test-only exports
+ */
+export const FileCreationHandlerTestUtils = {
+  isProcessing: (handler: FileCreationHandler, filePath: string): boolean => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (handler as any).isProcessing(filePath);
+  },
+  getProcessingCount: (handler: FileCreationHandler): number => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (handler as any).getProcessingCount();
+  }
+};

@@ -5,7 +5,11 @@
  * for template variable processing.
  */
 
-import { TemplateVariableProcessor, createTemplateProcessor } from './template-variables';
+import {
+  TemplateVariableProcessor,
+  createTemplateProcessor,
+  TemplateVariableProcessorTestUtils
+} from './template-variables';
 import { MarkdownFile } from './types';
 
 // Mock file for testing
@@ -126,7 +130,7 @@ describe('TemplateVariableProcessor', () => {
 
     test('REQ-028: Should identify invalid variables', () => {
       const template = '{{title}} {{bad1}} {{date}} {{bad2}}';
-      const invalid = processor.validateTemplate(template);
+      const invalid = TemplateVariableProcessorTestUtils.validateTemplate(processor, template);
 
       expect(invalid).toEqual(['bad1', 'bad2']);
     });
@@ -145,7 +149,7 @@ describe('TemplateVariableProcessor', () => {
 
   describe('Variable Information', () => {
     test('Should list available variables', () => {
-      const vars = processor.getAvailableVariables();
+      const vars = TemplateVariableProcessorTestUtils.getAvailableVariables(processor);
       expect(vars).toContain('title');
       expect(vars).toContain('date');
       expect(vars).toContain('time');
@@ -154,7 +158,7 @@ describe('TemplateVariableProcessor', () => {
 
     test('Should handle duplicate invalid variables', () => {
       const template = '{{bad}} {{bad}} {{bad}}';
-      const invalid = processor.validateTemplate(template);
+      const invalid = TemplateVariableProcessorTestUtils.validateTemplate(processor, template);
 
       expect(invalid).toEqual(['bad']); // No duplicates
     });

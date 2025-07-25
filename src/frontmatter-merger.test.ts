@@ -5,7 +5,7 @@
  * for intelligent frontmatter merging.
  */
 
-import { FrontmatterMerger } from './frontmatter-merger';
+import { FrontmatterMerger, FrontmatterMergerTestUtils } from './frontmatter-merger';
 
 describe('FrontmatterMerger', () => {
   let merger: FrontmatterMerger;
@@ -266,12 +266,14 @@ title: Old
 
   describe('YAML Validation', () => {
     test('Should validate correct YAML', () => {
-      expect(merger.validateYaml('title: Test')).toBe(true);
-      expect(merger.validateYaml('key1: value1\nkey2: value2')).toBe(true);
+      expect(FrontmatterMergerTestUtils.validateYaml(merger, 'title: Test')).toBe(true);
+      expect(FrontmatterMergerTestUtils.validateYaml(merger, 'key1: value1\nkey2: value2')).toBe(
+        true
+      );
     });
 
     test('Should handle empty YAML', () => {
-      expect(merger.validateYaml('')).toBe(true);
+      expect(FrontmatterMergerTestUtils.validateYaml(merger, '')).toBe(true);
     });
 
     test('Should handle YAML with comments', () => {
@@ -280,7 +282,7 @@ title: Test
 # Another comment
 tags: [one, two]`;
 
-      expect(merger.validateYaml(yaml)).toBe(true);
+      expect(FrontmatterMergerTestUtils.validateYaml(merger, yaml)).toBe(true);
     });
   });
 

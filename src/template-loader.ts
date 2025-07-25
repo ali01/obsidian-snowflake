@@ -82,7 +82,7 @@ export class TemplateLoader {
    * @param file - The file to get template for
    * @returns Template path or null if no template configured
    */
-  public getTemplateForFile(file: MarkdownFile): string | null {
+  private getTemplateForFile(file: MarkdownFile): string | null {
     // Get the folder path
     const folderPath = file.parent?.path ?? '';
 
@@ -127,7 +127,7 @@ export class TemplateLoader {
    * @param templatePath - Path to validate
    * @returns True if template exists
    */
-  public templateExists(templatePath: string): boolean {
+  private templateExists(templatePath: string): boolean {
     const file = this.vault.getAbstractFileByPath(templatePath);
     return file instanceof TFile;
   }
@@ -137,7 +137,7 @@ export class TemplateLoader {
    *
    * @returns Array of template file paths
    */
-  public getAvailableTemplates(): string[] {
+  private getAvailableTemplates(): string[] {
     const templates: string[] = [];
     const templatesFolder = this.settings.templatesFolder;
 
@@ -339,3 +339,21 @@ export class TemplateLoader {
     return `${this.settings.templatesFolder}/${templatePath}`;
   }
 }
+
+/**
+ * Test-only exports
+ */
+export const TemplateLoaderTestUtils = {
+  getTemplateForFile: (loader: TemplateLoader, file: MarkdownFile): string | null => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (loader as any).getTemplateForFile(file);
+  },
+  templateExists: (loader: TemplateLoader, templatePath: string): boolean => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (loader as any).templateExists(templatePath);
+  },
+  getAvailableTemplates: (loader: TemplateLoader): string[] => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (loader as any).getAvailableTemplates();
+  }
+};

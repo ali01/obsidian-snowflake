@@ -61,7 +61,7 @@ export class ErrorHandler {
   /**
    * Enable/disable debug mode
    */
-  public setDebugMode(enabled: boolean): void {
+  private setDebugMode(enabled: boolean): void {
     this.debugMode = enabled;
   }
 
@@ -261,7 +261,7 @@ export class ErrorHandler {
   /**
    * Create an ExtendedError with context
    */
-  public createError(
+  private createError(
     message: string,
     type: ErrorType,
     context: ErrorContext,
@@ -277,10 +277,35 @@ export class ErrorHandler {
   /**
    * Check if an error is a specific type
    */
-  public isErrorType(error: unknown, type: ErrorType): boolean {
+  private isErrorType(error: unknown, type: ErrorType): boolean {
     if (error !== null && error !== undefined && typeof error === 'object' && 'type' in error) {
       return (error as ExtendedError).type === type;
     }
     return false;
   }
 }
+
+/**
+ * Test-only exports
+ * These exports are only for testing purposes and should not be used in production code
+ */
+export const ErrorHandlerTestUtils = {
+  setDebugMode: (handler: ErrorHandler, enabled: boolean): void => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (handler as any).setDebugMode(enabled);
+  },
+  createError: (
+    handler: ErrorHandler,
+    message: string,
+    type: ErrorType,
+    context: ErrorContext,
+    originalError?: Error
+  ): ExtendedError => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (handler as any).createError(message, type, context, originalError);
+  },
+  isErrorType: (handler: ErrorHandler, error: unknown, type: ErrorType): boolean => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (handler as any).isErrorType(error, type);
+  }
+};

@@ -490,7 +490,7 @@ export class FrontmatterMerger {
    * @param yaml - YAML content to validate
    * @returns True if valid, false otherwise
    */
-  public validateYaml(yaml: string): boolean {
+  private validateYaml(yaml: string): boolean {
     try {
       const parsed = this.parseYaml(yaml);
       // Basic validation - should have parsed at least something
@@ -684,3 +684,13 @@ export class FrontmatterMerger {
     return { mergedFrontmatter, updatedDeleteList };
   }
 }
+
+/**
+ * Test-only exports
+ */
+export const FrontmatterMergerTestUtils = {
+  validateYaml: (merger: FrontmatterMerger, yaml: string): boolean => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (merger as any).validateYaml(yaml);
+  }
+};
