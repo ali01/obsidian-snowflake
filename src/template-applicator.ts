@@ -41,7 +41,6 @@ interface ApplyResult {
  */
 export class TemplateApplicator {
   private readonly vault: Vault;
-  private settings: SnowflakeSettings;
   private readonly loader: TemplateLoader;
   private readonly variableProcessor: TemplateVariableProcessor;
   private readonly frontmatterMerger: FrontmatterMerger;
@@ -49,7 +48,6 @@ export class TemplateApplicator {
 
   constructor(vault: Vault, settings: SnowflakeSettings) {
     this.vault = vault;
-    this.settings = settings;
     this.loader = new TemplateLoader(vault, settings);
     this.variableProcessor = new TemplateVariableProcessor(
       settings.dateFormat,
@@ -367,7 +365,6 @@ export class TemplateApplicator {
    * @param settings - New settings
    */
   public updateSettings(settings: SnowflakeSettings): void {
-    this.settings = settings;
     this.loader.updateSettings(settings);
     this.variableProcessor.setDateFormat(settings.dateFormat);
     this.variableProcessor.setTimeFormat(settings.timeFormat);
