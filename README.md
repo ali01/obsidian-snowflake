@@ -93,6 +93,66 @@ In settings, customize formats using moment.js syntax:
 - Date: `DD/MM/YYYY`, `MMM DD, YYYY`, etc.
 - Time: `h:mm A`, `HH:mm:ss`, etc.
 
+### Template Property Exclusions (Delete Lists)
+
+Templates can exclude properties from parent templates using the `delete` property. This is useful when you want to remove inherited properties that don't apply to specific note types.
+
+#### Basic Usage
+
+Add a `delete` property to your template's frontmatter with an array of property names to exclude:
+
+```yaml
+---
+delete: [author, project]
+category: personal
+tags: [diary]
+---
+```
+
+#### How It Works
+
+1. Properties listed in `delete` are removed from the inherited template
+2. Child templates can re-add excluded properties by defining them explicitly
+3. The `delete` property itself is never included in the final note
+
+#### Example Inheritance Chain
+
+Consider this template hierarchy:
+
+**base-template.md** (parent):
+```yaml
+---
+author: Team
+project: Default Project
+status: draft
+tags: [base]
+---
+```
+
+**personal-template.md** (child):
+```yaml
+---
+delete: [author, project]
+category: personal
+tags: [personal]
+---
+```
+
+**journal-template.md** (grandchild):
+```yaml
+---
+author: Me  # Re-adds the author property
+mood: neutral
+tags: [journal]
+---
+```
+
+When a note uses the journal template:
+- `project` is excluded (removed by personal-template)
+- `author` is included with value "Me" (re-added by journal-template)
+- `status` is included (never excluded)
+- All tags are concatenated: `[base, personal, journal]`
+
 ### Exclusion Lists
 
 - Specify files that should be excluded from template application
