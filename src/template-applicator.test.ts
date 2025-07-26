@@ -53,7 +53,9 @@ describe('TemplateApplicator', () => {
     processWithDeleteList: jest.fn(),
     applyDeleteList: jest.fn(),
     extractDeleteList: jest.fn(),
-    mergeWithDeleteList: jest.fn()
+    mergeWithDeleteList: jest.fn(),
+    extractPropertyNames: jest.fn(),
+    cleanupEmptyProperties: jest.fn()
   };
 
   const mockErrorHandler = {
@@ -141,6 +143,8 @@ describe('TemplateApplicator', () => {
         };
       }
     );
+    mockFrontmatterMerger.extractPropertyNames.mockReturnValue(new Set());
+    mockFrontmatterMerger.cleanupEmptyProperties.mockImplementation((fm) => fm);
 
     mockErrorHandler.handleError.mockReturnValue('Error occurred');
 
@@ -1541,6 +1545,522 @@ title: test
       // Author should be excluded
       expect(processedArg).not.toContain('author:');
       expect(processedArg).not.toContain('delete:');
+    });
+  });
+
+  describe('Empty Property Cleanup (REQ-038)', () => {
+    const mockFile: MarkdownFile = {
+      basename: 'test',
+      extension: 'md' as const,
+      path: 'Notes/test.md',
+      name: 'test.md',
+      parent: { path: 'Notes' },
+      vault: {} as any,
+      stat: {
+        ctime: Date.now(),
+        mtime: Date.now(),
+        size: 0
+      }
+    } as MarkdownFile;
+
+    beforeEach(() => {
+      // Reset mocks
+      jest.clearAllMocks();
+    });
+
+    test('Should clean up empty properties not from templates on existing files', async () => {
+      const existingContent = `---
+title: My Note
+author:
+description:
+tags: [personal]
+---
+Existing content`;
+
+      const templateContent = `---
+title: {{title}}
+tags: [template]
+category: blog
+---
+Template content`;
+
+      // Set up template chain
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/note.md', folderPath: 'Notes', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/note.md',
+            folderPath: 'Notes',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
+
+      // Mock the FrontmatterMerger methods that are used during template merging
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValue({
+        processedContent: 'title: {{title}}\ntags: [template]\ncategory: blog',
+        newDeleteList: []
+      });
+
+      // Mock property extraction - template provides title, tags, category
+      mockFrontmatterMerger.extractPropertyNames.mockImplementation((content) => {
+        // For the template frontmatter
+        if (content.includes('category: blog')) {
+          return new Set(['title', 'tags', 'category']);
+        }
+        // For the merged file content
+        if (content.includes('author:')) {
+          return new Set(['title', 'author', 'description', 'tags', 'category']);
+        }
+        return new Set();
+      });
+
+      // Mock template processing
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: `---
+title: test
+tags: [template]
+category: blog
+---
+Template content`,
+        variables: { title: 'test' },
+        hasSnowflakeId: false
+      });
+
+      // Mock file read - file has existing content with empty properties
+      mockVault.read.mockResolvedValue(existingContent);
+
+      // Mock frontmatter merge
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: `title: My Note
+author:
+description:
+tags: [personal, template]
+category: blog`,
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---
+${fm}
+---
+Existing content
+
+Template content`
+      );
+
+      // Mock cleanup - should remove author and description (empty and not from template)
+      mockFrontmatterMerger.cleanupEmptyProperties.mockReturnValue(`title: My Note
+tags: [personal, template]
+category: blog`);
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+
+      // Verify cleanup was called with template properties
+      expect(mockFrontmatterMerger.cleanupEmptyProperties).toHaveBeenCalledWith(
+        expect.stringContaining('author:'),
+        new Set(['title', 'tags', 'category'])
+      );
+
+      // Verify file was modified twice - once for template, once for cleanup
+      expect(mockVault.modify).toHaveBeenCalledTimes(2);
+
+      // Verify final content doesn't have empty properties
+      const finalModifyCall = mockVault.modify.mock.calls[1];
+      expect(finalModifyCall[1]).toContain('title: My Note');
+      expect(finalModifyCall[1]).toContain('tags: [personal, template]');
+      expect(finalModifyCall[1]).toContain('category: blog');
+      expect(finalModifyCall[1]).not.toContain('author:');
+      expect(finalModifyCall[1]).not.toContain('description:');
+    });
+
+    test('Should NOT clean up empty properties on new files', async () => {
+      const templateContent = `---
+title: {{title}}
+author:
+tags: []
+---
+Template content`;
+
+      // Set up template chain
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/note.md', folderPath: 'Notes', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/note.md',
+            folderPath: 'Notes',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
+
+      // Mock property extraction
+      mockFrontmatterMerger.extractPropertyNames.mockReturnValue(
+        new Set(['title', 'author', 'tags'])
+      );
+
+      // Mock template processing
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: `---
+title: test
+author:
+tags: []
+---
+Template content`,
+        variables: { title: 'test' },
+        hasSnowflakeId: false
+      });
+
+      // Mock file read - NEW FILE (empty content)
+      mockVault.read.mockResolvedValue('');
+
+      // Mock frontmatter merge
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: `title: test
+author:
+tags: []`,
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockReturnValue(`---
+title: test
+author:
+tags: []
+---
+Template content`);
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+
+      // Verify cleanup was NOT called for new file
+      expect(mockFrontmatterMerger.cleanupEmptyProperties).not.toHaveBeenCalled();
+
+      // Verify file was only modified once (no cleanup)
+      expect(mockVault.modify).toHaveBeenCalledTimes(1);
+
+      // Verify empty properties from template are preserved
+      const finalContent = mockVault.modify.mock.calls[0][1];
+      expect(finalContent).toContain('author:');
+      expect(finalContent).toContain('tags: []');
+    });
+
+    test('Should track properties through template inheritance chain', async () => {
+      const existingContent = `---
+title: My Note
+baseAuthor:
+projectLead:
+devLead:
+tags: []
+---
+Content`;
+
+      // Set up template chain with inheritance
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [
+          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 },
+          { path: 'Templates/dev.md', folderPath: 'Projects/Dev', depth: 2 }
+        ],
+        hasInheritance: true
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/base.md',
+            folderPath: '/',
+            depth: 0,
+            content: '---\nbaseAuthor: \ntags: [base]\n---\nBase'
+          },
+          {
+            path: 'Templates/project.md',
+            folderPath: 'Projects',
+            depth: 1,
+            content: '---\nprojectLead: \ntags: [project]\n---\nProject'
+          },
+          {
+            path: 'Templates/dev.md',
+            folderPath: 'Projects/Dev',
+            depth: 2,
+            content: '---\ndevLead: \ntags: [dev]\n---\nDev'
+          }
+        ],
+        hasInheritance: true
+      });
+
+      // Mock property extraction - now only called once for final merged template
+      mockFrontmatterMerger.extractPropertyNames.mockImplementation((content) => {
+        // For the final merged template
+        if (content.includes('devLead:')) {
+          return new Set(['baseAuthor', 'tags', 'projectLead', 'devLead']);
+        }
+        return new Set();
+      });
+
+      // Set up merge mocks
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValue({
+        processedContent: 'baseAuthor: \ntags: [base]',
+        newDeleteList: []
+      });
+      mockFrontmatterMerger.mergeWithDeleteList
+        .mockReturnValueOnce({
+          mergedFrontmatter: 'baseAuthor: \nprojectLead: \ntags: [base, project]',
+          updatedDeleteList: []
+        })
+        .mockReturnValueOnce({
+          mergedFrontmatter: 'baseAuthor: \nprojectLead: \ndevLead: \ntags: [base, project, dev]',
+          updatedDeleteList: []
+        });
+
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content:
+          '---\nbaseAuthor: \nprojectLead: \ndevLead: \ntags: [base, project, dev]\n---\nBase\n\nProject\n\nDev',
+        variables: {},
+        hasSnowflakeId: false
+      });
+
+      mockVault.read.mockResolvedValue(existingContent);
+
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged:
+          'title: My Note\nbaseAuthor: \nprojectLead: \ndevLead: \ntags: [base, project, dev]',
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---\n${fm}\n---\nContent\n\nBase\n\nProject\n\nDev`
+      );
+
+      // Mock cleanup - all empty properties are from templates, so none should be removed
+      mockFrontmatterMerger.cleanupEmptyProperties.mockImplementation(
+        (fm: string, props: Set<string>) => fm
+      );
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+
+      // Verify template properties were extracted from final merged template
+      expect(mockFrontmatterMerger.extractPropertyNames).toHaveBeenCalledTimes(1);
+
+      // Verify cleanup was called with all template properties
+      expect(mockFrontmatterMerger.cleanupEmptyProperties).toHaveBeenCalledWith(
+        expect.any(String),
+        new Set(['baseAuthor', 'tags', 'projectLead', 'devLead'])
+      );
+    });
+
+    test('Should work with applySpecificTemplate for manual commands', async () => {
+      const existingContent = `---
+title: My Note
+author:
+tags: [personal]
+notes:
+---
+Content`;
+
+      const templateContent = `---
+title: {{title}}
+tags: [template]
+status: draft
+---
+Template`;
+
+      mockTemplateLoader.loadTemplate.mockResolvedValue(templateContent);
+
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: `---
+title: test
+tags: [template]
+status: draft
+---
+Template`,
+        variables: { title: 'test' },
+        hasSnowflakeId: false
+      });
+
+      mockVault.read.mockResolvedValue(existingContent);
+
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: `title: My Note
+author:
+tags: [personal, template]
+notes:
+status: draft`,
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---
+${fm}
+---
+Content
+
+Template`
+      );
+
+      const result = await applicator.applySpecificTemplate(mockFile, 'Templates/specific.md');
+
+      expect(result.success).toBe(true);
+
+      // Verify cleanup was NOT called for specific template
+      expect(mockFrontmatterMerger.cleanupEmptyProperties).not.toHaveBeenCalled();
+
+      // Verify file was only modified once (no cleanup)
+      expect(mockVault.modify).toHaveBeenCalledTimes(1);
+
+      // Verify empty properties from original file are preserved
+      const finalContent = mockVault.modify.mock.calls[0][1];
+      expect(finalContent).toContain('author:');
+      expect(finalContent).toContain('notes:');
+    });
+
+    test('Should remove delete property when applying specific template', async () => {
+      const existingContent = `---
+title: My Note
+author: John
+---
+Content`;
+
+      const templateContent = `---
+title: Template Title
+delete: [author, tags]
+category: blog
+---
+Template content`;
+
+      mockTemplateLoader.loadTemplate.mockResolvedValue(templateContent);
+
+      // Mock processWithDeleteList to remove delete property
+      mockFrontmatterMerger.processWithDeleteList.mockReturnValue({
+        processedContent: `title: Template Title
+category: blog`,
+        newDeleteList: []
+      });
+
+      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
+        content: content.replace('Template Title', 'test'),
+        variables: { title: 'test' },
+        hasSnowflakeId: false
+      }));
+
+      mockVault.read.mockResolvedValue(existingContent);
+
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: `title: My Note
+author: John
+category: blog`,
+        hasSnowflakeId: false
+      });
+
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---
+${fm}
+---
+Content
+
+Template content`
+      );
+
+      const result = await applicator.applySpecificTemplate(mockFile, 'Templates/specific.md');
+
+      expect(result.success).toBe(true);
+
+      // Verify processWithDeleteList was called to remove delete property
+      expect(mockFrontmatterMerger.processWithDeleteList).toHaveBeenCalledWith(
+        expect.stringContaining('delete: [author, tags]'),
+        []
+      );
+
+      // Verify the template content passed to processTemplate doesn't have delete property
+      expect(mockVariableProcessor.processTemplate).toHaveBeenCalledWith(
+        expect.not.stringContaining('delete:'),
+        mockFile
+      );
+
+      // Verify the final content doesn't have delete property
+      const finalContent = mockVault.modify.mock.calls[0][1];
+      expect(finalContent).not.toContain('delete:');
+    });
+
+    test('Should handle cleanup when frontmatter becomes identical', async () => {
+      const existingContent = `---
+title: My Note
+author: John
+---
+Content`;
+
+      const templateContent = `---
+title: {{title}}
+author: John
+---
+Template`;
+
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/note.md', folderPath: 'Notes', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/note.md',
+            folderPath: 'Notes',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
+
+      mockFrontmatterMerger.extractPropertyNames.mockReturnValue(new Set(['title', 'author']));
+
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: `---
+title: test
+author: John
+---
+Template`,
+        variables: { title: 'test' },
+        hasSnowflakeId: false
+      });
+
+      mockVault.read.mockResolvedValue(existingContent);
+
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: `title: My Note
+author: John`,
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation(
+        (_, fm) => `---
+${fm}
+---
+Content
+
+Template`
+      );
+
+      // Mock cleanup returns same content (no changes needed)
+      mockFrontmatterMerger.cleanupEmptyProperties.mockReturnValue(`title: My Note
+author: John`);
+
+      const result = await applicator.applyTemplate(mockFile);
+
+      expect(result.success).toBe(true);
+
+      // Verify cleanup was called
+      expect(mockFrontmatterMerger.cleanupEmptyProperties).toHaveBeenCalled();
+
+      // Verify file was only modified once since cleanup didn't change anything
+      expect(mockVault.modify).toHaveBeenCalledTimes(1);
     });
   });
 });

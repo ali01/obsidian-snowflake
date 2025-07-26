@@ -626,6 +626,77 @@ export class FrontmatterMerger {
   }
 
   /**
+   * Extract property names from frontmatter content
+   *
+   * @param frontmatterContent - The frontmatter YAML content
+   * @returns Set of property names (excluding 'delete' property)
+   */
+  public extractPropertyNames(frontmatterContent: string): Set<string> {
+    const data = this.parseYaml(frontmatterContent);
+    const properties = new Set<string>();
+
+    for (const key of Object.keys(data)) {
+      if (key !== 'delete') {
+        properties.add(key);
+      }
+    }
+
+    return properties;
+  }
+
+  /**
+   * Check if a value is considered empty for cleanup purposes
+   *
+   * REQ-038: Empty values are: empty string, null, empty array
+   * NOT empty: false, 0, undefined (undefined means property doesn't exist)
+   *
+   * @param value - The value to check
+   * @returns True if the value is considered empty
+   */
+  private isEmptyValue(value: unknown): boolean {
+    if (value === null) {
+      return true;
+    }
+    if (typeof value === 'string' && value.trim() === '') {
+      return true;
+    }
+    if (Array.isArray(value) && value.length === 0) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Clean up empty properties that don't come from templates
+   *
+   * REQ-038: Remove properties that are empty and not from template chain
+   *
+   * @param frontmatterContent - The merged frontmatter content
+   * @param templateProperties - Set of properties that came from templates
+   * @returns Cleaned frontmatter content
+   */
+  public cleanupEmptyProperties(
+    frontmatterContent: string,
+    templateProperties: Set<string>
+  ): string {
+    const data = this.parseYaml(frontmatterContent);
+    const cleanedData: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(data)) {
+      const isFromTemplate = templateProperties.has(key);
+      const isEmpty = this.isEmptyValue(value);
+
+      // Keep if: property is from template OR value is not empty
+      if (isFromTemplate || !isEmpty) {
+        cleanedData[key] = value;
+      }
+    }
+
+    const result = this.dataToYaml(cleanedData);
+    return result;
+  }
+
+  /**
    * Merge template frontmatter with accumulated frontmatter considering delete lists
    *
    * This method handles the complete merge process including:

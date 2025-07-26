@@ -670,4 +670,173 @@ existingProp: value`;
       });
     });
   });
+
+  describe('Empty Property Cleanup (REQ-038)', () => {
+    describe('extractPropertyNames', () => {
+      test('Should extract all property names from frontmatter', () => {
+        const frontmatter = `title: My Note
+author: John Doe
+tags: [one, two]
+date: 2024-01-01`;
+
+        const properties = merger.extractPropertyNames(frontmatter);
+
+        expect(properties).toContain('title');
+        expect(properties).toContain('author');
+        expect(properties).toContain('tags');
+        expect(properties).toContain('date');
+        expect(properties.size).toBe(4);
+      });
+
+      test('Should exclude delete property from extracted names', () => {
+        const frontmatter = `title: My Note
+delete: [author, date]
+tags: [one, two]`;
+
+        const properties = merger.extractPropertyNames(frontmatter);
+
+        expect(properties).toContain('title');
+        expect(properties).toContain('tags');
+        expect(properties).not.toContain('delete');
+        expect(properties.size).toBe(2);
+      });
+
+      test('Should handle empty frontmatter', () => {
+        const properties = merger.extractPropertyNames('');
+        expect(properties.size).toBe(0);
+      });
+    });
+
+    describe('cleanupEmptyProperties', () => {
+      test('Should remove empty string properties not from templates', () => {
+        const frontmatter = `title: My Note
+author:
+tags: [one, two]
+description: `;
+
+        const templateProperties = new Set(['title', 'tags']);
+        const result = merger.cleanupEmptyProperties(frontmatter, templateProperties);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
+
+        expect(parsed.title).toBe('My Note');
+        expect(parsed.tags).toEqual(['one', 'two']);
+        expect(parsed.author).toBeUndefined(); // Removed - empty and not from template
+        expect(parsed.description).toBeUndefined(); // Removed - empty and not from template
+      });
+
+      test('Should keep empty properties that come from templates', () => {
+        const frontmatter = `title: My Note
+author:
+category:
+tags: []`;
+
+        const templateProperties = new Set(['author', 'category', 'tags']);
+        const result = merger.cleanupEmptyProperties(frontmatter, templateProperties);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
+
+        expect(parsed.title).toBe('My Note');
+        expect(parsed.author).toBe(''); // Kept - from template
+        expect(parsed.category).toBe(''); // Kept - from template
+        expect(parsed.tags).toEqual([]); // Kept - from template
+      });
+
+      test('Should remove null properties not from templates', () => {
+        const frontmatter = `title: My Note
+author: null
+date: 2024-01-01
+category: null`;
+
+        const templateProperties = new Set(['title', 'date']);
+        const result = merger.cleanupEmptyProperties(frontmatter, templateProperties);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
+
+        expect(parsed.title).toBe('My Note');
+        expect(parsed.date).toBe('2024-01-01');
+        expect(parsed.author).toBeUndefined(); // Removed - null and not from template
+        expect(parsed.category).toBeUndefined(); // Removed - null and not from template
+      });
+
+      test('Should remove empty arrays not from templates', () => {
+        const frontmatter = `title: My Note
+tags: []
+categories: []
+keywords: [seo, web]`;
+
+        const templateProperties = new Set(['title', 'tags']);
+        const result = merger.cleanupEmptyProperties(frontmatter, templateProperties);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
+
+        expect(parsed.title).toBe('My Note');
+        expect(parsed.tags).toEqual([]); // Kept - from template
+        expect(parsed.categories).toBeUndefined(); // Removed - empty array not from template
+        expect(parsed.keywords).toEqual(['seo', 'web']); // Kept - not empty
+      });
+
+      test('Should not consider false or 0 as empty', () => {
+        const frontmatter = `title: My Note
+published: false
+priority: 0
+draft: true`;
+
+        const templateProperties = new Set(['title']);
+        const result = merger.cleanupEmptyProperties(frontmatter, templateProperties);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
+
+        expect(parsed.title).toBe('My Note');
+        expect(parsed.published).toBe(false); // Kept - false is not empty
+        expect(parsed.priority).toBe(0); // Kept - 0 is not empty
+        expect(parsed.draft).toBe(true); // Kept - not empty
+      });
+
+      test('Should handle whitespace-only strings as empty', () => {
+        const frontmatter = `title: My Note
+author:
+description: "   "
+tags: [one]`;
+
+        const templateProperties = new Set(['title', 'tags']);
+        const result = merger.cleanupEmptyProperties(frontmatter, templateProperties);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
+
+        expect(parsed.title).toBe('My Note');
+        expect(parsed.tags).toEqual(['one']);
+        expect(parsed.author).toBeUndefined(); // Removed - whitespace only
+        expect(parsed.description).toBeUndefined(); // Removed - whitespace only
+      });
+
+      test('Should handle multi-line empty values', () => {
+        const frontmatter = `title: My Note
+description: |
+
+tags: [one]
+notes: |
+  Some content here`;
+
+        const templateProperties = new Set(['title', 'tags']);
+        const result = merger.cleanupEmptyProperties(frontmatter, templateProperties);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
+
+        expect(parsed.title).toBe('My Note');
+        expect(parsed.tags).toEqual(['one']);
+        expect(parsed.description).toBeUndefined(); // Removed - empty multi-line
+        expect(parsed.notes).toBe('Some content here'); // Kept - has content
+      });
+
+      test('Should not affect complex objects', () => {
+        const frontmatter = `title: My Note
+metadata: {"key": "value"}
+author:
+config: {}`;
+
+        const templateProperties = new Set(['title']);
+        const result = merger.cleanupEmptyProperties(frontmatter, templateProperties);
+        const parsed = FrontmatterMergerTestUtils.parseYaml(merger, result);
+
+        expect(parsed.title).toBe('My Note');
+        expect(parsed.metadata).toBeTruthy(); // Kept - not empty (JSON string)
+        expect(parsed.config).toBeTruthy(); // Kept - objects are not considered empty
+        expect(parsed.author).toBeUndefined(); // Removed - empty string
+      });
+    });
+  });
 });

@@ -89,8 +89,16 @@ export class TemplateApplicator {
     // Always use mergeTemplates to ensure delete list processing
     const finalTemplateContent = this.mergeTemplates(loadedChain.templates);
 
-    // Process variables and apply
-    const result = await this.applyProcessedTemplateContent(file, finalTemplateContent, editor);
+    // Extract properties from the FINAL merged template (after delete lists are applied) for REQ-038
+    const templateProperties = this.extractPropertiesFromFinalTemplate(finalTemplateContent);
+
+    // Process variables and apply with property tracking
+    const result = await this.applyProcessedTemplateContent(
+      file,
+      finalTemplateContent,
+      templateProperties,
+      editor
+    );
 
     if (result.success && context.isBatchOperation !== true) {
       const templateNames = loadedChain.templates.map((t) => t.path).join(' → ');
@@ -124,8 +132,14 @@ export class TemplateApplicator {
         };
       }
 
+      // Remove delete property from template before applying
+      const cleanedTemplateContent = this.removeDeletePropertyFromTemplate(templateContent);
+
       // Process template variables
-      const processedTemplate = this.variableProcessor.processTemplate(templateContent, file);
+      const processedTemplate = this.variableProcessor.processTemplate(
+        cleanedTemplateContent,
+        file
+      );
 
       // Apply the processed template
       const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
@@ -296,24 +310,37 @@ export class TemplateApplicator {
   }
 
   /**
-   * Apply processed template content to a file (with variable processing)
+   * Apply processed template content with empty property cleanup
+   *
+   * REQ-038: Remove empty properties not from templates
    *
    * @param file - The file to apply to
    * @param templateContent - The raw template content
+   * @param templateProperties - Properties from the template chain
    * @param editor - Optional editor for cursor position
    * @returns Application result
    */
   private async applyProcessedTemplateContent(
     file: MarkdownFile,
     templateContent: string,
+    templateProperties: Set<string>,
     editor?: Editor
   ): Promise<ApplyResult> {
     try {
+      // Read current content to check if file has existing content
+      const currentContent = await this.vault.read(file);
+      const hasExistingContent = currentContent.trim() !== '';
+
       // Process template variables
       const processedTemplate = this.variableProcessor.processTemplate(templateContent, file);
 
       // Apply the processed template
       const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
+
+      // REQ-038: Clean up empty properties only for existing files
+      if (result.success && hasExistingContent) {
+        await this.cleanupEmptyProperties(file, templateProperties);
+      }
 
       return {
         ...result,
@@ -436,5 +463,81 @@ export class TemplateApplicator {
       return mergedContent;
     }
     return body;
+  }
+
+  /**
+   * Extract property names from the final merged template
+   *
+   * REQ-038: Track properties that actually exist in the final template after delete lists
+   *
+   * @param finalTemplateContent - The final merged template content
+   * @returns Set of property names in the final template
+   */
+  private extractPropertiesFromFinalTemplate(finalTemplateContent: string): Set<string> {
+    const parts = this.splitContent(finalTemplateContent);
+
+    if (parts.frontmatter !== null && parts.frontmatter.trim() !== '') {
+      const properties = this.frontmatterMerger.extractPropertyNames(parts.frontmatter);
+      return properties;
+    }
+
+    return new Set<string>();
+  }
+
+  /**
+   * Clean up empty properties not from templates
+   *
+   * REQ-038: Remove empty properties that weren't added by template chain
+   *
+   * @param file - The file to clean up
+   * @param templateProperties - Properties from the template chain
+   */
+  private async cleanupEmptyProperties(
+    file: MarkdownFile,
+    templateProperties: Set<string>
+  ): Promise<void> {
+    const content = await this.vault.read(file);
+    const parts = this.splitContent(content);
+
+    if (parts.frontmatter !== null && parts.frontmatter.trim() !== '') {
+      const cleanedFrontmatter = this.frontmatterMerger.cleanupEmptyProperties(
+        parts.frontmatter,
+        templateProperties
+      );
+
+      // Only rewrite if something changed
+      if (cleanedFrontmatter !== parts.frontmatter) {
+        const cleanedContent = `---\n${cleanedFrontmatter}---\n${parts.body}`;
+        const normalizedContent = cleanedContent.trimEnd() + '\n';
+        await this.vault.modify(file, normalizedContent);
+      }
+    }
+  }
+
+  /**
+   * Remove delete property from template content
+   *
+   * When applying a specific template, we don't want the delete property
+   * to be added to the file's frontmatter
+   *
+   * @param templateContent - The template content
+   * @returns Template content without delete property
+   */
+  private removeDeletePropertyFromTemplate(templateContent: string): string {
+    const parts = this.splitContent(templateContent);
+
+    if (parts.frontmatter === null || parts.frontmatter.trim() === '') {
+      return templateContent;
+    }
+
+    // Use processWithDeleteList with empty delete list to just remove the delete property
+    const result = this.frontmatterMerger.processWithDeleteList(parts.frontmatter, []);
+
+    if (result.processedContent.trim() === '') {
+      // If frontmatter becomes empty after removing delete property, return just the body
+      return parts.body;
+    }
+
+    return `---\n${result.processedContent}---\n${parts.body}`;
   }
 }

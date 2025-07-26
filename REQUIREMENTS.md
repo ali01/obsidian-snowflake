@@ -113,6 +113,17 @@ Each requirement has a unique ID (like REQ-001) for easy reference.
 *Example: If a template has `tags: [template-specific]` and `delete: [tags]`, the `tags: [template-specific]` will be included.*
 *Rationale: Explicit definitions should always win over exclusions.*
 
+### Property Cleanup After Template Application
+
+**REQ-038**: When applying a template chain to an existing file, if the file has properties that were not added as part of the template chain AND are empty (have no values), then the Snowflake plugin shall remove those properties. This cleanup shall NOT occur when applying a specific template using the "Apply specific template" command.
+
+*Example scenario:*
+- *Existing file has: `author: `, `date: 2024-01-01`, `tags: [personal]`*
+- *Template chain provides: `date: {{date}}`, `tags: [template-tag]`*
+- *Result when applying mapped templates: `author` property is removed (empty and not from template), `date` and `tags` are merged*
+- *Result when applying specific template: All existing properties are preserved, including empty `author`*
+*Rationale: Clean up empty properties when applying the full template configuration for a folder, but preserve all properties when manually applying individual templates to avoid unintended data loss.*
+
 
 ---
 
