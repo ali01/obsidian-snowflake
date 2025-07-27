@@ -124,6 +124,17 @@ Each requirement has a unique ID (like REQ-001) for easy reference.
 - *Result when applying specific template: All existing properties are preserved, including empty `author`*
 *Rationale: Clean up empty properties when applying the full template configuration for a folder, but preserve all properties when manually applying individual templates to avoid unintended data loss.*
 
+### Batch Operations
+
+**REQ-039**: When applying templates to multiple files in a batch operation (such as "Apply templates to folder"), the Snowflake plugin shall only apply the frontmatter portion of the template to each file, unless that file's body consists of nothing but whitespace.
+
+*Example scenarios:*
+- *Batch operation on file with content: Only frontmatter is updated, body remains unchanged*
+- *Batch operation on file with empty/whitespace body: Both frontmatter and body from template are applied*
+- *Single file operations: Full template (frontmatter + body) is always applied*
+
+*Rationale: Batch operations are typically used to update metadata across many existing files. Preserving existing body content prevents accidental data loss while still allowing templates to populate empty files.*
+
 
 ---
 

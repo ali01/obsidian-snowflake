@@ -689,6 +689,238 @@ Template`;
       expect(finalContent).toBe('---\ntitle: Test\n---\n# Test\n\nContent\n');
       expect(finalContent).not.toMatch(/\n{3}/);
     });
+
+    test('REQ-039: Should only apply frontmatter in batch operations for files with content', async () => {
+      // Existing content with body
+      const existingContent = `---
+title: My Note
+tags: [personal]
+---
+
+# My Important Content
+
+This is important content that should not be replaced.`;
+
+      // Template with both frontmatter and body
+      const templateContent = `---
+title: Template Title
+date: {{date}}
+tags: [template]
+---
+
+# Template Content
+
+This is template body content.`;
+
+      const processedTemplate = `---
+title: Template Title
+date: 2024-01-01
+tags: [template]
+---
+
+# Template Content
+
+This is template body content.`;
+
+      mockVault.read.mockResolvedValue(existingContent);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: processedTemplate,
+        variables: { date: '2024-01-01' },
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'title: Template Title\ndate: 2024-01-01\ntags: [personal, template]',
+        conflicts: ['title'],
+        added: ['date']
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation((content, merged) => {
+        // Simulate applying merged frontmatter
+        const bodyMatch = content.match(/---[\s\S]*?---\n([\s\S]*)/);
+        const body = bodyMatch ? bodyMatch[1] : content;
+        return `---\n${merged}\n---\n${body}`;
+      });
+      mockFrontmatterMerger.extractPropertyNames.mockReturnValue(
+        new Set(['title', 'date', 'tags'])
+      );
+
+      // Apply with batch operation context
+      const result = await applicator.applyTemplate(mockFile, {
+        isManualCommand: true,
+        isBatchOperation: true
+      });
+
+      expect(result.success).toBe(true);
+
+      // Verify the body content was NOT replaced
+      const modifiedContent = mockVault.modify.mock.calls[0][1];
+      expect(modifiedContent).toContain('# My Important Content');
+      expect(modifiedContent).toContain('This is important content that should not be replaced.');
+      expect(modifiedContent).not.toContain('# Template Content');
+      expect(modifiedContent).not.toContain('This is template body content.');
+
+      // Verify frontmatter was updated
+      expect(modifiedContent).toContain('date: 2024-01-01');
+    });
+
+    test('REQ-039: Should apply full template in batch operations for files with whitespace-only body', async () => {
+      // Existing content with whitespace-only body
+      const existingContent = `---
+title: Empty Note
+---
+
+
+
+  `; // Just whitespace
+
+      // Template with both frontmatter and body
+      const templateContent = `---
+title: Template Title
+date: {{date}}
+---
+
+# Template Content
+
+This is template body content.`;
+
+      const processedTemplate = `---
+title: Template Title
+date: 2024-01-01
+---
+
+# Template Content
+
+This is template body content.`;
+
+      mockVault.read.mockResolvedValue(existingContent);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: processedTemplate,
+        variables: { date: '2024-01-01' },
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'title: Template Title\ndate: 2024-01-01',
+        conflicts: ['title'],
+        added: ['date']
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation((content, merged) => {
+        return `---\n${merged}\n---\n# Template Content\n\nThis is template body content.`;
+      });
+      mockFrontmatterMerger.extractPropertyNames.mockReturnValue(new Set(['title', 'date']));
+
+      // Apply with batch operation context
+      const result = await applicator.applyTemplate(mockFile, {
+        isManualCommand: true,
+        isBatchOperation: true
+      });
+
+      expect(result.success).toBe(true);
+
+      // Verify the body content WAS replaced since it was whitespace-only
+      const modifiedContent = mockVault.modify.mock.calls[0][1];
+      expect(modifiedContent).toContain('# Template Content');
+      expect(modifiedContent).toContain('This is template body content.');
+    });
+
+    test('REQ-039: Should apply full template in non-batch operations regardless of body content', async () => {
+      // Existing content with body
+      const existingContent = `---
+title: My Note
+---
+
+# My Important Content
+
+This is important content.`;
+
+      // Template with both frontmatter and body
+      const templateContent = `---
+date: {{date}}
+---
+
+## Template Section`;
+
+      const processedTemplate = `---
+date: 2024-01-01
+---
+
+## Template Section`;
+
+      mockVault.read.mockResolvedValue(existingContent);
+      mockTemplateLoader.getTemplateChain.mockReturnValue({
+        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        hasInheritance: false
+      });
+      mockTemplateLoader.loadTemplateChain.mockResolvedValue({
+        templates: [
+          {
+            path: 'Templates/default.md',
+            folderPath: '',
+            depth: 0,
+            content: templateContent
+          }
+        ],
+        hasInheritance: false
+      });
+      mockVariableProcessor.processTemplate.mockReturnValue({
+        content: processedTemplate,
+        variables: { date: '2024-01-01' },
+        hasSnowflakeId: false
+      });
+      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
+        merged: 'title: My Note\ndate: 2024-01-01',
+        conflicts: [],
+        added: ['date']
+      });
+      mockFrontmatterMerger.applyToFile.mockImplementation((content, merged) => {
+        const bodyMatch = content.match(/---[\s\S]*?---\n([\s\S]*)/);
+        const body = bodyMatch ? bodyMatch[1] : content;
+        return `---\n${merged}\n---\n${body}\n\n## Template Section`;
+      });
+      mockFrontmatterMerger.extractPropertyNames.mockReturnValue(new Set(['date']));
+
+      // Apply WITHOUT batch operation context
+      const result = await applicator.applyTemplate(
+        mockFile,
+        { isManualCommand: true } // No isBatchOperation
+      );
+
+      expect(result.success).toBe(true);
+
+      // Verify both original body and template body are present
+      const modifiedContent = mockVault.modify.mock.calls[0][1];
+      expect(modifiedContent).toContain('# My Important Content');
+      expect(modifiedContent).toContain('This is important content.');
+      expect(modifiedContent).toContain('## Template Section');
+    });
   });
 
   describe('applySpecificTemplate', () => {

@@ -95,7 +95,8 @@ export class TemplateApplicator {
       file,
       finalTemplateContent,
       templateProperties,
-      editor
+      editor,
+      context
     );
 
     if (result.success && context.isBatchOperation !== true) {
@@ -171,16 +172,19 @@ export class TemplateApplicator {
    *
    * REQ-006: Merge template with existing content
    * REQ-007: Insert body at cursor position
+   * REQ-039: Apply only frontmatter in batch operations
    *
    * @param file - The file to apply to
    * @param processedContent - The processed template content
    * @param editor - Optional editor for cursor position
+   * @param context - Command context with batch operation flag
    * @returns Application result
    */
   private async applyProcessedTemplate(
     file: MarkdownFile,
     processedContent: string,
-    editor?: Editor
+    editor?: Editor,
+    context?: CommandContext
   ): Promise<ApplyResult> {
     const currentContent = await this.vault.read(file);
     const templateParts = this.splitContent(processedContent);
@@ -193,13 +197,24 @@ export class TemplateApplicator {
       currentParts
     );
 
-    // Process body content
-    const finalContent = this.processBodyContent(
-      contentAfterFrontmatter,
-      templateParts.body,
-      updatedBody,
-      editor
-    );
+    // REQ-039: Check if we should skip body processing in batch operations
+    const isBatchOperation = context?.isBatchOperation === true;
+    const shouldSkipBody = isBatchOperation && updatedBody.trim() !== '';
+
+    // Process body content unless we're in batch mode with existing content
+    let finalContent: string;
+    if (shouldSkipBody) {
+      // In batch mode with existing content: keep the current body
+      finalContent = contentAfterFrontmatter;
+    } else {
+      // Normal mode or batch mode with whitespace-only body: process template body
+      finalContent = this.processBodyContent(
+        contentAfterFrontmatter,
+        templateParts.body,
+        updatedBody,
+        editor
+      );
+    }
 
     // Ensure file ends with exactly one newline
     const normalizedContent = finalContent.trimEnd() + '\n';
@@ -311,18 +326,21 @@ export class TemplateApplicator {
    * Apply processed template content with empty property cleanup
    *
    * REQ-038: Remove empty properties not from templates
+   * REQ-039: Apply only frontmatter in batch operations
    *
    * @param file - The file to apply to
    * @param templateContent - The raw template content
    * @param templateProperties - Properties from the template chain
    * @param editor - Optional editor for cursor position
+   * @param context - Command context with batch operation flag
    * @returns Application result
    */
   private async applyProcessedTemplateContent(
     file: MarkdownFile,
     templateContent: string,
     templateProperties: Set<string>,
-    editor?: Editor
+    editor?: Editor,
+    context?: CommandContext
   ): Promise<ApplyResult> {
     try {
       // Read current content to check if file has existing content
@@ -333,7 +351,12 @@ export class TemplateApplicator {
       const processedTemplate = this.variableProcessor.processTemplate(templateContent, file);
 
       // Apply the processed template
-      const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
+      const result = await this.applyProcessedTemplate(
+        file,
+        processedTemplate.content,
+        editor,
+        context
+      );
 
       // REQ-038: Clean up empty properties only for existing files
       if (result.success && hasExistingContent) {
