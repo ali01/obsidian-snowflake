@@ -217,7 +217,8 @@ export class FrontmatterMerger {
       return;
     }
 
-    const keyMatch = line.match(/^(\w+):\s*(.*)$/);
+    // Match property names (including those with spaces) followed by colon
+    const keyMatch = line.match(/^([^:]+?):\s*(.*)$/);
     if (keyMatch) {
       this.handleKeyValueLine(keyMatch, data, state);
     } else if (state.currentKey !== null) {
@@ -252,7 +253,8 @@ export class FrontmatterMerger {
     // Save previous multi-line value if exists
     this.savePendingValue(data, state);
 
-    state.currentKey = keyMatch[1];
+    // Trim key to handle property names with spaces correctly
+    state.currentKey = keyMatch[1].trim();
     const value = keyMatch[2].trim();
 
     if (value === '|') {

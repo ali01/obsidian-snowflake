@@ -310,6 +310,24 @@ title: "Title with: Special Characters"
       expect(result.merged).toContain('title: "Title with: Special Characters"');
       expect(result.merged).toContain('subtitle: "Another: Title"');
     });
+
+    test('Should handle property names with spaces', () => {
+      const fileContent = `---
+My Property: value1
+Another Key: value2
+---`;
+      const templateFrontmatter = `My Property: template value
+Third Property: value3`;
+
+      const result = merger.mergeWithFile(fileContent, templateFrontmatter);
+
+      // File value should be preserved for conflicting keys
+      expect(result.merged).toContain('My Property: value1');
+      expect(result.merged).toContain('Another Key: value2');
+      expect(result.merged).toContain('Third Property: value3');
+      expect(result.conflicts).toContain('My Property');
+      expect(result.added).toContain('Another Key');
+    });
   });
 
   describe('Complex Scenarios', () => {
