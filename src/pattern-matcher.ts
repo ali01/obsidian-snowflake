@@ -5,6 +5,7 @@
  * - * matches any sequence of characters (except /)
  * - ? matches any single character
  * - ** matches any number of directories
+ * - directory/ matches all files under that directory
  */
 
 /**
@@ -26,6 +27,16 @@ export function matchesExclusionPattern(filePath: string, patterns: string[]): b
     // Empty pattern matches nothing
     if (!pattern || pattern.trim() === '') {
       return false;
+    }
+
+    // Directory pattern: matches all files under that directory
+    if (pattern.endsWith('/')) {
+      const dirPath = pattern.slice(0, -1); // Remove trailing slash
+      // Match if file path starts with the directory path
+      return (
+        filePath.startsWith(dirPath + '/') ||
+        filePath === dirPath
+      );
     }
 
     // Exact match

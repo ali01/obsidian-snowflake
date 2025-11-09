@@ -66,6 +66,53 @@ describe('PatternMatcher', () => {
       expect(matchesExclusionPattern('backup/2024/old-data.md', patterns)).toBe(true);
       expect(matchesExclusionPattern('backup/old-data.md', patterns)).toBe(false); // Missing middle directory
     });
+
+    test('Should match directory patterns (ending with /)', () => {
+      const patterns = ['Archive/', 'Drafts/'];
+
+      // Files directly under the directory
+      expect(matchesExclusionPattern('Archive/old-file.md', patterns)).toBe(true);
+      expect(matchesExclusionPattern('Drafts/draft.md', patterns)).toBe(true);
+
+      // Files in nested subdirectories
+      expect(matchesExclusionPattern('Archive/2023/data.md', patterns)).toBe(true);
+      expect(matchesExclusionPattern('Drafts/work/notes.md', patterns)).toBe(true);
+      expect(matchesExclusionPattern('Archive/a/b/c/deep.md', patterns)).toBe(true);
+
+      // Files not under the directory
+      expect(matchesExclusionPattern('Current/file.md', patterns)).toBe(false);
+      expect(matchesExclusionPattern('Archive-related.md', patterns)).toBe(false);
+      expect(matchesExclusionPattern('MyArchive/file.md', patterns)).toBe(false);
+    });
+
+    test('Should match nested directory patterns', () => {
+      const patterns = ['Projects/Archive/', 'Work/Old/'];
+
+      // Match files in nested directories
+      expect(matchesExclusionPattern('Projects/Archive/old.md', patterns)).toBe(true);
+      expect(matchesExclusionPattern('Work/Old/data.md', patterns)).toBe(true);
+      expect(matchesExclusionPattern('Projects/Archive/sub/deep.md', patterns)).toBe(true);
+
+      // Don't match files outside the directories
+      expect(matchesExclusionPattern('Projects/Current/file.md', patterns)).toBe(false);
+      expect(matchesExclusionPattern('Work/New/file.md', patterns)).toBe(false);
+      expect(matchesExclusionPattern('Archive/file.md', patterns)).toBe(false);
+    });
+
+    test('Should handle mixed patterns (directory and glob)', () => {
+      const patterns = ['Archive/', '*.tmp', '**/draft-*'];
+
+      // Directory pattern matches
+      expect(matchesExclusionPattern('Archive/file.md', patterns)).toBe(true);
+      expect(matchesExclusionPattern('Archive/sub/file.md', patterns)).toBe(true);
+
+      // Glob pattern matches
+      expect(matchesExclusionPattern('test.tmp', patterns)).toBe(true);
+      expect(matchesExclusionPattern('folder/draft-123.md', patterns)).toBe(true);
+
+      // No match
+      expect(matchesExclusionPattern('Current/file.md', patterns)).toBe(false);
+    });
   });
 
   describe('processExclusionPatterns', () => {

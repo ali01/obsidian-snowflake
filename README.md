@@ -153,10 +153,42 @@ When a note uses the journal template:
 - `status` is included (never excluded)
 - All tags are concatenated: `[base, personal, journal]`
 
-### Exclusion Lists
+### File Exclusion Patterns
 
-- Specify files that should be excluded from template application
-- Use regex patterns (e.g. `*.tmp` or `draft-*`) to match multiple files
+Each folder mapping can have exclusion patterns to prevent templates from being
+applied to specific files or directories.
+
+#### Pattern Types
+
+**Exact filename**:
+- `README.md` - excludes files named exactly "README.md"
+
+**Wildcard patterns**:
+- `*.tmp` - excludes all files ending with .tmp
+- `draft-*` - excludes files starting with "draft-"
+- `test?.md` - excludes files like "test1.md", "testA.md"
+
+**Directory patterns**:
+- `Archive/` - excludes all files under the Archive directory
+- `Old/Backups/` - excludes all files under the nested Old/Backups directory
+
+**Recursive patterns**:
+- `**/README.md` - excludes README.md files in any subdirectory
+- `**/draft-*` - excludes draft files at any depth
+
+#### Examples
+
+To exclude an entire subdirectory and some specific files:
+```
+Archive/
+*.tmp
+draft-notes.md
+```
+
+This will ignore:
+- Everything under `Projects/Archive/`
+- Any `.tmp` files
+- Files named exactly `draft-notes.md`
 
 ## Development
 
