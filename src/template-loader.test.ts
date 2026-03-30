@@ -80,7 +80,8 @@ describe('TemplateLoader', () => {
 
       templatesFolder: 'Templates',
       dateFormat: 'YYYY-MM-DD',
-      timeFormat: 'HH:mm'
+      timeFormat: 'HH:mm',
+      globalExcludePatterns: []
     };
     loader = new TemplateLoader(mockVault as any, settings);
 
@@ -145,7 +146,8 @@ describe('TemplateLoader', () => {
         templateMappings: {},
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       });
 
       const file = {

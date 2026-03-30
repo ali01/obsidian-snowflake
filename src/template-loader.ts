@@ -292,7 +292,7 @@ export class TemplateLoader {
   }
 
   /**
-   * Check if a file is excluded by the mapping's exclusion patterns
+   * Check if a file is excluded by global or mapping exclusion patterns
    *
    * @param file - The file to check
    * @param mappingFolderPath - The folder path of the mapping
@@ -304,18 +304,8 @@ export class TemplateLoader {
     mappingFolderPath: string,
     mapping: string | TemplateMappingConfig
   ): boolean {
-    // String mappings have no exclusions
-    if (typeof mapping === 'string') {
-      return false;
-    }
-
-    // Check if there are exclusion patterns
-    if (!mapping.excludePatterns || mapping.excludePatterns.length === 0) {
-      return false;
-    }
-
     // Get the file path relative to the mapping folder
-    const filePath = file.path;
+    const filePath = file.path ?? '';
     let relativePath: string;
     if (mappingFolderPath === '') {
       relativePath = filePath;
@@ -323,6 +313,28 @@ export class TemplateLoader {
       relativePath = filePath.slice(mappingFolderPath.length + 1);
     } else {
       relativePath = file.name;
+    }
+
+    // Check global exclude patterns first
+    const globalPatterns = this.settings.globalExcludePatterns;
+    if (globalPatterns && globalPatterns.length > 0) {
+      if (matchesExclusionPattern(relativePath, globalPatterns)) {
+        return true;
+      }
+      // Also check against full path for global patterns
+      if (relativePath !== filePath && matchesExclusionPattern(filePath, globalPatterns)) {
+        return true;
+      }
+    }
+
+    // String mappings have no per-mapping exclusions
+    if (typeof mapping === 'string') {
+      return false;
+    }
+
+    // Check per-mapping exclusion patterns
+    if (!mapping.excludePatterns || mapping.excludePatterns.length === 0) {
+      return false;
     }
 
     return matchesExclusionPattern(relativePath, mapping.excludePatterns);

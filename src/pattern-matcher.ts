@@ -33,10 +33,7 @@ export function matchesExclusionPattern(filePath: string, patterns: string[]): b
     if (pattern.endsWith('/')) {
       const dirPath = pattern.slice(0, -1); // Remove trailing slash
       // Match if file path starts with the directory path
-      return (
-        filePath.startsWith(dirPath + '/') ||
-        filePath === dirPath
-      );
+      return filePath.startsWith(dirPath + '/') || filePath === dirPath;
     }
 
     // Exact match

@@ -19,6 +19,7 @@ import { TemplatePreviewModal } from './template-preview-modal';
 import { ErrorHandler } from '../error-handler';
 import type { ErrorContext, TemplateMappingConfig } from '../types';
 import type { SnowflakeCommands } from '../commands';
+import { processExclusionPatterns } from '../pattern-matcher';
 
 /**
  * Settings tab for configuring the Snowflake plugin
@@ -41,6 +42,7 @@ export class SnowflakeSettingTab extends PluginSettingTab {
 
     this.addHeader(containerEl);
     this.addGeneralSettings(containerEl);
+    this.addGlobalExcludeSettings(containerEl);
     this.addTemplateMappings(containerEl);
     this.addVariableFormatSettings(containerEl);
     this.addHelpSection(containerEl);
@@ -58,6 +60,43 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     containerEl.createEl('h2', { text: 'General Settings' });
 
     this.addTemplatesFolderSetting(containerEl);
+  }
+
+  private addGlobalExcludeSettings(containerEl: HTMLElement): void {
+    containerEl.createEl('h2', {
+      text: 'Global Exclude Patterns'
+    });
+    containerEl.createEl('p', {
+      text:
+        'Files matching these patterns will be ignored' +
+        ' by all template mappings.' +
+        ' One pattern per line.',
+      cls: 'setting-item-description'
+    });
+
+    const patterns = this.plugin.settings.globalExcludePatterns;
+    const currentValue = patterns.length > 0 ? patterns.join('\n') : '';
+
+    new Setting(containerEl)
+      .setName('Exclude patterns')
+      .setDesc(
+        'Glob patterns: * matches characters,' +
+          ' ** matches directories,' +
+          ' ? matches single character'
+      )
+      .addTextArea((text) => {
+        text
+          .setPlaceholder('*.tmp\n_archive/**\n~*.md')
+          .setValue(currentValue)
+          .onChange(async (value) => {
+            const result = processExclusionPatterns(value);
+            this.plugin.settings.globalExcludePatterns = result.patterns;
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.rows = 4;
+        text.inputEl.cols = 30;
+        return text;
+      });
   }
 
   private addTemplatesFolderSetting(containerEl: HTMLElement): void {

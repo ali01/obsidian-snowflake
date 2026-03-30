@@ -66,6 +66,7 @@ export interface SnowflakeSettings {
   templatesFolder: string;
   dateFormat: string;
   timeFormat: string;
+  globalExcludePatterns: string[];
 }
 
 /**

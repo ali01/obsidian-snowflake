@@ -24,7 +24,8 @@ describe('Settings Utilities', () => {
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       });
     });
   });
@@ -41,7 +42,8 @@ describe('Settings Utilities', () => {
         },
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       expect(areSettingsValid(settings)).toBe(true);
@@ -64,7 +66,8 @@ describe('Settings Utilities', () => {
         },
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       expect(areSettingsValid(settings)).toBe(true);
@@ -78,7 +81,8 @@ describe('Settings Utilities', () => {
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       const result = validateSettings(settings);
@@ -124,7 +128,8 @@ describe('Settings Utilities', () => {
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       const result = validateSettings(settings);
@@ -160,7 +165,8 @@ describe('Settings Utilities', () => {
         },
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       const result = validateSettings(settings);
@@ -187,7 +193,8 @@ describe('Settings Utilities', () => {
         templateMappings: { Projects: 'project.md' },
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       const migrated = migrateSettings(currentSettings);
@@ -209,7 +216,8 @@ describe('Settings Utilities', () => {
         templateMappings: {},
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       });
     });
 
@@ -218,14 +226,16 @@ describe('Settings Utilities', () => {
         templateMappings: {},
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       });
 
       expect(migrateSettings(undefined as any)).toEqual({
         templateMappings: {},
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       });
     });
 
@@ -241,7 +251,8 @@ describe('Settings Utilities', () => {
         templateMappings: { Projects: 'project.md' }, // Valid field is preserved
         templatesFolder: 'Templates', // Default value
         dateFormat: 'YYYY-MM-DD', // Default value
-        timeFormat: 'HH:mm' // Default value
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: [] // Default value
       });
     });
   });
@@ -253,7 +264,8 @@ describe('Settings Utilities', () => {
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       const updated = updateTemplateMappings(settings, 'Daily', 'daily.md');
@@ -270,7 +282,8 @@ describe('Settings Utilities', () => {
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       const updated = updateTemplateMappings(settings, 'Projects', 'new-project.md');
@@ -284,7 +297,8 @@ describe('Settings Utilities', () => {
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       const updated = updateTemplateMappings(settings, 'Daily', 'daily.md');
@@ -304,7 +318,8 @@ describe('Settings Utilities', () => {
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       const updated = removeTemplateMapping(settings, 'Daily');
@@ -320,7 +335,8 @@ describe('Settings Utilities', () => {
 
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       };
 
       const updated = removeTemplateMapping(settings, 'NonExistent');
@@ -362,6 +378,7 @@ describe('Settings Utilities', () => {
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
         timeFormat: 'HH:mm',
+        globalExcludePatterns: [],
         // Old fields that should be removed
         defaultTemplate: 'default.md',
         enableAutoTemplating: true,
@@ -375,7 +392,8 @@ describe('Settings Utilities', () => {
         templateMappings: { Projects: 'project.md' },
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       });
 
       // Ensure old fields are not present
@@ -393,7 +411,8 @@ describe('Settings Utilities', () => {
         },
         templatesFolder: 'MyTemplates',
         dateFormat: 'DD/MM/YYYY',
-        timeFormat: 'h:mm A'
+        timeFormat: 'h:mm A',
+        globalExcludePatterns: []
       };
 
       const cleaned = cleanSettings(validSettings);
@@ -413,7 +432,8 @@ describe('Settings Utilities', () => {
         templateMappings: {},
         templatesFolder: 'Templates',
         dateFormat: 'YYYY-MM-DD',
-        timeFormat: 'HH:mm'
+        timeFormat: 'HH:mm',
+        globalExcludePatterns: []
       });
     });
   });

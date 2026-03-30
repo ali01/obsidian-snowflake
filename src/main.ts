@@ -126,6 +126,11 @@ export default class SnowflakePlugin extends Plugin {
     ) {
       this.settings.templatesFolder = 'Templates';
     }
+
+    // Ensure globalExcludePatterns is an array
+    if (!Array.isArray(this.settings.globalExcludePatterns)) {
+      this.settings.globalExcludePatterns = [];
+    }
   }
 }
 

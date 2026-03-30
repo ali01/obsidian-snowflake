@@ -46,7 +46,8 @@ describe('FileCreationHandler', () => {
 
       templatesFolder: 'Templates',
       dateFormat: 'YYYY-MM-DD',
-      timeFormat: 'HH:mm'
+      timeFormat: 'HH:mm',
+      globalExcludePatterns: []
     };
 
     // Create handler

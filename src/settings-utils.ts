@@ -66,16 +66,32 @@ export function areSettingsValid(settings: unknown): settings is SnowflakeSettin
 
   const s = settings as Record<string, unknown>;
 
-  return (
-    'templateMappings' in s &&
-    isValidTemplateMapping(s.templateMappings) &&
-    'templatesFolder' in s &&
-    typeof s.templatesFolder === 'string' &&
-    'dateFormat' in s &&
-    typeof s.dateFormat === 'string' &&
-    'timeFormat' in s &&
-    typeof s.timeFormat === 'string'
-  );
+  if (
+    !(
+      'templateMappings' in s &&
+      isValidTemplateMapping(s.templateMappings) &&
+      'templatesFolder' in s &&
+      typeof s.templatesFolder === 'string' &&
+      'dateFormat' in s &&
+      typeof s.dateFormat === 'string' &&
+      'timeFormat' in s &&
+      typeof s.timeFormat === 'string'
+    )
+  ) {
+    return false;
+  }
+
+  // globalExcludePatterns is optional for backwards compat
+  if ('globalExcludePatterns' in s) {
+    if (!Array.isArray(s.globalExcludePatterns)) {
+      return false;
+    }
+    if (!(s.globalExcludePatterns as unknown[]).every((p: unknown) => typeof p === 'string')) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /**
@@ -230,6 +246,17 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
   validateFieldTypes(s, errors);
   validateTemplateMappingValues(s.templateMappings, errors);
 
+  // Validate globalExcludePatterns if present
+  if ('globalExcludePatterns' in s) {
+    if (!Array.isArray(s.globalExcludePatterns)) {
+      errors.push('globalExcludePatterns must be an array');
+    } else if (
+      !(s.globalExcludePatterns as unknown[]).every((p: unknown) => typeof p === 'string')
+    ) {
+      errors.push('globalExcludePatterns must contain only strings');
+    }
+  }
+
   return { isValid: errors.length === 0, errors };
 }
 
@@ -272,6 +299,15 @@ export function migrateSettings(settings: unknown): SnowflakeSettings {
       migrated.timeFormat = s.timeFormat;
     }
 
+    // Migrate globalExcludePatterns if present and valid
+    if (
+      'globalExcludePatterns' in s &&
+      Array.isArray(s.globalExcludePatterns) &&
+      (s.globalExcludePatterns as unknown[]).every((p: unknown) => typeof p === 'string')
+    ) {
+      migrated.globalExcludePatterns = s.globalExcludePatterns as string[];
+    }
+
     return migrated;
   }
 
@@ -291,7 +327,8 @@ export function cleanSettings(settings: SnowflakeSettings): SnowflakeSettings {
     templateMappings: settings.templateMappings,
     templatesFolder: settings.templatesFolder,
     dateFormat: settings.dateFormat || DEFAULT_SETTINGS.dateFormat,
-    timeFormat: settings.timeFormat || DEFAULT_SETTINGS.timeFormat
+    timeFormat: settings.timeFormat || DEFAULT_SETTINGS.timeFormat,
+    globalExcludePatterns: settings.globalExcludePatterns || DEFAULT_SETTINGS.globalExcludePatterns
   };
 
   return cleaned;

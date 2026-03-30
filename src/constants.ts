@@ -22,7 +22,10 @@ export const DEFAULT_SETTINGS: SnowflakeSettings = {
   dateFormat: 'YYYY-MM-DD',
 
   // Time format for {{time}} variable (uses moment.js format)
-  timeFormat: 'HH:mm'
+  timeFormat: 'HH:mm',
+
+  // Global exclusion patterns applied to all template mappings
+  globalExcludePatterns: []
 };
 
 /**
