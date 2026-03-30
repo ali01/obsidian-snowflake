@@ -124,16 +124,14 @@ describe('FileCreationHandler', () => {
       });
     });
 
-    test('Should apply template even to files with existing content', async () => {
+    test('Should skip files with existing content (e.g. synced files)', async () => {
       const file = createMockFile('test.md', 'Projects');
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
-      (mockVault.read as jest.Mock).mockResolvedValue('Existing content'); // Non-empty content
+      (mockVault.read as jest.Mock).mockResolvedValue('Existing content');
 
       await handleFileCreation(file);
 
-      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
-        isManualCommand: false
-      });
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
     test('Should skip if file was deleted during processing', async () => {
@@ -260,7 +258,7 @@ describe('FileCreationHandler', () => {
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
-    test('Should apply template even when file has content', async () => {
+    test('Should skip files with existing content on move (e.g. synced files)', async () => {
       const file = createMockFile('test.md', 'Projects');
       const oldPath = 'Documents/test.md';
 
@@ -269,9 +267,7 @@ describe('FileCreationHandler', () => {
 
       await handleFileMove(file, oldPath);
 
-      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
-        isManualCommand: false
-      });
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
     test('Should not apply template when moved to unmapped directory', async () => {

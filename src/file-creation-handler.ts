@@ -128,10 +128,18 @@ export class FileCreationHandler {
       return;
     }
 
+    let content: string;
     try {
-      await this.vault.read(file);
+      content = await this.vault.read(file);
     } catch {
       // If we can't read the file, skip it
+      return;
+    }
+
+    // Skip files that already have content — they were likely
+    // synced from another device where the template was already
+    // applied. Only auto-apply templates to empty/new files.
+    if (content.trim() !== '') {
       return;
     }
 
