@@ -1,35 +1,24 @@
 /**
  * Template Loader
  *
- * REQ-002: When a user creates a new markdown file in a folder that has a template
- * mapping, the plugin shall automatically apply that folder's template to the file.
- *
- * REQ-003: If a folder has no specific template mapping, then the plugin shall use
- * the default template (if configured).
- *
- * REQ-026: If a template file doesn't exist when needed, then the plugin shall
- * create the new file empty and show a notice.
+ * Resolves which SCHEMA.md files apply to a newly-created markdown file by
+ * walking the folder hierarchy root → leaf and collecting every ancestor
+ * folder's SCHEMA.md (if present).
  */
 
-import { TFile, TFolder } from 'obsidian';
-import type { TAbstractFile, Vault } from 'obsidian';
+import { TFile } from 'obsidian';
+import type { Vault } from 'obsidian';
 import type {
   SnowflakeSettings,
   MarkdownFile,
   ErrorContext,
   TemplateChain,
-  TemplateChainItem,
-  TemplateMappingConfig
+  TemplateChainItem
 } from './types';
+import { SCHEMA_FILE_NAME } from './constants';
 import { matchesExclusionPattern } from './pattern-matcher';
 import { ErrorHandler } from './error-handler';
 
-/**
- * TemplateLoader: Responsible for loading template files from the vault
- *
- * Purpose: Provides a clean interface for loading templates with proper error
- * handling and user feedback.
- */
 export class TemplateLoader {
   private readonly vault: Vault;
   private settings: SnowflakeSettings;
@@ -41,26 +30,15 @@ export class TemplateLoader {
     this.errorHandler = ErrorHandler.getInstance();
   }
 
-  /**
-   * Load a template file by path
-   *
-   * REQ-026: Handle missing template files gracefully
-   *
-   * @param templatePath - Path to the template file
-   * @returns Template content or null if not found
-   */
   public async loadTemplate(templatePath: string): Promise<string | null> {
     try {
-      // Get the template file
       const templateFile = this.vault.getAbstractFileByPath(templatePath);
 
       if (!templateFile || !(templateFile instanceof TFile)) {
-        // REQ-026: Template doesn't exist
         console.warn(`Template not found: ${templatePath}`);
         return null;
       }
 
-      // Read template content
       const content = await this.vault.read(templateFile);
       return content;
     } catch (error) {
@@ -73,154 +51,36 @@ export class TemplateLoader {
     }
   }
 
-  /**
-   * Get the template path for a file based on its location
-   *
-   * REQ-002: Use folder-specific template mapping
-   * REQ-003: Fall back to default template
-   *
-   * @param file - The file to get template for
-   * @returns Template path or null if no template configured
-   */
-  private getTemplateForFile(file: MarkdownFile): string | null {
-    // Get the folder path
-    const folderPath = file.parent?.path ?? '';
-
-    // Check for exact folder match first
-    const mapping = this.settings.templateMappings[folderPath];
-    if (mapping !== undefined) {
-      if (this.isFileExcluded(file, folderPath, mapping)) {
-        return null;
-      }
-      return this.resolveTemplatePathFromMapping(mapping);
-    }
-
-    // Check parent folders (for nested folder support)
-    let currentPath = folderPath;
-    while (currentPath.includes('/')) {
-      currentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
-      const parentMapping = this.settings.templateMappings[currentPath];
-      if (parentMapping !== undefined) {
-        if (this.isFileExcluded(file, currentPath, parentMapping)) {
-          return null;
-        }
-        return this.resolveTemplatePathFromMapping(parentMapping);
-      }
-    }
-
-    // Check root folder mapping (both empty string and "/")
-    const rootMapping = this.settings.templateMappings[''] ?? this.settings.templateMappings['/'];
-    if (rootMapping !== undefined) {
-      if (this.isFileExcluded(file, '', rootMapping)) {
-        return null;
-      }
-      return this.resolveTemplatePathFromMapping(rootMapping);
-    }
-
-    // No mapping found
-    return null;
-  }
-
-  /**
-   * Validate that a template path exists
-   *
-   * @param templatePath - Path to validate
-   * @returns True if template exists
-   */
-  private templateExists(templatePath: string): boolean {
-    const file = this.vault.getAbstractFileByPath(templatePath);
-    return file instanceof TFile;
-  }
-
-  /**
-   * Get all available template files in the templates folder
-   *
-   * @returns Array of template file paths
-   */
-  private getAvailableTemplates(): string[] {
-    const templates: string[] = [];
-    const templatesFolder = this.settings.templatesFolder;
-
-    // Get the folder
-    const folder = this.vault.getAbstractFileByPath(templatesFolder);
-    if (!folder) {
-      return templates;
-    }
-
-    // Check if it's a TFolder (has children property)
-    if (!('children' in folder)) {
-      return templates;
-    }
-
-    // Recursively collect markdown files
-    const collectTemplates = (abstractFile: TAbstractFile): void => {
-      if (abstractFile instanceof TFile && abstractFile.extension === 'md') {
-        templates.push(abstractFile.path);
-      } else if (abstractFile instanceof TFolder) {
-        for (const child of abstractFile.children) {
-          collectTemplates(child);
-        }
-      }
-    };
-
-    const abstractFolder = folder as TAbstractFile;
-    collectTemplates(abstractFolder);
-    return templates;
-  }
-
-  /**
-   * Update settings reference (for when settings change)
-   *
-   * @param settings - New settings object
-   */
   public updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
   }
 
   /**
-   * Get the template chain for a file based on its location
+   * Build the SCHEMA.md inheritance chain for a file.
    *
-   * REQ-032: Check parent folders for template mappings and apply them
-   * in order from root to leaf
-   *
-   * @param file - The file to get template chain for
-   * @returns Template chain with all applicable templates
+   * Walks from vault root down to the file's parent folder; every folder that
+   * contains a SCHEMA.md contributes one entry to the chain (root first).
+   * If the file matches a global exclude pattern, returns an empty chain.
    */
   public getTemplateChain(file: MarkdownFile): TemplateChain {
-    const templates: TemplateChainItem[] = [];
-
-    // Get all folder paths from file location to root
-    const folderPaths = this.getFolderHierarchy(file);
-
-    // Check each folder for template mappings (root to leaf order)
-    for (let i = 0; i < folderPaths.length; i++) {
-      const folderPath = folderPaths[i];
-      const mapping = this.settings.templateMappings[folderPath];
-
-      if (mapping !== undefined) {
-        // Check if file is excluded at this level
-        if (!this.isFileExcluded(file, folderPath, mapping)) {
-          templates.push({
-            path: this.resolveTemplatePathFromMapping(mapping),
-            folderPath: folderPath,
-            depth: i
-          });
-        }
-      }
+    if (this.isFileExcluded(file)) {
+      return { templates: [], hasInheritance: false };
     }
 
-    // If no folder mappings found, check for root mapping
-    if (templates.length === 0) {
-      const rootMapping = this.settings.templateMappings[''] ?? this.settings.templateMappings['/'];
-      if (rootMapping !== undefined) {
-        // Check if file is excluded at root level
-        if (!this.isFileExcluded(file, '', rootMapping)) {
-          templates.push({
-            path: this.resolveTemplatePathFromMapping(rootMapping),
-            folderPath: '',
-            depth: 0
-          });
-        }
+    const templates: TemplateChainItem[] = [];
+    const folderPaths = this.getFolderHierarchy(file);
+
+    for (let i = 0; i < folderPaths.length; i++) {
+      const folderPath = folderPaths[i];
+      const schemaPath = this.schemaPathFor(folderPath);
+      const schemaFile = this.vault.getAbstractFileByPath(schemaPath);
+
+      if (schemaFile instanceof TFile) {
+        templates.push({
+          path: schemaPath,
+          folderPath: folderPath,
+          depth: i
+        });
       }
     }
 
@@ -230,26 +90,14 @@ export class TemplateLoader {
     };
   }
 
-  /**
-   * Load content for all templates in a chain
-   *
-   * REQ-032: Handle missing templates gracefully
-   *
-   * @param chain - Template chain to load
-   * @returns Template chain with content populated
-   */
   public async loadTemplateChain(chain: TemplateChain): Promise<TemplateChain> {
     const loadedTemplates: TemplateChainItem[] = [];
 
     for (const template of chain.templates) {
       const content = await this.loadTemplate(template.path);
 
-      // Skip templates that couldn't be loaded
       if (content !== null) {
-        loadedTemplates.push({
-          ...template,
-          content
-        });
+        loadedTemplates.push({ ...template, content });
       } else {
         console.warn(`Skipping missing template in chain: ${template.path}`);
       }
@@ -262,24 +110,17 @@ export class TemplateLoader {
   }
 
   /**
-   * Get folder hierarchy from a file's location
-   *
-   * @param file - File to get hierarchy for
-   * @returns Array of folder paths from root to immediate parent
+   * Folder paths from vault root to the file's immediate parent.
+   * Root is represented as the empty string.
    */
   private getFolderHierarchy(file: MarkdownFile): string[] {
-    const paths: string[] = [];
+    const paths: string[] = [''];
 
-    // Start with root
-    paths.push('');
-
-    // Get folder path
     const folderPath = file.parent?.path;
     if (folderPath === undefined || folderPath === '' || folderPath === '/') {
       return paths;
     }
 
-    // Build hierarchy from root to leaf
     const parts = folderPath.split('/').filter((p) => p !== '');
     let currentPath = '';
 
@@ -292,63 +133,24 @@ export class TemplateLoader {
   }
 
   /**
-   * Check if a file is excluded by global or mapping exclusion patterns
-   *
-   * @param file - The file to check
-   * @param mappingFolderPath - The folder path of the mapping
-   * @param mapping - The template mapping configuration
-   * @returns True if the file should be excluded
+   * Returns the vault path of the SCHEMA.md that would govern files in the
+   * given folder. Empty/root folder yields a top-level SCHEMA.md.
    */
-  private isFileExcluded(
-    file: MarkdownFile,
-    mappingFolderPath: string,
-    mapping: string | TemplateMappingConfig
-  ): boolean {
-    // Get the file path relative to the mapping folder
-    const filePath = file.path ?? '';
-    let relativePath: string;
-    if (mappingFolderPath === '') {
-      relativePath = filePath;
-    } else if (filePath.startsWith(mappingFolderPath + '/')) {
-      relativePath = filePath.slice(mappingFolderPath.length + 1);
-    } else {
-      relativePath = file.name;
+  private schemaPathFor(folderPath: string): string {
+    if (folderPath === '' || folderPath === '/') {
+      return SCHEMA_FILE_NAME;
     }
-
-    // Check global exclude patterns first
-    const globalPatterns = this.settings.globalExcludePatterns;
-    if (globalPatterns && globalPatterns.length > 0) {
-      if (matchesExclusionPattern(relativePath, globalPatterns)) {
-        return true;
-      }
-      // Also check against full path for global patterns
-      if (relativePath !== filePath && matchesExclusionPattern(filePath, globalPatterns)) {
-        return true;
-      }
-    }
-
-    // String mappings have no per-mapping exclusions
-    if (typeof mapping === 'string') {
-      return false;
-    }
-
-    // Check per-mapping exclusion patterns
-    if (!mapping.excludePatterns || mapping.excludePatterns.length === 0) {
-      return false;
-    }
-
-    return matchesExclusionPattern(relativePath, mapping.excludePatterns);
+    return `${folderPath}/${SCHEMA_FILE_NAME}`;
   }
 
-  /**
-   * Resolve template path from a mapping
-   *
-   * @param mapping - The template mapping (string or config object)
-   * @returns Resolved template path
-   */
-  private resolveTemplatePathFromMapping(mapping: string | TemplateMappingConfig): string {
-    const templatePath = typeof mapping === 'string' ? mapping : mapping.templatePath;
-    return `${this.settings.templatesFolder}/${templatePath}`;
+  private isFileExcluded(file: MarkdownFile): boolean {
+    const patterns = this.settings.globalExcludePatterns;
+    if (!patterns || patterns.length === 0) {
+      return false;
+    }
+
+    const filePath = file.path ?? '';
+    return matchesExclusionPattern(filePath, patterns);
   }
 }
 
@@ -356,16 +158,12 @@ export class TemplateLoader {
  * Test-only exports
  */
 export const TemplateLoaderTestUtils = {
-  getTemplateForFile: (loader: TemplateLoader, file: MarkdownFile): string | null => {
+  isFileExcluded: (loader: TemplateLoader, file: MarkdownFile): boolean => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (loader as any).getTemplateForFile(file);
+    return (loader as any).isFileExcluded(file);
   },
-  templateExists: (loader: TemplateLoader, templatePath: string): boolean => {
+  schemaPathFor: (loader: TemplateLoader, folderPath: string): string => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (loader as any).templateExists(templatePath);
-  },
-  getAvailableTemplates: (loader: TemplateLoader): string[] => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (loader as any).getAvailableTemplates();
+    return (loader as any).schemaPathFor(folderPath);
   }
 };

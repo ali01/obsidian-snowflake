@@ -29,110 +29,10 @@ __export(main_exports, {
   default: () => SnowflakePlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian14 = require("obsidian");
+var import_obsidian9 = require("obsidian");
 
 // src/ui/settings-tab.ts
-var import_obsidian7 = require("obsidian");
-
-// src/ui/folder-input-suggest.ts
 var import_obsidian = require("obsidian");
-var FolderInputSuggest = class extends import_obsidian.AbstractInputSuggest {
-  constructor(app, inputEl) {
-    super(app, inputEl);
-    this.inputEl = inputEl;
-  }
-  getSuggestions(query) {
-    const lowerQuery = query.toLowerCase();
-    const allFolders = this.app.vault.getAllLoadedFiles().filter((file) => file instanceof import_obsidian.TFolder);
-    if (!query) {
-      return allFolders.filter((folder) => !folder.parent || folder.parent === this.app.vault.getRoot()).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 10);
-    }
-    return allFolders.filter((folder) => {
-      const path = folder.path.toLowerCase();
-      const name = folder.name.toLowerCase();
-      return path.includes(lowerQuery) || name.includes(lowerQuery);
-    }).sort((a, b) => {
-      const aNameMatch = a.name.toLowerCase() === lowerQuery;
-      const bNameMatch = b.name.toLowerCase() === lowerQuery;
-      if (aNameMatch && !bNameMatch) return -1;
-      if (!aNameMatch && bNameMatch) return 1;
-      const aStartsWith = a.name.toLowerCase().startsWith(lowerQuery);
-      const bStartsWith = b.name.toLowerCase().startsWith(lowerQuery);
-      if (aStartsWith && !bStartsWith) return -1;
-      if (!aStartsWith && bStartsWith) return 1;
-      return a.path.length - b.path.length;
-    }).slice(0, 10);
-  }
-  renderSuggestion(folder, el) {
-    el.setText(folder.path);
-    el.addClass("folder-suggestion-item");
-  }
-  selectSuggestion(folder, _evt) {
-    this.inputEl.value = folder.path;
-    this.inputEl.trigger("input");
-    this.close();
-  }
-};
-
-// src/ui/template-mapping-modal.ts
-var import_obsidian3 = require("obsidian");
-
-// src/ui/file-input-suggest.ts
-var import_obsidian2 = require("obsidian");
-var FileInputSuggest = class extends import_obsidian2.AbstractInputSuggest {
-  constructor(app, inputEl, fileExtension = "md", rootFolder) {
-    super(app, inputEl);
-    this.inputEl = inputEl;
-    this.fileExtension = fileExtension;
-    this.rootFolder = rootFolder;
-  }
-  getSuggestions(query) {
-    const lowerQuery = query.toLowerCase();
-    let allFiles = this.app.vault.getAllLoadedFiles().filter(
-      (file) => file instanceof import_obsidian2.TFile && file.extension === this.fileExtension
-    );
-    if (this.rootFolder !== void 0 && this.rootFolder !== "") {
-      const rootPath = this.rootFolder;
-      allFiles = allFiles.filter((file) => file.path.startsWith(rootPath + "/"));
-    }
-    if (!query) {
-      return allFiles.sort((a, b) => a.path.localeCompare(b.path)).slice(0, 10);
-    }
-    return this.filterAndSortFiles(allFiles, lowerQuery).slice(0, 10);
-  }
-  filterAndSortFiles(files, lowerQuery) {
-    return files.filter((file) => {
-      const path = file.path.toLowerCase();
-      const basename = file.basename.toLowerCase();
-      return path.includes(lowerQuery) || basename.includes(lowerQuery);
-    }).sort((a, b) => {
-      const aNameMatch = a.basename.toLowerCase() === lowerQuery;
-      const bNameMatch = b.basename.toLowerCase() === lowerQuery;
-      if (aNameMatch && !bNameMatch) return -1;
-      if (!aNameMatch && bNameMatch) return 1;
-      const aStartsWith = a.basename.toLowerCase().startsWith(lowerQuery);
-      const bStartsWith = b.basename.toLowerCase().startsWith(lowerQuery);
-      if (aStartsWith && !bStartsWith) return -1;
-      if (!aStartsWith && bStartsWith) return 1;
-      return a.path.length - b.path.length;
-    });
-  }
-  renderSuggestion(file, el) {
-    el.createDiv({ cls: "suggestion-content" }, (contentEl) => {
-      contentEl.createDiv({ cls: "suggestion-title", text: file.basename });
-      contentEl.createDiv({ cls: "suggestion-path", text: file.path });
-    });
-  }
-  selectSuggestion(file, _evt) {
-    if (this.rootFolder !== void 0 && file.path.startsWith(this.rootFolder + "/")) {
-      this.inputEl.value = file.path.slice(this.rootFolder.length + 1);
-    } else {
-      this.inputEl.value = file.path;
-    }
-    this.inputEl.trigger("input");
-    this.close();
-  }
-};
 
 // src/pattern-matcher.ts
 function matchesExclusionPattern(filePath, patterns) {
@@ -198,183 +98,185 @@ function processExclusionPatterns(input) {
   };
 }
 
-// src/ui/template-mapping-modal.ts
-var TemplateMappingModal = class extends import_obsidian3.Modal {
-  constructor(app, templatesFolder, onSave, editData) {
-    super(app);
-    this.folderPath = "";
-    this.templatePath = "";
-    this.excludePatterns = "";
-    this.templatesFolder = templatesFolder;
-    this.onSave = onSave;
-    if (editData) {
-      this.isEditMode = true;
-      this.originalFolderPath = editData.folderPath;
-      this.folderPath = editData.folderPath;
-      if (typeof editData.config === "string") {
-        this.templatePath = editData.config;
-      } else {
-        this.templatePath = editData.config.templatePath;
-        if (editData.config.excludePatterns && editData.config.excludePatterns.length > 0) {
-          this.excludePatterns = editData.config.excludePatterns.join("\n");
-        }
-      }
-    } else {
-      this.isEditMode = false;
-    }
+// src/ui/settings-tab.ts
+var SnowflakeSettingTab = class extends import_obsidian.PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
   }
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.createEl("h2", {
-      text: this.isEditMode ? "Edit Template Mapping" : "Add Template Mapping"
-    });
-    contentEl.createEl("p", {
-      text: this.isEditMode ? "Modify the folder mapping configuration" : "Map a folder to a template file",
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    this.addHeader(containerEl);
+    this.addGlobalExcludeSettings(containerEl);
+    this.addVariableFormatSettings(containerEl);
+    this.addHelpSection(containerEl);
+  }
+  addHeader(containerEl) {
+    containerEl.createEl("h1", { text: "Snowflake Settings" });
+    containerEl.createEl("p", {
+      text: "Snowflake applies templates to new notes from a SCHEMA.md file in their folder (and any ancestor folders, root \u2192 leaf). Add a SCHEMA.md to any folder to make it Snowflake-managed.",
       cls: "setting-item-description"
     });
-    new import_obsidian3.Setting(contentEl).setName("Folder").setDesc("Select the folder to map (leave empty for root folder)").addText((text) => {
-      new FolderInputSuggest(this.app, text.inputEl);
-      text.setPlaceholder("Example: Projects (empty for root)").setValue(this.folderPath).onChange((value) => {
-        this.folderPath = value;
-        this.updateSaveButton();
-      });
-      if (this.isEditMode) {
-        setTimeout(() => {
-          text.inputEl.blur();
-        }, 0);
-      }
-      return text;
+  }
+  addGlobalExcludeSettings(containerEl) {
+    containerEl.createEl("h2", { text: "Global Exclude Patterns" });
+    containerEl.createEl("p", {
+      text: "Files matching these patterns are skipped by Snowflake. One pattern per line.",
+      cls: "setting-item-description"
     });
-    new import_obsidian3.Setting(contentEl).setName("Template").setDesc("Select the template file to use").addText((text) => {
-      new FileInputSuggest(this.app, text.inputEl, "md", this.templatesFolder);
-      text.setPlaceholder("Example: project.md").setValue(this.templatePath).onChange((value) => {
-        this.templatePath = value;
-        this.updateSaveButton();
-      });
-      return text;
-    });
-    new import_obsidian3.Setting(contentEl).setName("Exclude Files (optional)").setDesc("Enter patterns to exclude files from template application. One pattern per line.").addTextArea((text) => {
-      text.setPlaceholder("*.tmp\ndraft-*\nREADME.md").setValue(this.excludePatterns).onChange((value) => {
-        this.excludePatterns = value;
+    const patterns = this.plugin.settings.globalExcludePatterns;
+    const currentValue = patterns.length > 0 ? patterns.join("\n") : "";
+    new import_obsidian.Setting(containerEl).setName("Exclude patterns").setDesc(
+      "Glob patterns: * matches characters, ** matches directories, ? matches single character"
+    ).addTextArea((text) => {
+      text.setPlaceholder("*.tmp\n_archive/**\n~*.md").setValue(currentValue).onChange(async (value) => {
+        const result = processExclusionPatterns(value);
+        this.plugin.settings.globalExcludePatterns = result.patterns;
+        await this.plugin.saveSettings();
       });
       text.inputEl.rows = 4;
-      text.inputEl.style.width = "100%";
+      text.inputEl.cols = 30;
       return text;
     });
-    new import_obsidian3.Setting(contentEl).addButton(
-      (btn) => btn.setButtonText("Cancel").onClick(() => {
-        this.close();
-      })
-    ).addButton((btn) => {
-      this.saveButton = btn.setButtonText(this.isEditMode ? "Save" : "Add").setCta().onClick(() => {
-        this.handleSave();
-      }).buttonEl;
-      this.updateSaveButton();
-      return btn;
+  }
+  addVariableFormatSettings(containerEl) {
+    containerEl.createEl("h2", { text: "Variable Formats" });
+    containerEl.createEl("p", {
+      text: "Customize the format for date and time variables in templates",
+      cls: "setting-item-description"
+    });
+    new import_obsidian.Setting(containerEl).setName("Date format").setDesc("Format for {{date}} variable (uses moment.js format)").addText((text) => {
+      var _a;
+      text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat);
+      const preview = (_a = text.inputEl.parentElement) == null ? void 0 : _a.createDiv({
+        cls: "setting-item-description",
+        text: `Preview: ${window.moment().format(this.plugin.settings.dateFormat)}`
+      });
+      text.onChange(async (value) => {
+        const format = value || "YYYY-MM-DD";
+        this.plugin.settings.dateFormat = format;
+        await this.plugin.saveSettings();
+        if (preview) {
+          try {
+            preview.textContent = `Preview: ${window.moment().format(format)}`;
+          } catch (e) {
+            preview.textContent = "Preview: Invalid format";
+          }
+        }
+      });
+      return text;
+    });
+    new import_obsidian.Setting(containerEl).setName("Time format").setDesc("Format for {{time}} variable (uses moment.js format)").addText((text) => {
+      var _a;
+      text.setPlaceholder("HH:mm").setValue(this.plugin.settings.timeFormat);
+      const preview = (_a = text.inputEl.parentElement) == null ? void 0 : _a.createDiv({
+        cls: "setting-item-description",
+        text: `Preview: ${window.moment().format(this.plugin.settings.timeFormat)}`
+      });
+      text.onChange(async (value) => {
+        const format = value || "HH:mm";
+        this.plugin.settings.timeFormat = format;
+        await this.plugin.saveSettings();
+        if (preview) {
+          try {
+            preview.textContent = `Preview: ${window.moment().format(format)}`;
+          } catch (e) {
+            preview.textContent = "Preview: Invalid format";
+          }
+        }
+      });
+      return text;
+    });
+    containerEl.createEl("p", {
+      cls: "setting-item-description",
+      text: "Common formats: YYYY-MM-DD, DD/MM/YYYY, MMM DD YYYY, HH:mm:ss, h:mm A"
     });
   }
-  updateSaveButton() {
-    if (this.saveButton) {
-      this.saveButton.disabled = !this.templatePath;
-    }
-  }
-  handleSave() {
-    if (!this.templatePath) {
-      new import_obsidian3.Notice("Please select a template");
-      return;
-    }
-    const result = processExclusionPatterns(this.excludePatterns);
-    if (!result.isValid) {
-      const errorMessage = result.errors.join("\n");
-      new import_obsidian3.Notice(`Invalid exclusion patterns:
-${errorMessage}`, 5e3);
-      return;
-    }
-    this.onSave(
-      this.folderPath,
-      this.templatePath,
-      result.patterns.length > 0 ? result.patterns : void 0,
-      this.isEditMode ? this.originalFolderPath : void 0
-    );
-    this.close();
-  }
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
+  addHelpSection(containerEl) {
+    containerEl.createEl("h2", { text: "Template Variables" });
+    containerEl.createEl("p", {
+      text: "You can use these variables in your SCHEMA.md templates:",
+      cls: "setting-item-description"
+    });
+    const variableList = containerEl.createEl("ul", {
+      cls: "setting-item-description"
+    });
+    variableList.createEl("li", { text: "{{title}} - The filename without extension" });
+    variableList.createEl("li", {
+      text: `{{date}} - Current date (using your format: ${this.plugin.settings.dateFormat})`
+    });
+    variableList.createEl("li", {
+      text: `{{time}} - Current time (using your format: ${this.plugin.settings.timeFormat})`
+    });
+    variableList.createEl("li", { text: "{{snowflake_id}} - Unique 10-character ID" });
   }
 };
 
-// src/ui/confirmation-modal.ts
-var import_obsidian4 = require("obsidian");
-var ConfirmationModal = class extends import_obsidian4.Modal {
-  constructor(app, title, message, onConfirm, onCancel) {
-    super(app);
-    this.title = title;
-    this.message = message;
-    this.onConfirm = onConfirm;
-    this.onCancel = onCancel;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.createEl("h2", { text: this.title });
-    contentEl.createEl("p", { text: this.message });
-    new import_obsidian4.Setting(contentEl).addButton(
-      (btn) => btn.setButtonText("Cancel").onClick(() => {
-        this.close();
-        this.onCancel();
-      })
-    ).addButton(
-      (btn) => btn.setButtonText("Confirm").setCta().onClick(() => {
-        this.close();
-        this.onConfirm();
-      })
-    );
-  }
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
-  }
+// src/constants.ts
+var DEFAULT_SETTINGS = {
+  dateFormat: "YYYY-MM-DD",
+  timeFormat: "HH:mm",
+  globalExcludePatterns: []
+};
+var SCHEMA_FILE_NAME = "SCHEMA.md";
+var ID_CONFIG = {
+  length: 10,
+  alphabet: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 };
 
-// src/ui/template-preview-modal.ts
+// src/settings-utils.ts
+function areSettingsValid(settings) {
+  if (settings === null || settings === void 0 || typeof settings !== "object") {
+    return false;
+  }
+  const s = settings;
+  if (!("dateFormat" in s && typeof s.dateFormat === "string" && "timeFormat" in s && typeof s.timeFormat === "string" && "globalExcludePatterns" in s && Array.isArray(s.globalExcludePatterns) && s.globalExcludePatterns.every((p) => typeof p === "string"))) {
+    return false;
+  }
+  return true;
+}
+function migrateSettings(settings) {
+  if (areSettingsValid(settings)) {
+    return cleanSettings(settings);
+  }
+  if (settings !== null && settings !== void 0 && typeof settings === "object") {
+    const s = settings;
+    const migrated = { ...DEFAULT_SETTINGS };
+    if (typeof s.dateFormat === "string" && s.dateFormat.trim() !== "") {
+      migrated.dateFormat = s.dateFormat;
+    }
+    if (typeof s.timeFormat === "string" && s.timeFormat.trim() !== "") {
+      migrated.timeFormat = s.timeFormat;
+    }
+    if (Array.isArray(s.globalExcludePatterns) && s.globalExcludePatterns.every((p) => typeof p === "string")) {
+      migrated.globalExcludePatterns = s.globalExcludePatterns;
+    }
+    return migrated;
+  }
+  return { ...DEFAULT_SETTINGS };
+}
+function cleanSettings(settings) {
+  return {
+    dateFormat: settings.dateFormat || DEFAULT_SETTINGS.dateFormat,
+    timeFormat: settings.timeFormat || DEFAULT_SETTINGS.timeFormat,
+    globalExcludePatterns: settings.globalExcludePatterns || DEFAULT_SETTINGS.globalExcludePatterns
+  };
+}
+
+// src/file-creation-handler.ts
 var import_obsidian5 = require("obsidian");
-var TemplatePreviewModal = class extends import_obsidian5.Modal {
-  constructor(app, templatePath, content) {
-    super(app);
-    this.templatePath = templatePath;
-    this.content = content;
-  }
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.createEl("h2", { text: `Preview: ${this.templatePath}` });
-    const pre = contentEl.createEl("pre", {
-      cls: "template-preview-content"
-    });
-    pre.createEl("code", {
-      cls: "language-markdown",
-      text: this.content
-    });
-    pre.style.maxHeight = "400px";
-    pre.style.overflow = "auto";
-    pre.style.backgroundColor = "var(--background-secondary)";
-    pre.style.padding = "1em";
-    pre.style.borderRadius = "4px";
-    const buttonContainer = contentEl.createDiv({ cls: "modal-button-container" });
-    buttonContainer.createEl("button", {
-      text: "Close",
-      cls: "mod-cta"
-    }).addEventListener("click", () => {
-      this.close();
-    });
-  }
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
-  }
-};
+
+// src/types.ts
+function isMarkdownFile(file) {
+  return file.extension === "md";
+}
+
+// src/template-loader.ts
+var import_obsidian3 = require("obsidian");
 
 // src/error-handler.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian2 = require("obsidian");
 var ErrorHandler = class _ErrorHandler {
   constructor() {
     this.debugMode = false;
@@ -404,7 +306,7 @@ var ErrorHandler = class _ErrorHandler {
     const errorType = this.categorizeError(error);
     const userMessage = this.getUserMessage(errorType, context, error);
     this.logError(error, context, errorType);
-    new import_obsidian6.Notice(userMessage);
+    new import_obsidian2.Notice(userMessage);
     return userMessage;
   }
   /**
@@ -566,468 +468,17 @@ var ErrorHandler = class _ErrorHandler {
   }
 };
 
-// src/ui/settings-tab.ts
-var SnowflakeSettingTab = class extends import_obsidian7.PluginSettingTab {
-  constructor(app, plugin, commands) {
-    super(app, plugin);
-    this.plugin = plugin;
-    this.errorHandler = ErrorHandler.getInstance();
-    this.commands = commands;
-  }
-  display() {
-    const { containerEl } = this;
-    containerEl.empty();
-    this.addHeader(containerEl);
-    this.addGeneralSettings(containerEl);
-    this.addGlobalExcludeSettings(containerEl);
-    this.addTemplateMappings(containerEl);
-    this.addVariableFormatSettings(containerEl);
-    this.addHelpSection(containerEl);
-  }
-  addHeader(containerEl) {
-    containerEl.createEl("h1", { text: "Snowflake Settings" });
-    containerEl.createEl("p", {
-      text: "Configure automatic template application for new notes.",
-      cls: "setting-item-description"
-    });
-  }
-  addGeneralSettings(containerEl) {
-    containerEl.createEl("h2", { text: "General Settings" });
-    this.addTemplatesFolderSetting(containerEl);
-  }
-  addGlobalExcludeSettings(containerEl) {
-    containerEl.createEl("h2", {
-      text: "Global Exclude Patterns"
-    });
-    containerEl.createEl("p", {
-      text: "Files matching these patterns will be ignored by all template mappings. One pattern per line.",
-      cls: "setting-item-description"
-    });
-    const patterns = this.plugin.settings.globalExcludePatterns;
-    const currentValue = patterns.length > 0 ? patterns.join("\n") : "";
-    new import_obsidian7.Setting(containerEl).setName("Exclude patterns").setDesc(
-      "Glob patterns: * matches characters, ** matches directories, ? matches single character"
-    ).addTextArea((text) => {
-      text.setPlaceholder("*.tmp\n_archive/**\n~*.md").setValue(currentValue).onChange(async (value) => {
-        const result = processExclusionPatterns(value);
-        this.plugin.settings.globalExcludePatterns = result.patterns;
-        await this.plugin.saveSettings();
-      });
-      text.inputEl.rows = 4;
-      text.inputEl.cols = 30;
-      return text;
-    });
-  }
-  addTemplatesFolderSetting(containerEl) {
-    new import_obsidian7.Setting(containerEl).setName("Templates folder").setDesc("The folder where your template files are stored").addText((text) => {
-      new FolderInputSuggest(this.app, text.inputEl);
-      text.setPlaceholder("Templates").setValue(this.plugin.settings.templatesFolder).onChange(async (value) => {
-        this.plugin.settings.templatesFolder = value || "Templates";
-        await this.plugin.saveSettings();
-      });
-      setTimeout(() => {
-        text.inputEl.blur();
-      }, 0);
-      return text;
-    });
-  }
-  addVariableFormatSettings(containerEl) {
-    containerEl.createEl("h2", { text: "Variable Formats" });
-    containerEl.createEl("p", {
-      text: "Customize the format for date and time variables in templates",
-      cls: "setting-item-description"
-    });
-    new import_obsidian7.Setting(containerEl).setName("Date format").setDesc("Format for {{date}} variable (uses moment.js format)").addText((text) => {
-      var _a;
-      text.setPlaceholder("YYYY-MM-DD").setValue(this.plugin.settings.dateFormat);
-      const preview = (_a = text.inputEl.parentElement) == null ? void 0 : _a.createDiv({
-        cls: "setting-item-description",
-        text: `Preview: ${window.moment().format(this.plugin.settings.dateFormat)}`
-      });
-      text.onChange(async (value) => {
-        const format = value || "YYYY-MM-DD";
-        this.plugin.settings.dateFormat = format;
-        await this.plugin.saveSettings();
-        if (preview) {
-          try {
-            preview.textContent = `Preview: ${window.moment().format(format)}`;
-          } catch (e) {
-            preview.textContent = "Preview: Invalid format";
-          }
-        }
-      });
-      return text;
-    });
-    new import_obsidian7.Setting(containerEl).setName("Time format").setDesc("Format for {{time}} variable (uses moment.js format)").addText((text) => {
-      var _a;
-      text.setPlaceholder("HH:mm").setValue(this.plugin.settings.timeFormat);
-      const preview = (_a = text.inputEl.parentElement) == null ? void 0 : _a.createDiv({
-        cls: "setting-item-description",
-        text: `Preview: ${window.moment().format(this.plugin.settings.timeFormat)}`
-      });
-      text.onChange(async (value) => {
-        const format = value || "HH:mm";
-        this.plugin.settings.timeFormat = format;
-        await this.plugin.saveSettings();
-        if (preview) {
-          try {
-            preview.textContent = `Preview: ${window.moment().format(format)}`;
-          } catch (e) {
-            preview.textContent = "Preview: Invalid format";
-          }
-        }
-      });
-      return text;
-    });
-    containerEl.createEl("p", {
-      cls: "setting-item-description",
-      text: "Common formats: YYYY-MM-DD, DD/MM/YYYY, MMM DD YYYY, HH:mm:ss, h:mm A"
-    });
-  }
-  addTemplateMappings(containerEl) {
-    containerEl.createEl("h2", { text: "Folder Template Mappings" });
-    containerEl.createEl("p", {
-      text: "Configure which template to use for each folder",
-      cls: "setting-item-description"
-    });
-    const mappings = Object.entries(this.plugin.settings.templateMappings);
-    if (mappings.length === 0) {
-      this.showNoMappingsMessage(containerEl);
-    } else {
-      this.showExistingMappings(containerEl, mappings);
-    }
-    this.addNewMappingButton(containerEl);
-    if (mappings.length >= 2) {
-      this.addApplyAllButton(containerEl);
-    }
-  }
-  showNoMappingsMessage(containerEl) {
-    containerEl.createEl("p", {
-      text: "No folder mappings configured. Click 'Add mapping' to get started.",
-      cls: "setting-item-description mod-warning"
-    });
-  }
-  showExistingMappings(containerEl, mappings) {
-    mappings.sort((a, b) => a[0].localeCompare(b[0]));
-    mappings.forEach(([folderPath, config]) => {
-      this.createMappingSetting(containerEl, folderPath, config);
-    });
-  }
-  createMappingSetting(containerEl, folderPath, config) {
-    const templatePath = typeof config === "string" ? config : config.templatePath;
-    const excludePatterns = typeof config === "object" ? config.excludePatterns : void 0;
-    const setting = new import_obsidian7.Setting(containerEl);
-    const nameEl = setting.nameEl;
-    nameEl.createSpan({ text: folderPath || "/ (root folder)" });
-    if (excludePatterns && excludePatterns.length > 0) {
-      nameEl.createSpan({
-        text: ` (${String(excludePatterns.length)} exclusion${excludePatterns.length > 1 ? "s" : ""})`,
-        cls: "snowflake-exclusion-count"
-      });
-    }
-    setting.setDesc(templatePath);
-    setting.addButton(
-      (button) => button.setIcon("eye").setTooltip("Preview template").onClick(async () => {
-        await this.previewTemplate(templatePath);
-      })
-    );
-    setting.addButton(
-      (button) => button.setIcon("play").setTooltip("Apply template to all notes in folder").onClick(async () => {
-        await this.commands.applyTemplateToFolderPath(folderPath);
-      })
-    );
-    setting.addButton(
-      (button) => button.setIcon("pencil").setTooltip("Edit mapping").onClick(() => {
-        this.showEditMappingDialog(folderPath, config);
-      })
-    );
-    setting.addButton(
-      (button) => button.setButtonText("Remove").setWarning().onClick(async () => {
-        delete this.plugin.settings.templateMappings[folderPath];
-        await this.plugin.saveSettings();
-        this.display();
-        new import_obsidian7.Notice(`Removed mapping for ${folderPath || "root folder"}`);
-      })
-    );
-  }
-  addApplyAllButton(containerEl) {
-    new import_obsidian7.Setting(containerEl).setName("Apply all mappings").setDesc("Apply templates to all mapped folders").addButton(
-      (button) => button.setButtonText("Apply All").setTooltip("Apply templates to all mapped folders").onClick(() => {
-        this.applyAllMappings();
-      })
-    );
-  }
-  addNewMappingButton(containerEl) {
-    new import_obsidian7.Setting(containerEl).setName("Add folder mapping").setDesc("Map a folder to a specific template").addButton(
-      (button) => button.setButtonText("Add Mapping").setCta().onClick(() => {
-        this.showAddMappingDialog();
-      })
-    );
-  }
-  addHelpSection(containerEl) {
-    containerEl.createEl("h2", { text: "Template Variables" });
-    containerEl.createEl("p", {
-      text: "You can use these variables in your templates:",
-      cls: "setting-item-description"
-    });
-    const variableList = containerEl.createEl("ul", {
-      cls: "setting-item-description"
-    });
-    variableList.createEl("li", { text: "{{title}} - The filename without extension" });
-    variableList.createEl("li", {
-      text: `{{date}} - Current date (using your format: ${this.plugin.settings.dateFormat})`
-    });
-    variableList.createEl("li", {
-      text: `{{time}} - Current time (using your format: ${this.plugin.settings.timeFormat})`
-    });
-    variableList.createEl("li", { text: "{{snowflake_id}} - Unique 10-character ID" });
-  }
-  /**
-   * Show dialog to add a new folder mapping
-   */
-  showAddMappingDialog() {
-    new TemplateMappingModal(
-      this.app,
-      this.plugin.settings.templatesFolder,
-      (folderPath, templatePath, excludePatterns, originalFolderPath) => {
-        if (!originalFolderPath && folderPath in this.plugin.settings.templateMappings) {
-          new import_obsidian7.Notice("This folder already has a template mapping");
-          return;
-        }
-        if (excludePatterns && excludePatterns.length > 0) {
-          this.plugin.settings.templateMappings[folderPath] = {
-            templatePath,
-            excludePatterns
-          };
-        } else {
-          this.plugin.settings.templateMappings[folderPath] = templatePath;
-        }
-        void this.plugin.saveSettings();
-        this.display();
-        new import_obsidian7.Notice(`Mapped ${folderPath || "root folder"} to ${templatePath}`);
-      }
-    ).open();
-  }
-  /**
-   * Show dialog to edit an existing folder mapping
-   */
-  showEditMappingDialog(folderPath, config) {
-    new TemplateMappingModal(
-      this.app,
-      this.plugin.settings.templatesFolder,
-      (newFolderPath, templatePath, excludePatterns, originalFolderPath) => {
-        if (originalFolderPath && newFolderPath !== originalFolderPath && newFolderPath in this.plugin.settings.templateMappings) {
-          new import_obsidian7.Notice("This folder already has a template mapping");
-          return;
-        }
-        if (originalFolderPath && newFolderPath !== originalFolderPath) {
-          delete this.plugin.settings.templateMappings[originalFolderPath];
-        }
-        if (excludePatterns && excludePatterns.length > 0) {
-          this.plugin.settings.templateMappings[newFolderPath] = {
-            templatePath,
-            excludePatterns
-          };
-        } else {
-          this.plugin.settings.templateMappings[newFolderPath] = templatePath;
-        }
-        void this.plugin.saveSettings();
-        this.display();
-        new import_obsidian7.Notice(`Updated mapping for ${newFolderPath || "root folder"}`);
-      },
-      {
-        folderPath,
-        config
-      }
-    ).open();
-  }
-  /**
-   * Preview a template file
-   */
-  async previewTemplate(templatePath) {
-    const fullPath = templatePath.startsWith(this.plugin.settings.templatesFolder + "/") ? templatePath : `${this.plugin.settings.templatesFolder}/${templatePath}`;
-    const file = this.app.vault.getAbstractFileByPath(fullPath);
-    if (!file || !(file instanceof import_obsidian7.TFile)) {
-      new import_obsidian7.Notice(`Template not found: ${fullPath}`);
-      return;
-    }
-    try {
-      const content = await this.app.vault.read(file);
-      new TemplatePreviewModal(this.app, templatePath, content).open();
-    } catch (error) {
-      const errorContext = {
-        operation: "load_template",
-        templatePath
-      };
-      this.errorHandler.handleError(error, errorContext);
-    }
-  }
-  /**
-   * Apply templates to all mapped folders
-   */
-  applyAllMappings() {
-    const mappings = Object.entries(this.plugin.settings.templateMappings);
-    if (mappings.length === 0) {
-      new import_obsidian7.Notice("No template mappings configured");
-      return;
-    }
-    new ConfirmationModal(
-      this.app,
-      "Apply All Template Mappings",
-      `This will apply templates to all notes in ${String(mappings.length)} mapped folder${mappings.length > 1 ? "s" : ""}. Are you sure you want to continue?`,
-      () => {
-        void (async () => {
-          let totalSuccess = 0;
-          let totalFiles = 0;
-          for (const [folderPath] of mappings) {
-            const result = await this.commands.applyTemplateToFolderPath(folderPath, true);
-            if (result) {
-              totalSuccess += result.success;
-              totalFiles += result.total;
-            }
-          }
-          if (totalFiles === 0) {
-            new import_obsidian7.Notice("No markdown files found in selected folders");
-          } else if (totalSuccess === totalFiles) {
-            new import_obsidian7.Notice(`Templates applied to ${String(totalSuccess)} notes`);
-          } else {
-            new import_obsidian7.Notice(
-              `Templates applied to ${String(totalSuccess)} of ${String(totalFiles)} notes`
-            );
-          }
-        })();
-      },
-      () => {
-      }
-    ).open();
-  }
-};
-
-// src/constants.ts
-var DEFAULT_SETTINGS = {
-  // Folder-specific template assignments (REQ-002)
-  templateMappings: {},
-  // Base directory where templates are stored
-  templatesFolder: "Templates",
-  // Date format for {{date}} variable (uses moment.js format)
-  dateFormat: "YYYY-MM-DD",
-  // Time format for {{time}} variable (uses moment.js format)
-  timeFormat: "HH:mm",
-  // Global exclusion patterns applied to all template mappings
-  globalExcludePatterns: []
-};
-var ID_CONFIG = {
-  // Length of generated IDs
-  length: 10,
-  // Alphabet of 62 alphanumeric characters
-  // Includes: lowercase, uppercase, numbers
-  // Excludes: Special characters (no dashes or underscores)
-  alphabet: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-};
-
-// src/settings-utils.ts
-function isValidTemplateMapping(value) {
-  if (value === null || value === void 0 || typeof value !== "object") {
-    return false;
-  }
-  return Object.entries(value).every(([key, val]) => {
-    if (typeof key !== "string") return false;
-    if (typeof val === "string") return true;
-    if (typeof val === "object" && val !== null && "templatePath" in val) {
-      const config = val;
-      if (typeof config.templatePath !== "string") return false;
-      if ("excludePatterns" in config) {
-        if (!Array.isArray(config.excludePatterns)) return false;
-        return config.excludePatterns.every((p) => typeof p === "string");
-      }
-      return true;
-    }
-    return false;
-  });
-}
-function areSettingsValid(settings) {
-  if (settings === null || settings === void 0 || typeof settings !== "object") {
-    return false;
-  }
-  const s = settings;
-  if (!("templateMappings" in s && isValidTemplateMapping(s.templateMappings) && "templatesFolder" in s && typeof s.templatesFolder === "string" && "dateFormat" in s && typeof s.dateFormat === "string" && "timeFormat" in s && typeof s.timeFormat === "string")) {
-    return false;
-  }
-  if ("globalExcludePatterns" in s) {
-    if (!Array.isArray(s.globalExcludePatterns)) {
-      return false;
-    }
-    if (!s.globalExcludePatterns.every((p) => typeof p === "string")) {
-      return false;
-    }
-  }
-  return true;
-}
-function migrateSettings(settings) {
-  if (areSettingsValid(settings)) {
-    return cleanSettings(settings);
-  }
-  if (settings !== null && settings !== void 0 && typeof settings === "object") {
-    const s = settings;
-    const migrated = { ...DEFAULT_SETTINGS };
-    if ("templateMappings" in s && isValidTemplateMapping(s.templateMappings)) {
-      migrated.templateMappings = s.templateMappings;
-    }
-    if ("templatesFolder" in s && typeof s.templatesFolder === "string" && s.templatesFolder.trim() !== "") {
-      migrated.templatesFolder = s.templatesFolder;
-    }
-    if ("dateFormat" in s && typeof s.dateFormat === "string" && s.dateFormat.trim() !== "") {
-      migrated.dateFormat = s.dateFormat;
-    }
-    if ("timeFormat" in s && typeof s.timeFormat === "string" && s.timeFormat.trim() !== "") {
-      migrated.timeFormat = s.timeFormat;
-    }
-    if ("globalExcludePatterns" in s && Array.isArray(s.globalExcludePatterns) && s.globalExcludePatterns.every((p) => typeof p === "string")) {
-      migrated.globalExcludePatterns = s.globalExcludePatterns;
-    }
-    return migrated;
-  }
-  return { ...DEFAULT_SETTINGS };
-}
-function cleanSettings(settings) {
-  const cleaned = {
-    templateMappings: settings.templateMappings,
-    templatesFolder: settings.templatesFolder,
-    dateFormat: settings.dateFormat || DEFAULT_SETTINGS.dateFormat,
-    timeFormat: settings.timeFormat || DEFAULT_SETTINGS.timeFormat,
-    globalExcludePatterns: settings.globalExcludePatterns || DEFAULT_SETTINGS.globalExcludePatterns
-  };
-  return cleaned;
-}
-
-// src/file-creation-handler.ts
-var import_obsidian10 = require("obsidian");
-
-// src/types.ts
-function isMarkdownFile(file) {
-  return file.extension === "md";
-}
-
 // src/template-loader.ts
-var import_obsidian8 = require("obsidian");
 var TemplateLoader = class {
   constructor(vault, settings) {
     this.vault = vault;
     this.settings = settings;
     this.errorHandler = ErrorHandler.getInstance();
   }
-  /**
-   * Load a template file by path
-   *
-   * REQ-026: Handle missing template files gracefully
-   *
-   * @param templatePath - Path to the template file
-   * @returns Template content or null if not found
-   */
   async loadTemplate(templatePath) {
     try {
       const templateFile = this.vault.getAbstractFileByPath(templatePath);
-      if (!templateFile || !(templateFile instanceof import_obsidian8.TFile)) {
+      if (!templateFile || !(templateFile instanceof import_obsidian3.TFile)) {
         console.warn(`Template not found: ${templatePath}`);
         return null;
       }
@@ -1042,127 +493,32 @@ var TemplateLoader = class {
       return null;
     }
   }
-  /**
-   * Get the template path for a file based on its location
-   *
-   * REQ-002: Use folder-specific template mapping
-   * REQ-003: Fall back to default template
-   *
-   * @param file - The file to get template for
-   * @returns Template path or null if no template configured
-   */
-  getTemplateForFile(file) {
-    var _a, _b, _c;
-    const folderPath = (_b = (_a = file.parent) == null ? void 0 : _a.path) != null ? _b : "";
-    const mapping = this.settings.templateMappings[folderPath];
-    if (mapping !== void 0) {
-      if (this.isFileExcluded(file, folderPath, mapping)) {
-        return null;
-      }
-      return this.resolveTemplatePathFromMapping(mapping);
-    }
-    let currentPath = folderPath;
-    while (currentPath.includes("/")) {
-      currentPath = currentPath.substring(0, currentPath.lastIndexOf("/"));
-      const parentMapping = this.settings.templateMappings[currentPath];
-      if (parentMapping !== void 0) {
-        if (this.isFileExcluded(file, currentPath, parentMapping)) {
-          return null;
-        }
-        return this.resolveTemplatePathFromMapping(parentMapping);
-      }
-    }
-    const rootMapping = (_c = this.settings.templateMappings[""]) != null ? _c : this.settings.templateMappings["/"];
-    if (rootMapping !== void 0) {
-      if (this.isFileExcluded(file, "", rootMapping)) {
-        return null;
-      }
-      return this.resolveTemplatePathFromMapping(rootMapping);
-    }
-    return null;
-  }
-  /**
-   * Validate that a template path exists
-   *
-   * @param templatePath - Path to validate
-   * @returns True if template exists
-   */
-  templateExists(templatePath) {
-    const file = this.vault.getAbstractFileByPath(templatePath);
-    return file instanceof import_obsidian8.TFile;
-  }
-  /**
-   * Get all available template files in the templates folder
-   *
-   * @returns Array of template file paths
-   */
-  getAvailableTemplates() {
-    const templates = [];
-    const templatesFolder = this.settings.templatesFolder;
-    const folder = this.vault.getAbstractFileByPath(templatesFolder);
-    if (!folder) {
-      return templates;
-    }
-    if (!("children" in folder)) {
-      return templates;
-    }
-    const collectTemplates = (abstractFile) => {
-      if (abstractFile instanceof import_obsidian8.TFile && abstractFile.extension === "md") {
-        templates.push(abstractFile.path);
-      } else if (abstractFile instanceof import_obsidian8.TFolder) {
-        for (const child of abstractFile.children) {
-          collectTemplates(child);
-        }
-      }
-    };
-    const abstractFolder = folder;
-    collectTemplates(abstractFolder);
-    return templates;
-  }
-  /**
-   * Update settings reference (for when settings change)
-   *
-   * @param settings - New settings object
-   */
   updateSettings(settings) {
     this.settings = settings;
   }
   /**
-   * Get the template chain for a file based on its location
+   * Build the SCHEMA.md inheritance chain for a file.
    *
-   * REQ-032: Check parent folders for template mappings and apply them
-   * in order from root to leaf
-   *
-   * @param file - The file to get template chain for
-   * @returns Template chain with all applicable templates
+   * Walks from vault root down to the file's parent folder; every folder that
+   * contains a SCHEMA.md contributes one entry to the chain (root first).
+   * If the file matches a global exclude pattern, returns an empty chain.
    */
   getTemplateChain(file) {
-    var _a;
+    if (this.isFileExcluded(file)) {
+      return { templates: [], hasInheritance: false };
+    }
     const templates = [];
     const folderPaths = this.getFolderHierarchy(file);
     for (let i = 0; i < folderPaths.length; i++) {
       const folderPath = folderPaths[i];
-      const mapping = this.settings.templateMappings[folderPath];
-      if (mapping !== void 0) {
-        if (!this.isFileExcluded(file, folderPath, mapping)) {
-          templates.push({
-            path: this.resolveTemplatePathFromMapping(mapping),
-            folderPath,
-            depth: i
-          });
-        }
-      }
-    }
-    if (templates.length === 0) {
-      const rootMapping = (_a = this.settings.templateMappings[""]) != null ? _a : this.settings.templateMappings["/"];
-      if (rootMapping !== void 0) {
-        if (!this.isFileExcluded(file, "", rootMapping)) {
-          templates.push({
-            path: this.resolveTemplatePathFromMapping(rootMapping),
-            folderPath: "",
-            depth: 0
-          });
-        }
+      const schemaPath = this.schemaPathFor(folderPath);
+      const schemaFile = this.vault.getAbstractFileByPath(schemaPath);
+      if (schemaFile instanceof import_obsidian3.TFile) {
+        templates.push({
+          path: schemaPath,
+          folderPath,
+          depth: i
+        });
       }
     }
     return {
@@ -1170,23 +526,12 @@ var TemplateLoader = class {
       hasInheritance: templates.length > 1
     };
   }
-  /**
-   * Load content for all templates in a chain
-   *
-   * REQ-032: Handle missing templates gracefully
-   *
-   * @param chain - Template chain to load
-   * @returns Template chain with content populated
-   */
   async loadTemplateChain(chain) {
     const loadedTemplates = [];
     for (const template of chain.templates) {
       const content = await this.loadTemplate(template.path);
       if (content !== null) {
-        loadedTemplates.push({
-          ...template,
-          content
-        });
+        loadedTemplates.push({ ...template, content });
       } else {
         console.warn(`Skipping missing template in chain: ${template.path}`);
       }
@@ -1197,15 +542,12 @@ var TemplateLoader = class {
     };
   }
   /**
-   * Get folder hierarchy from a file's location
-   *
-   * @param file - File to get hierarchy for
-   * @returns Array of folder paths from root to immediate parent
+   * Folder paths from vault root to the file's immediate parent.
+   * Root is represented as the empty string.
    */
   getFolderHierarchy(file) {
     var _a;
-    const paths = [];
-    paths.push("");
+    const paths = [""];
     const folderPath = (_a = file.parent) == null ? void 0 : _a.path;
     if (folderPath === void 0 || folderPath === "" || folderPath === "/") {
       return paths;
@@ -1219,50 +561,23 @@ var TemplateLoader = class {
     return paths;
   }
   /**
-   * Check if a file is excluded by global or mapping exclusion patterns
-   *
-   * @param file - The file to check
-   * @param mappingFolderPath - The folder path of the mapping
-   * @param mapping - The template mapping configuration
-   * @returns True if the file should be excluded
+   * Returns the vault path of the SCHEMA.md that would govern files in the
+   * given folder. Empty/root folder yields a top-level SCHEMA.md.
    */
-  isFileExcluded(file, mappingFolderPath, mapping) {
-    var _a;
-    const filePath = (_a = file.path) != null ? _a : "";
-    let relativePath;
-    if (mappingFolderPath === "") {
-      relativePath = filePath;
-    } else if (filePath.startsWith(mappingFolderPath + "/")) {
-      relativePath = filePath.slice(mappingFolderPath.length + 1);
-    } else {
-      relativePath = file.name;
+  schemaPathFor(folderPath) {
+    if (folderPath === "" || folderPath === "/") {
+      return SCHEMA_FILE_NAME;
     }
-    const globalPatterns = this.settings.globalExcludePatterns;
-    if (globalPatterns && globalPatterns.length > 0) {
-      if (matchesExclusionPattern(relativePath, globalPatterns)) {
-        return true;
-      }
-      if (relativePath !== filePath && matchesExclusionPattern(filePath, globalPatterns)) {
-        return true;
-      }
-    }
-    if (typeof mapping === "string") {
-      return false;
-    }
-    if (!mapping.excludePatterns || mapping.excludePatterns.length === 0) {
-      return false;
-    }
-    return matchesExclusionPattern(relativePath, mapping.excludePatterns);
+    return `${folderPath}/${SCHEMA_FILE_NAME}`;
   }
-  /**
-   * Resolve template path from a mapping
-   *
-   * @param mapping - The template mapping (string or config object)
-   * @returns Resolved template path
-   */
-  resolveTemplatePathFromMapping(mapping) {
-    const templatePath = typeof mapping === "string" ? mapping : mapping.templatePath;
-    return `${this.settings.templatesFolder}/${templatePath}`;
+  isFileExcluded(file) {
+    var _a;
+    const patterns = this.settings.globalExcludePatterns;
+    if (!patterns || patterns.length === 0) {
+      return false;
+    }
+    const filePath = (_a = file.path) != null ? _a : "";
+    return matchesExclusionPattern(filePath, patterns);
   }
 };
 
@@ -1278,7 +593,7 @@ function generateNanoID(size = ID_CONFIG.length) {
 }
 
 // src/template-variables.ts
-var import_obsidian9 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 var VARIABLE_REGEX = /\{\{(\w+)\}\}/g;
 var DEFAULT_DATE_FORMAT = "YYYY-MM-DD";
 var DEFAULT_TIME_FORMAT = "HH:mm";
@@ -1326,7 +641,7 @@ var TemplateVariableProcessor = class {
    * @returns Variable context
    */
   buildContext(file, generateId) {
-    const now = (0, import_obsidian9.moment)();
+    const now = (0, import_obsidian4.moment)();
     const context = {
       title: file.basename,
       // filename without .md extension
@@ -1973,7 +1288,7 @@ var TemplateApplicator = class {
   async applyTemplate(file, context = { isManualCommand: false }, editor) {
     const chain = this.loader.getTemplateChain(file);
     if (chain.templates.length === 0) {
-      return { success: false, message: "No template configured for this location" };
+      return { success: false, message: "No SCHEMA.md found for this location" };
     }
     const loadedChain = await this.loader.loadTemplateChain(chain);
     if (loadedChain.templates.length === 0) {
@@ -1993,50 +1308,6 @@ var TemplateApplicator = class {
       console.info(`Snowflake: Template(s) "${templateNames}" applied to ${file.path}`);
     }
     return result;
-  }
-  /**
-   * Apply a specific template to a file (for manual commands)
-   *
-   * @param file - The file to apply template to
-   * @param templatePath - Specific template to apply
-   * @param editor - Optional editor for cursor position
-   * @returns Application result
-   */
-  async applySpecificTemplate(file, templatePath, editor) {
-    try {
-      const templateContent = await this.loader.loadTemplate(templatePath);
-      if (templateContent === null) {
-        console.error(`Snowflake: Template not found: ${templatePath}`);
-        return {
-          success: false,
-          message: `Template not found: ${templatePath}`
-        };
-      }
-      const cleanedTemplateContent = this.removeDeletePropertyFromTemplate(templateContent);
-      const processedTemplate = this.variableProcessor.processTemplate(
-        cleanedTemplateContent,
-        file
-      );
-      const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
-      if (result.success) {
-        console.info(`Snowflake: Template "${templatePath}" applied to ${file.path}`);
-      }
-      return {
-        ...result,
-        hadSnowflakeId: processedTemplate.hasSnowflakeId
-      };
-    } catch (error) {
-      const errorContext = {
-        operation: "apply_template",
-        filePath: file.path,
-        templatePath
-      };
-      const errorMessage = this.errorHandler.handleError(error, errorContext);
-      return {
-        success: false,
-        message: errorMessage
-      };
-    }
   }
   /**
    * Apply processed template content to a file
@@ -2309,28 +1580,6 @@ ${parts.body}`;
       }
     }
   }
-  /**
-   * Remove delete property from template content
-   *
-   * When applying a specific template, we don't want the delete property
-   * to be added to the file's frontmatter
-   *
-   * @param templateContent - The template content
-   * @returns Template content without delete property
-   */
-  removeDeletePropertyFromTemplate(templateContent) {
-    const parts = this.splitContent(templateContent);
-    if (parts.frontmatter === null || parts.frontmatter.trim() === "") {
-      return templateContent;
-    }
-    const result = this.frontmatterMerger.processWithDeleteList(parts.frontmatter, []);
-    if (result.processedContent.trim() === "") {
-      return parts.body;
-    }
-    return `---
-${result.processedContent}---
-${parts.body}`;
-  }
 };
 
 // src/file-creation-handler.ts
@@ -2350,14 +1599,14 @@ var FileCreationHandler = class {
    */
   start() {
     this.createEventRef = this.vault.on("create", (file) => {
-      if (file instanceof import_obsidian10.TFile) {
+      if (file instanceof import_obsidian5.TFile) {
         this.handleFileCreation(file).catch(() => {
         });
       }
     });
     this.plugin.registerEvent(this.createEventRef);
     this.renameEventRef = this.vault.on("rename", (file, oldPath) => {
-      if (file instanceof import_obsidian10.TFile) {
+      if (file instanceof import_obsidian5.TFile) {
         this.handleFileMove(file, oldPath).catch(() => {
         });
       }
@@ -2395,6 +1644,9 @@ var FileCreationHandler = class {
    */
   async processFile(file) {
     if (!isMarkdownFile(file)) {
+      return;
+    }
+    if (file.name === SCHEMA_FILE_NAME) {
       return;
     }
     if (this.processingQueue.has(file.path)) {
@@ -2477,53 +1729,43 @@ var FileCreationHandler = class {
 };
 
 // src/commands.ts
-var import_obsidian13 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 
-// src/ui/template-selection-modal.ts
-var import_obsidian11 = require("obsidian");
-var TemplateSelectionModal = class extends import_obsidian11.FuzzySuggestModal {
-  constructor(app, templatesFolder, onSelect) {
+// src/ui/confirmation-modal.ts
+var import_obsidian6 = require("obsidian");
+var ConfirmationModal = class extends import_obsidian6.Modal {
+  constructor(app, title, message, onConfirm, onCancel) {
     super(app);
-    this.templatesFolder = templatesFolder;
-    this.onSelect = onSelect;
-    this.setPlaceholder("Select a template to apply...");
+    this.title = title;
+    this.message = message;
+    this.onConfirm = onConfirm;
+    this.onCancel = onCancel;
   }
-  /**
-   * Get all template files from the templates folder
-   */
-  getItems() {
-    const templateFolder = this.app.vault.getAbstractFileByPath(this.templatesFolder);
-    if (!templateFolder || !(templateFolder instanceof import_obsidian11.TFolder)) {
-      new import_obsidian11.Notice(`Templates folder not found: ${this.templatesFolder}`);
-      return [];
-    }
-    const templates = [];
-    import_obsidian11.Vault.recurseChildren(templateFolder, (file) => {
-      if (file instanceof import_obsidian11.TFile && file.extension === "md") {
-        templates.push(file);
-      }
-    });
-    templates.sort((a, b) => a.path.localeCompare(b.path));
-    return templates;
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.createEl("h2", { text: this.title });
+    contentEl.createEl("p", { text: this.message });
+    new import_obsidian6.Setting(contentEl).addButton(
+      (btn) => btn.setButtonText("Cancel").onClick(() => {
+        this.close();
+        this.onCancel();
+      })
+    ).addButton(
+      (btn) => btn.setButtonText("Confirm").setCta().onClick(() => {
+        this.close();
+        this.onConfirm();
+      })
+    );
   }
-  /**
-   * Get display text for a template
-   */
-  getItemText(template) {
-    const relativePath = template.path.startsWith(this.templatesFolder + "/") ? template.path.slice(this.templatesFolder.length + 1) : template.path;
-    return relativePath;
-  }
-  /**
-   * Handle template selection
-   */
-  onChooseItem(template, _evt) {
-    this.onSelect(template);
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
   }
 };
 
 // src/ui/folder-modal.ts
-var import_obsidian12 = require("obsidian");
-var FolderSuggestModal = class extends import_obsidian12.FuzzySuggestModal {
+var import_obsidian7 = require("obsidian");
+var FolderSuggestModal = class extends import_obsidian7.FuzzySuggestModal {
   constructor(app, onChoose) {
     super(app);
     this.onChoose = onChoose;
@@ -2534,7 +1776,7 @@ var FolderSuggestModal = class extends import_obsidian12.FuzzySuggestModal {
     folders.push(rootFolder);
     const addFolders = (folder) => {
       for (const child of folder.children) {
-        if (child instanceof import_obsidian12.TFolder) {
+        if (child instanceof import_obsidian7.TFolder) {
           folders.push(child);
           addFolders(child);
         }
@@ -2559,13 +1801,10 @@ var SnowflakeCommands = class {
     this.templateApplicator = new TemplateApplicator(plugin.app.vault, settings);
     this.errorHandler = ErrorHandler.getInstance();
   }
-  /**
-   * Register all commands with Obsidian
-   */
   registerCommands() {
     this.plugin.addCommand({
-      id: "apply-template-to-current-note",
-      name: "Apply mapped templates",
+      id: "apply-schema-to-current-note",
+      name: "Apply schema to current note",
       editorCallback: (editor, view) => {
         this.applyTemplateToCurrentNote(editor, view).catch(() => {
         });
@@ -2586,13 +1825,6 @@ var SnowflakeCommands = class {
       }
     });
     this.plugin.addCommand({
-      id: "apply-specific-template",
-      name: "Apply specific template",
-      editorCallback: (editor, view) => {
-        this.applyAnyTemplateToCurrentNote(editor, view);
-      }
-    });
-    this.plugin.addCommand({
       id: "create-note-in-folder",
       name: "Create new note in folder",
       callback: () => {
@@ -2600,28 +1832,21 @@ var SnowflakeCommands = class {
       }
     });
   }
-  /**
-   * Apply template to the currently active note
-   *
-   * REQ-017: Apply appropriate template to current file
-   * REQ-018: Follow same merging rules as automatic application
-   * REQ-025: Work even when auto-templating is disabled
-   */
   async applyTemplateToCurrentNote(editor, view) {
     const file = "file" in view ? view.file : view;
     if (!file) {
-      new import_obsidian13.Notice("No active file");
+      new import_obsidian8.Notice("No active file");
       return;
     }
     if (!isMarkdownFile(file)) {
-      new import_obsidian13.Notice("Current file is not a markdown file");
+      new import_obsidian8.Notice("Current file is not a markdown file");
       return;
     }
     const context = { isManualCommand: true };
     try {
       const result = await this.templateApplicator.applyTemplate(file, context, editor);
       if (!result.success) {
-        new import_obsidian13.Notice(result.message);
+        new import_obsidian8.Notice(result.message);
       }
     } catch (error) {
       const errorContext = {
@@ -2631,18 +1856,11 @@ var SnowflakeCommands = class {
       this.errorHandler.handleError(error, errorContext);
     }
   }
-  /**
-   * Process all markdown files in a folder
-   *
-   * REQ-020: Process ALL markdown files
-   * REQ-021: Async processing for UI responsiveness
-   * REQ-022: Show progress and completion
-   */
   async processFolderBatch(folder, skipConfirmation = false) {
     const markdownFiles = this.getMarkdownFiles(folder);
     if (markdownFiles.length === 0) {
       if (!skipConfirmation) {
-        new import_obsidian13.Notice("No markdown files found in selected folder");
+        new import_obsidian8.Notice("No markdown files found in selected folder");
       }
       return null;
     }
@@ -2658,18 +1876,11 @@ var SnowflakeCommands = class {
     }
     return result;
   }
-  /**
-   * Apply template to all notes in a folder by path
-   *
-   * Public method for use from settings panel
-   *
-   * @param folderPath - Path to the folder to process
-   */
   async applyTemplateToFolderPath(folderPath, skipConfirmation = false) {
     const folder = this.plugin.app.vault.getAbstractFileByPath(folderPath);
-    if (!folder || !(folder instanceof import_obsidian13.TFolder)) {
+    if (!folder || !(folder instanceof import_obsidian8.TFolder)) {
       if (!skipConfirmation) {
-        new import_obsidian13.Notice(`Folder not found: ${folderPath}`);
+        new import_obsidian8.Notice(`Folder not found: ${folderPath}`);
       }
       return null;
     }
@@ -2711,18 +1922,11 @@ var SnowflakeCommands = class {
   }
   showCompletionNotice(result) {
     if (result.success === result.total) {
-      new import_obsidian13.Notice(`Templates applied to ${String(result.success)} notes`);
+      new import_obsidian8.Notice(`Templates applied to ${String(result.success)} notes`);
     } else {
-      new import_obsidian13.Notice(`Templates applied to ${String(result.success)} of ${String(result.total)} notes`);
+      new import_obsidian8.Notice(`Templates applied to ${String(result.success)} of ${String(result.total)} notes`);
     }
   }
-  /**
-   * Show confirmation dialog for batch operation
-   *
-   * @param folder - The folder to process
-   * @param fileCount - Number of files that will be processed
-   * @returns Promise resolving to true if confirmed, false if cancelled
-   */
   confirmBatchOperation(folder, fileCount) {
     return new Promise((resolve) => {
       const modal = new ConfirmationModal(
@@ -2739,113 +1943,32 @@ var SnowflakeCommands = class {
       modal.open();
     });
   }
-  /**
-   * Recursively collect all markdown files in a folder
-   *
-   * @param folder - Folder to search
-   * @param files - Array to collect files into
-   */
   collectMarkdownFiles(folder, files) {
     for (const child of folder.children) {
-      if (child instanceof import_obsidian13.TFile && isMarkdownFile(child)) {
+      if (child instanceof import_obsidian8.TFile && isMarkdownFile(child)) {
         files.push(child);
-      } else if (child instanceof import_obsidian13.TFolder) {
+      } else if (child instanceof import_obsidian8.TFolder) {
         this.collectMarkdownFiles(child, files);
       }
     }
   }
-  /**
-   * Sleep for a given number of milliseconds
-   *
-   * @param ms - Milliseconds to sleep
-   */
   sleep(ms) {
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
   }
-  /**
-   * Update settings reference
-   *
-   * @param settings - New settings
-   */
   updateSettings(settings) {
     this.settings = settings;
     this.templateApplicator.updateSettings(settings);
   }
-  /**
-   * Insert current date at cursor position
-   *
-   * @param editor - The editor instance
-   */
   insertDate(editor) {
     const date = window.moment().format(this.settings.dateFormat);
     editor.replaceSelection(date);
   }
-  /**
-   * Insert current time at cursor position
-   *
-   * @param editor - The editor instance
-   */
   insertTime(editor) {
     const time = window.moment().format(this.settings.timeFormat);
     editor.replaceSelection(time);
   }
-  /**
-   * Apply any template to the currently active note via template selection modal
-   *
-   * @param editor - The editor instance
-   * @param view - The markdown view or file info
-   */
-  applyAnyTemplateToCurrentNote(editor, view) {
-    const file = "file" in view ? view.file : view;
-    if (!file) {
-      new import_obsidian13.Notice("No active file");
-      return;
-    }
-    if (!isMarkdownFile(file)) {
-      new import_obsidian13.Notice("Current file is not a markdown file");
-      return;
-    }
-    const modal = new TemplateSelectionModal(
-      this.plugin.app,
-      this.settings.templatesFolder,
-      (templateFile) => {
-        this.applySelectedTemplate(file, templateFile, editor).catch(() => {
-        });
-      }
-    );
-    modal.open();
-  }
-  /**
-   * Apply a selected template to a file
-   *
-   * @param file - The file to apply template to
-   * @param templateFile - The template file to apply
-   * @param editor - The editor instance
-   */
-  async applySelectedTemplate(file, templateFile, editor) {
-    try {
-      const result = await this.templateApplicator.applySpecificTemplate(
-        file,
-        templateFile.path,
-        editor
-      );
-      if (!result.success) {
-        new import_obsidian13.Notice(result.message);
-      }
-    } catch (error) {
-      const errorContext = {
-        operation: "apply_template",
-        filePath: file.path,
-        templatePath: templateFile.path
-      };
-      this.errorHandler.handleError(error, errorContext);
-    }
-  }
-  /**
-   * Create a new note in a user-selected folder
-   */
   createNoteInFolder() {
     const modal = new FolderSuggestModal(this.plugin.app, (folder) => {
       this.createNoteInFolderHandler(folder).catch(() => {
@@ -2853,11 +1976,6 @@ var SnowflakeCommands = class {
     });
     modal.open();
   }
-  /**
-   * Handle creation of a new note in the specified folder
-   *
-   * @param folder - The folder to create the note in
-   */
   async createNoteInFolderHandler(folder) {
     try {
       let fileName = "Untitled";
@@ -2872,7 +1990,7 @@ var SnowflakeCommands = class {
       const leaf = this.plugin.app.workspace.getLeaf();
       await leaf.openFile(file);
       setTimeout(() => {
-        const view = this.plugin.app.workspace.getActiveViewOfType(import_obsidian13.MarkdownView);
+        const view = this.plugin.app.workspace.getActiveViewOfType(import_obsidian8.MarkdownView);
         if (view) {
           const titleEl = view.containerEl.querySelector(".inline-title");
           if (titleEl) {
@@ -2898,12 +2016,12 @@ var SnowflakeCommands = class {
 };
 
 // src/main.ts
-var SnowflakePlugin = class extends import_obsidian14.Plugin {
+var SnowflakePlugin = class extends import_obsidian9.Plugin {
   async onload() {
     await this.loadSettings();
     this.commands = new SnowflakeCommands(this, this.settings);
     this.commands.registerCommands();
-    this.addSettingTab(new SnowflakeSettingTab(this.app, this, this.commands));
+    this.addSettingTab(new SnowflakeSettingTab(this.app, this));
     this.fileCreationHandler = new FileCreationHandler(this, this.app.vault, this.settings);
     this.app.workspace.onLayoutReady(() => {
       var _a;
@@ -2943,17 +2061,12 @@ var SnowflakePlugin = class extends import_obsidian14.Plugin {
       this.commands.updateSettings(this.settings);
     }
   }
-  /**
-   * Validates and fixes settings to ensure they're properly formed
-   *
-   * REQ-023: Ensures all required settings exist with valid values
-   */
   validateSettings() {
-    if (typeof this.settings.templateMappings !== "object" || Array.isArray(this.settings.templateMappings)) {
-      this.settings.templateMappings = {};
+    if (typeof this.settings.dateFormat !== "string" || this.settings.dateFormat.trim() === "") {
+      this.settings.dateFormat = "YYYY-MM-DD";
     }
-    if (typeof this.settings.templatesFolder !== "string" || this.settings.templatesFolder.trim() === "") {
-      this.settings.templatesFolder = "Templates";
+    if (typeof this.settings.timeFormat !== "string" || this.settings.timeFormat.trim() === "") {
+      this.settings.timeFormat = "HH:mm";
     }
     if (!Array.isArray(this.settings.globalExcludePatterns)) {
       this.settings.globalExcludePatterns = [];

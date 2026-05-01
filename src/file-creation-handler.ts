@@ -17,6 +17,7 @@ import { TFile } from 'obsidian';
 import type { TAbstractFile, Vault, Plugin, EventRef } from 'obsidian';
 import { isMarkdownFile } from './types';
 import type { SnowflakeSettings, CommandContext, ErrorContext, MarkdownFile } from './types';
+import { SCHEMA_FILE_NAME } from './constants';
 import { TemplateApplicator } from './template-applicator';
 import { ErrorHandler } from './error-handler';
 
@@ -104,6 +105,11 @@ export class FileCreationHandler {
   private async processFile(file: TFile): Promise<void> {
     // REQ-004: Only process markdown files
     if (!isMarkdownFile(file)) {
+      return;
+    }
+
+    // SCHEMA.md files are templates themselves; never apply a template to one.
+    if (file.name === SCHEMA_FILE_NAME) {
       return;
     }
 

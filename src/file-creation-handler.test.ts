@@ -7,7 +7,6 @@ import { TFile, TFolder, Vault, Plugin } from 'obsidian';
 import { SnowflakeSettings } from './types';
 import { TemplateApplicator } from './template-applicator';
 
-// Mock the TemplateApplicator
 jest.mock('./template-applicator');
 
 describe('FileCreationHandler', () => {
@@ -19,41 +18,27 @@ describe('FileCreationHandler', () => {
   let consoleErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    // Clear all mocks
     jest.clearAllMocks();
-
-    // Mock console.error to prevent noise in tests
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation();
 
-    // Mock plugin
     mockPlugin = {
       registerEvent: jest.fn()
     } as any;
 
-    // Mock vault
     mockVault = {
       on: jest.fn().mockReturnValue('event-ref'),
       offref: jest.fn(),
-      read: jest.fn().mockResolvedValue(''), // Default to empty content for new files
+      read: jest.fn().mockResolvedValue(''),
       getAbstractFileByPath: jest.fn()
     } as any;
 
-    // Default settings
     settings = {
-      templateMappings: {
-        Projects: 'project.md'
-      },
-
-      templatesFolder: 'Templates',
       dateFormat: 'YYYY-MM-DD',
       timeFormat: 'HH:mm',
       globalExcludePatterns: []
     };
 
-    // Create handler
     handler = new FileCreationHandler(mockPlugin, mockVault, settings);
-
-    // Get mocked TemplateApplicator
     mockTemplateApplicator = (TemplateApplicator as jest.MockedClass<typeof TemplateApplicator>)
       .mock.instances[0] as jest.Mocked<TemplateApplicator>;
   });
@@ -65,7 +50,6 @@ describe('FileCreationHandler', () => {
   describe('start/stop', () => {
     test('Should register event handlers on start', () => {
       handler.start();
-
       expect(mockVault.on).toHaveBeenCalledWith('create', expect.any(Function));
       expect(mockVault.on).toHaveBeenCalledWith('rename', expect.any(Function));
       expect(mockPlugin.registerEvent).toHaveBeenCalledTimes(2);
@@ -75,20 +59,15 @@ describe('FileCreationHandler', () => {
     test('Should unregister event handlers on stop', () => {
       handler.start();
       handler.stop();
-
       expect(mockVault.offref).toHaveBeenCalledTimes(2);
       expect(mockVault.offref).toHaveBeenCalledWith('event-ref');
     });
 
     test('Should clear processing queue on stop', () => {
-      // Add something to queue
       const file = createMockFile('test.md', 'Projects');
       handler.start();
-
-      // Manually add to queue to test clearing
       (handler as any).processingQueue.add(file.path);
       expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(true);
-
       handler.stop();
       expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(false);
     });
@@ -99,13 +78,20 @@ describe('FileCreationHandler', () => {
 
     beforeEach(() => {
       handler.start();
-      // Get the registered handler function
       handleFileCreation = (mockVault.on as jest.Mock).mock.calls[0][1];
     });
 
-    test('REQ-004: Should skip non-markdown files', async () => {
+    test('Should skip non-markdown files', async () => {
       const file = createMockFile('test.txt', 'Projects');
       file.extension = 'txt';
+      await handleFileCreation(file);
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+    });
+
+    test('Should never apply a template to a SCHEMA.md file itself', async () => {
+      const file = createMockFile('SCHEMA.md', 'Projects');
+      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue('');
 
       await handleFileCreation(file);
 
@@ -115,7 +101,7 @@ describe('FileCreationHandler', () => {
     test('Should process markdown files', async () => {
       const file = createMockFile('test.md', 'Projects');
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
-      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content for new file
+      (mockVault.read as jest.Mock).mockResolvedValue('');
 
       await handleFileCreation(file);
 
@@ -130,31 +116,23 @@ describe('FileCreationHandler', () => {
       (mockVault.read as jest.Mock).mockResolvedValue('Existing content');
 
       await handleFileCreation(file);
-
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
     test('Should skip if file was deleted during processing', async () => {
       const file = createMockFile('test.md', 'Projects');
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(null);
-
       await handleFileCreation(file);
-
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
     test('Should prevent double processing of same file', async () => {
       const file = createMockFile('test.md', 'Projects');
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
-      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
+      (mockVault.read as jest.Mock).mockResolvedValue('');
 
-      // Start two concurrent processes
-      const promise1 = handleFileCreation(file);
-      const promise2 = handleFileCreation(file);
+      await Promise.all([handleFileCreation(file), handleFileCreation(file)]);
 
-      await Promise.all([promise1, promise2]);
-
-      // Should only process once
       expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledTimes(1);
     });
 
@@ -163,31 +141,16 @@ describe('FileCreationHandler', () => {
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
       mockTemplateApplicator.applyTemplate.mockRejectedValue(new Error('Apply error'));
 
-      // Should not throw
       await expect(handler['handleFileCreation'](file)).resolves.not.toThrow();
-
-      // Should still remove from queue
       expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(false);
     });
   });
 
   describe('updateSettings', () => {
     test('Should update internal settings and applicator', () => {
-      const newSettings: SnowflakeSettings = {
-        ...settings
-      };
-
+      const newSettings: SnowflakeSettings = { ...settings };
       handler.updateSettings(newSettings);
-
       expect(mockTemplateApplicator.updateSettings).toHaveBeenCalledWith(newSettings);
-
-      // Verify settings were updated by testing behavior
-      const file = createMockFile('test.md', 'Projects');
-      handler.start();
-      const handleFileCreation = (mockVault.on as jest.Mock).mock.calls[0][1];
-
-      handleFileCreation(file);
-      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
   });
 
@@ -198,24 +161,19 @@ describe('FileCreationHandler', () => {
       expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(false);
       expect(FileCreationHandlerTestUtils.getProcessingCount(handler)).toBe(0);
 
-      // Start processing
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
-      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
+      (mockVault.read as jest.Mock).mockResolvedValue('');
       handler.start();
       const handleFileCreation = (mockVault.on as jest.Mock).mock.calls[0][1];
 
       const processPromise = handleFileCreation(file);
 
-      // Should be processing now
       expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(true);
       expect(FileCreationHandlerTestUtils.getProcessingCount(handler)).toBe(1);
 
       await processPromise;
-
-      // Wait a bit more for async processing to complete
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Should be done processing
       expect(FileCreationHandlerTestUtils.isProcessing(handler, file.path)).toBe(false);
       expect(FileCreationHandlerTestUtils.getProcessingCount(handler)).toBe(0);
     });
@@ -226,31 +184,29 @@ describe('FileCreationHandler', () => {
 
     beforeEach(() => {
       handler.start();
-      // Get the registered handler function for rename events
       const renameCalls = (mockVault.on as jest.Mock).mock.calls.filter(
         (call) => call[0] === 'rename'
       );
       handleFileMove = renameCalls[0][1];
     });
 
-    test('Should apply template when empty file moved to mapped directory', async () => {
+    test('Should apply template when empty file moved across folders', async () => {
       const file = createMockFile('test.md', 'Projects');
       const oldPath = 'Documents/test.md';
 
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
-      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
+      (mockVault.read as jest.Mock).mockResolvedValue('');
 
       await handleFileMove(file, oldPath);
 
-      expect(mockVault.getAbstractFileByPath).toHaveBeenCalledWith('Projects/test.md');
       expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
         isManualCommand: false
       });
     });
 
-    test('Should not apply template when file moved within same directory', async () => {
+    test('Should not apply template when file is renamed in same folder', async () => {
       const file = createMockFile('renamed.md', 'Projects');
-      const oldPath = 'Projects/test.md'; // Same directory, just renamed
+      const oldPath = 'Projects/test.md';
 
       await handleFileMove(file, oldPath);
 
@@ -258,34 +214,14 @@ describe('FileCreationHandler', () => {
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
-    test('Should skip files with existing content on move (e.g. synced files)', async () => {
+    test('Should skip files with existing content on move', async () => {
       const file = createMockFile('test.md', 'Projects');
-      const oldPath = 'Documents/test.md';
-
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
       (mockVault.read as jest.Mock).mockResolvedValue('Existing content');
 
-      await handleFileMove(file, oldPath);
+      await handleFileMove(file, 'Documents/test.md');
 
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
-    });
-
-    test('Should not apply template when moved to unmapped directory', async () => {
-      const file = createMockFile('test.md', 'UnmappedFolder');
-      const oldPath = 'Documents/test.md';
-
-      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
-      (mockVault.read as jest.Mock).mockResolvedValue('');
-
-      // Template applicator will return false for unmapped directories
-      mockTemplateApplicator.applyTemplate.mockResolvedValue({
-        success: false,
-        message: 'No template configured for this location'
-      });
-
-      await handleFileMove(file, oldPath);
-
-      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalled();
     });
 
     test('Should not apply template to non-markdown files', async () => {
@@ -295,59 +231,30 @@ describe('FileCreationHandler', () => {
         extension: 'txt',
         path: 'Projects/test.txt'
       });
-      const oldPath = 'Documents/test.txt';
 
-      await handleFileMove(file, oldPath);
+      await handleFileMove(file, 'Documents/test.txt');
 
       expect(mockVault.read).not.toHaveBeenCalled();
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
-    test('Should handle nested folder mappings correctly', async () => {
-      // Add a nested folder mapping
-      settings.templateMappings['Projects/Subfolder'] = 'subfolder.md';
-      handler.updateSettings(settings);
-
-      const file = createMockFile('test.md', 'Projects/Subfolder');
-      const oldPath = 'Documents/test.md';
-
+    test('Should not template a SCHEMA.md when it is moved into a new folder', async () => {
+      const file = createMockFile('SCHEMA.md', 'Projects');
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
-      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
+      (mockVault.read as jest.Mock).mockResolvedValue('');
 
-      await handleFileMove(file, oldPath);
+      await handleFileMove(file, 'Other/SCHEMA.md');
 
-      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
-        isManualCommand: false
-      });
-    });
-
-    test('Should handle root folder mapping', async () => {
-      settings.templateMappings['/'] = 'default.md';
-      handler.updateSettings(settings);
-
-      const file = createMockFile('test.md', '');
-      const oldPath = 'Documents/test.md';
-
-      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
-      (mockVault.read as jest.Mock).mockResolvedValue(''); // Empty content
-
-      await handleFileMove(file, oldPath);
-
-      expect(mockTemplateApplicator.applyTemplate).toHaveBeenCalledWith(file, {
-        isManualCommand: false
-      });
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
   });
 });
 
-/**
- * Helper to create mock TFile
- */
 function createMockFile(name: string, parentPath: string): TFile {
   const file = new TFile();
   file.name = name;
   file.basename = name.replace('.md', '');
-  file.extension = 'md';
+  file.extension = name.endsWith('.md') ? 'md' : name.split('.').pop() || '';
   file.path = parentPath ? `${parentPath}/${name}` : name;
   file.parent = parentPath ? Object.assign(new TFolder(), { path: parentPath }) : null;
   return file;

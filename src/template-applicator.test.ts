@@ -31,9 +31,7 @@ describe('TemplateApplicator', () => {
 
   // Create mock instances
   const mockTemplateLoader = {
-    getTemplateForFile: jest.fn(),
     loadTemplate: jest.fn(),
-    templateExists: jest.fn(),
     updateSettings: jest.fn(),
     getTemplateChain: jest.fn(),
     loadTemplateChain: jest.fn()
@@ -90,20 +88,13 @@ describe('TemplateApplicator', () => {
 
     // Default settings
     settings = {
-      templateMappings: {
-        Projects: 'project.md'
-      },
-
-      templatesFolder: 'Templates',
       dateFormat: 'YYYY-MM-DD',
       timeFormat: 'HH:mm',
       globalExcludePatterns: []
     };
 
     // Reset all mocks to default behavior
-    mockTemplateLoader.getTemplateForFile.mockReturnValue(null);
     mockTemplateLoader.loadTemplate.mockResolvedValue(null);
-    mockTemplateLoader.templateExists.mockResolvedValue(false);
     mockTemplateLoader.getTemplateChain.mockReturnValue({
       templates: [],
       hasInheritance: false
@@ -591,7 +582,7 @@ Template`;
       const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
 
       expect(result.success).toBe(false);
-      expect(result.message).toContain('No template configured');
+      expect(result.message).toContain('No SCHEMA.md found');
     });
 
     test('Should handle vault modify errors gracefully', async () => {
@@ -639,7 +630,7 @@ Template`;
       const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
 
       expect(result.success).toBe(false);
-      expect(result.message).toContain('No template configured');
+      expect(result.message).toContain('No SCHEMA.md found');
       expect(mockVault.modify).not.toHaveBeenCalled();
     });
 
@@ -921,77 +912,6 @@ date: 2024-01-01
       expect(modifiedContent).toContain('# My Important Content');
       expect(modifiedContent).toContain('This is important content.');
       expect(modifiedContent).toContain('## Template Section');
-    });
-  });
-
-  describe('applySpecificTemplate', () => {
-    const mockFile: MarkdownFile = {
-      basename: 'test',
-      extension: 'md' as const,
-      path: 'Projects/test.md',
-      name: 'test.md',
-      parent: { path: 'Projects' },
-      vault: {} as any,
-      stat: {
-        ctime: Date.now(),
-        mtime: Date.now(),
-        size: 0
-      }
-    } as MarkdownFile;
-
-    test('Should apply a specific template to a file', async () => {
-      const templateContent = `---
-title: {{title}}
----
-# {{title}}`;
-
-      const processedContent = `---
-title: test
----
-# test`;
-
-      mockVault.read.mockResolvedValue('');
-      mockTemplateLoader.loadTemplate.mockResolvedValue(templateContent);
-      mockVariableProcessor.processTemplate.mockReturnValue({
-        content: processedContent,
-        variables: { title: 'test' },
-        hasSnowflakeId: false
-      });
-      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
-        merged: 'title: test',
-        hasSnowflakeId: false
-      });
-      mockFrontmatterMerger.applyToFile.mockReturnValue(processedContent);
-
-      const result = await applicator.applySpecificTemplate(mockFile, 'Templates/specific.md');
-
-      expect(result.success).toBe(true);
-      expect(mockVault.modify).toHaveBeenCalledWith(mockFile, expect.any(String));
-      expect(consoleInfoSpy).toHaveBeenCalledWith(
-        'Snowflake: Template "Templates/specific.md" applied to Projects/test.md'
-      );
-    });
-
-    test('Should handle template not found', async () => {
-      mockTemplateLoader.loadTemplate.mockResolvedValue(null);
-
-      const result = await applicator.applySpecificTemplate(mockFile, 'Templates/missing.md');
-
-      expect(result.success).toBe(false);
-      expect(result.message).toContain('Template not found');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Snowflake: Template not found: Templates/missing.md'
-      );
-    });
-
-    test('Should handle errors gracefully', async () => {
-      mockTemplateLoader.loadTemplate.mockRejectedValue(new Error('Read error'));
-      mockErrorHandler.handleError.mockReturnValue('Error loading template');
-
-      const result = await applicator.applySpecificTemplate(mockFile, 'Templates/error.md');
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('Error loading template');
     });
   });
 
@@ -2090,138 +2010,6 @@ Content`;
         expect.any(String),
         new Set(['baseAuthor', 'tags', 'projectLead', 'devLead'])
       );
-    });
-
-    test('Should work with applySpecificTemplate for manual commands', async () => {
-      const existingContent = `---
-title: My Note
-author:
-tags: [personal]
-notes:
----
-Content`;
-
-      const templateContent = `---
-title: {{title}}
-tags: [template]
-status: draft
----
-Template`;
-
-      mockTemplateLoader.loadTemplate.mockResolvedValue(templateContent);
-
-      mockVariableProcessor.processTemplate.mockReturnValue({
-        content: `---
-title: test
-tags: [template]
-status: draft
----
-Template`,
-        variables: { title: 'test' },
-        hasSnowflakeId: false
-      });
-
-      mockVault.read.mockResolvedValue(existingContent);
-
-      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
-        merged: `title: My Note
-author:
-tags: [personal, template]
-notes:
-status: draft`,
-        hasSnowflakeId: false
-      });
-      mockFrontmatterMerger.applyToFile.mockImplementation(
-        (_, fm) => `---
-${fm}
----
-Content
-
-Template`
-      );
-
-      const result = await applicator.applySpecificTemplate(mockFile, 'Templates/specific.md');
-
-      expect(result.success).toBe(true);
-
-      // Verify cleanup was NOT called for specific template
-      expect(mockFrontmatterMerger.cleanupEmptyProperties).not.toHaveBeenCalled();
-
-      // Verify file was only modified once (no cleanup)
-      expect(mockVault.modify).toHaveBeenCalledTimes(1);
-
-      // Verify empty properties from original file are preserved
-      const finalContent = mockVault.modify.mock.calls[0][1];
-      expect(finalContent).toContain('author:');
-      expect(finalContent).toContain('notes:');
-    });
-
-    test('Should remove delete property when applying specific template', async () => {
-      const existingContent = `---
-title: My Note
-author: John
----
-Content`;
-
-      const templateContent = `---
-title: Template Title
-delete: [author, tags]
-category: blog
----
-Template content`;
-
-      mockTemplateLoader.loadTemplate.mockResolvedValue(templateContent);
-
-      // Mock processWithDeleteList to remove delete property
-      mockFrontmatterMerger.processWithDeleteList.mockReturnValue({
-        processedContent: `title: Template Title
-category: blog`,
-        newDeleteList: []
-      });
-
-      mockVariableProcessor.processTemplate.mockImplementation((content) => ({
-        content: content.replace('Template Title', 'test'),
-        variables: { title: 'test' },
-        hasSnowflakeId: false
-      }));
-
-      mockVault.read.mockResolvedValue(existingContent);
-
-      mockFrontmatterMerger.mergeWithFile.mockReturnValue({
-        merged: `title: My Note
-author: John
-category: blog`,
-        hasSnowflakeId: false
-      });
-
-      mockFrontmatterMerger.applyToFile.mockImplementation(
-        (_, fm) => `---
-${fm}
----
-Content
-
-Template content`
-      );
-
-      const result = await applicator.applySpecificTemplate(mockFile, 'Templates/specific.md');
-
-      expect(result.success).toBe(true);
-
-      // Verify processWithDeleteList was called to remove delete property
-      expect(mockFrontmatterMerger.processWithDeleteList).toHaveBeenCalledWith(
-        expect.stringContaining('delete: [author, tags]'),
-        []
-      );
-
-      // Verify the template content passed to processTemplate doesn't have delete property
-      expect(mockVariableProcessor.processTemplate).toHaveBeenCalledWith(
-        expect.not.stringContaining('delete:'),
-        mockFile
-      );
-
-      // Verify the final content doesn't have delete property
-      const finalContent = mockVault.modify.mock.calls[0][1];
-      expect(finalContent).not.toContain('delete:');
     });
 
     test('Should handle cleanup when frontmatter becomes identical', async () => {

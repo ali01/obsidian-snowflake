@@ -4,44 +4,20 @@
 
 import type { SnowflakeSettings } from './types';
 
-/**
- * Default settings for the plugin
- *
- * REQ-023: The plugin shall allow users to configure these settings:
- * - templateMappings: Which folders use which templates (use "/" for root)
- * - templatesFolder: Where to look for template files
- */
 export const DEFAULT_SETTINGS: SnowflakeSettings = {
-  // Folder-specific template assignments (REQ-002)
-  templateMappings: {},
-
-  // Base directory where templates are stored
-  templatesFolder: 'Templates',
-
-  // Date format for {{date}} variable (uses moment.js format)
   dateFormat: 'YYYY-MM-DD',
-
-  // Time format for {{time}} variable (uses moment.js format)
   timeFormat: 'HH:mm',
-
-  // Global exclusion patterns applied to all template mappings
   globalExcludePatterns: []
 };
 
 /**
- * ID generation configuration
+ * The conventional filename used to declare a folder as Snowflake-managed.
  */
-export const ID_CONFIG = {
-  // Length of generated IDs
-  length: 10,
+export const SCHEMA_FILE_NAME = 'SCHEMA.md';
 
-  // Alphabet of 62 alphanumeric characters
-  // Includes: lowercase, uppercase, numbers
-  // Excludes: Special characters (no dashes or underscores)
+export const ID_CONFIG = {
+  length: 10,
   alphabet: '0123456789' + 'abcdefghijklmnopqrstuvwxyz' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 } as const;
 
-/**
- * Frontmatter regex pattern
- */
 export const FRONTMATTER_REGEX = /^---\s*\n([\s\S]*?)\n---/;

@@ -1,26 +1,9 @@
 /**
  * Snowflake Commands
  *
- * REQ-017: When a user runs "Apply template to current note", the plugin
- * shall apply the appropriate template to the currently open markdown file.
- *
- * REQ-018: When manually applying a template to a file with existing content,
- * the plugin shall follow the same merging rules as automatic application.
- *
- * REQ-019: When a user runs "Insert template to all notes in folder", the
- * plugin shall show a folder selection dialog.
- *
- * REQ-020: After folder selection, the plugin shall apply templates to ALL
- * markdown files in that folder.
- *
- * REQ-021: While processing multiple files in a batch operation, the plugin
- * shall do so asynchronously to keep the UI responsive.
- *
- * REQ-022: When a batch operation completes, the plugin shall show a notice
- * like "Templates applied to 15 notes".
- *
- * REQ-025: Where auto-templating is disabled but a user runs a manual command,
- * the plugin shall still apply the template.
+ * Manual commands that operate on the SCHEMA.md chain for the active file
+ * (or a folder, for batch operations). All commands work regardless of
+ * whether auto-templating fired.
  */
 
 import { Notice, TFile, TFolder, MarkdownView } from 'obsidian';
@@ -35,16 +18,9 @@ import type {
 } from './types';
 import { TemplateApplicator } from './template-applicator';
 import { ConfirmationModal } from './ui/confirmation-modal';
-import { TemplateSelectionModal } from './ui/template-selection-modal';
 import { FolderSuggestModal } from './ui/folder-modal';
 import { ErrorHandler } from './error-handler';
 
-/**
- * SnowflakeCommands: Manages all user-invokable commands
- *
- * Purpose: Provides manual template application commands that work
- * regardless of auto-templating settings.
- */
 export class SnowflakeCommands {
   private readonly plugin: Plugin;
   private settings: SnowflakeSettings;
@@ -58,14 +34,10 @@ export class SnowflakeCommands {
     this.errorHandler = ErrorHandler.getInstance();
   }
 
-  /**
-   * Register all commands with Obsidian
-   */
   public registerCommands(): void {
-    // REQ-017: Command to apply template to current note
     this.plugin.addCommand({
-      id: 'apply-template-to-current-note',
-      name: 'Apply mapped templates',
+      id: 'apply-schema-to-current-note',
+      name: 'Apply schema to current note',
       editorCallback: (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
         this.applyTemplateToCurrentNote(editor, view).catch(() => {
           // Error is handled in the method
@@ -73,7 +45,6 @@ export class SnowflakeCommands {
       }
     });
 
-    // Command to insert current date
     this.plugin.addCommand({
       id: 'insert-date',
       name: 'Insert current date',
@@ -82,7 +53,6 @@ export class SnowflakeCommands {
       }
     });
 
-    // Command to insert current time
     this.plugin.addCommand({
       id: 'insert-time',
       name: 'Insert current time',
@@ -91,16 +61,6 @@ export class SnowflakeCommands {
       }
     });
 
-    // Command to apply any template to current note
-    this.plugin.addCommand({
-      id: 'apply-specific-template',
-      name: 'Apply specific template',
-      editorCallback: (editor: Editor, view: MarkdownView | MarkdownFileInfo) => {
-        this.applyAnyTemplateToCurrentNote(editor, view);
-      }
-    });
-
-    // Command to create a new note in a selected folder
     this.plugin.addCommand({
       id: 'create-note-in-folder',
       name: 'Create new note in folder',
@@ -110,13 +70,6 @@ export class SnowflakeCommands {
     });
   }
 
-  /**
-   * Apply template to the currently active note
-   *
-   * REQ-017: Apply appropriate template to current file
-   * REQ-018: Follow same merging rules as automatic application
-   * REQ-025: Work even when auto-templating is disabled
-   */
   private async applyTemplateToCurrentNote(
     editor: Editor,
     view: MarkdownView | MarkdownFileInfo
@@ -133,7 +86,6 @@ export class SnowflakeCommands {
       return;
     }
 
-    // REQ-025: Manual command context
     const context: CommandContext = { isManualCommand: true };
 
     try {
@@ -151,13 +103,6 @@ export class SnowflakeCommands {
     }
   }
 
-  /**
-   * Process all markdown files in a folder
-   *
-   * REQ-020: Process ALL markdown files
-   * REQ-021: Async processing for UI responsiveness
-   * REQ-022: Show progress and completion
-   */
   private async processFolderBatch(
     folder: TFolder,
     skipConfirmation = false
@@ -171,7 +116,6 @@ export class SnowflakeCommands {
       return null;
     }
 
-    // Show confirmation dialog unless skipped
     if (!skipConfirmation) {
       const confirmed = await this.confirmBatchOperation(folder, markdownFiles.length);
       if (!confirmed) {
@@ -181,7 +125,6 @@ export class SnowflakeCommands {
 
     const result = await this.processFilesInBatches(markdownFiles);
 
-    // Only show completion notice if not part of a larger batch
     if (!skipConfirmation) {
       this.showCompletionNotice(result);
     }
@@ -189,13 +132,6 @@ export class SnowflakeCommands {
     return result;
   }
 
-  /**
-   * Apply template to all notes in a folder by path
-   *
-   * Public method for use from settings panel
-   *
-   * @param folderPath - Path to the folder to process
-   */
   public async applyTemplateToFolderPath(
     folderPath: string,
     skipConfirmation = false
@@ -262,13 +198,6 @@ export class SnowflakeCommands {
     }
   }
 
-  /**
-   * Show confirmation dialog for batch operation
-   *
-   * @param folder - The folder to process
-   * @param fileCount - Number of files that will be processed
-   * @returns Promise resolving to true if confirmed, false if cancelled
-   */
   private confirmBatchOperation(folder: TFolder, fileCount: number): Promise<boolean> {
     return new Promise((resolve) => {
       const modal = new ConfirmationModal(
@@ -286,12 +215,6 @@ export class SnowflakeCommands {
     });
   }
 
-  /**
-   * Recursively collect all markdown files in a folder
-   *
-   * @param folder - Folder to search
-   * @param files - Array to collect files into
-   */
   private collectMarkdownFiles(folder: TFolder, files: TFile[]): void {
     for (const child of folder.children) {
       if (child instanceof TFile && isMarkdownFile(child)) {
@@ -302,119 +225,27 @@ export class SnowflakeCommands {
     }
   }
 
-  /**
-   * Sleep for a given number of milliseconds
-   *
-   * @param ms - Milliseconds to sleep
-   */
   private sleep(ms: number): Promise<void> {
     return new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
   }
 
-  /**
-   * Update settings reference
-   *
-   * @param settings - New settings
-   */
   public updateSettings(settings: SnowflakeSettings): void {
     this.settings = settings;
     this.templateApplicator.updateSettings(settings);
   }
 
-  /**
-   * Insert current date at cursor position
-   *
-   * @param editor - The editor instance
-   */
   private insertDate(editor: Editor): void {
     const date = window.moment().format(this.settings.dateFormat);
     editor.replaceSelection(date);
   }
 
-  /**
-   * Insert current time at cursor position
-   *
-   * @param editor - The editor instance
-   */
   private insertTime(editor: Editor): void {
     const time = window.moment().format(this.settings.timeFormat);
     editor.replaceSelection(time);
   }
 
-  /**
-   * Apply any template to the currently active note via template selection modal
-   *
-   * @param editor - The editor instance
-   * @param view - The markdown view or file info
-   */
-  private applyAnyTemplateToCurrentNote(
-    editor: Editor,
-    view: MarkdownView | MarkdownFileInfo
-  ): void {
-    const file = 'file' in view ? view.file : view;
-
-    if (!file) {
-      new Notice('No active file');
-      return;
-    }
-
-    if (!isMarkdownFile(file)) {
-      new Notice('Current file is not a markdown file');
-      return;
-    }
-
-    // Show template selection modal
-    const modal = new TemplateSelectionModal(
-      this.plugin.app,
-      this.settings.templatesFolder,
-      (templateFile: TFile) => {
-        // Apply the selected template asynchronously
-        this.applySelectedTemplate(file, templateFile, editor).catch(() => {
-          // Error is handled in the method
-        });
-      }
-    );
-
-    modal.open();
-  }
-
-  /**
-   * Apply a selected template to a file
-   *
-   * @param file - The file to apply template to
-   * @param templateFile - The template file to apply
-   * @param editor - The editor instance
-   */
-  private async applySelectedTemplate(
-    file: MarkdownFile,
-    templateFile: TFile,
-    editor: Editor
-  ): Promise<void> {
-    try {
-      const result = await this.templateApplicator.applySpecificTemplate(
-        file,
-        templateFile.path,
-        editor
-      );
-
-      if (!result.success) {
-        new Notice(result.message);
-      }
-    } catch (error) {
-      const errorContext: ErrorContext = {
-        operation: 'apply_template',
-        filePath: file.path,
-        templatePath: templateFile.path
-      };
-      this.errorHandler.handleError(error, errorContext);
-    }
-  }
-
-  /**
-   * Create a new note in a user-selected folder
-   */
   private createNoteInFolder(): void {
     const modal = new FolderSuggestModal(this.plugin.app, (folder: TFolder) => {
       this.createNoteInFolderHandler(folder).catch(() => {
@@ -424,42 +255,29 @@ export class SnowflakeCommands {
     modal.open();
   }
 
-  /**
-   * Handle creation of a new note in the specified folder
-   *
-   * @param folder - The folder to create the note in
-   */
   private async createNoteInFolderHandler(folder: TFolder): Promise<void> {
     try {
-      // Generate a unique filename
       let fileName = 'Untitled';
       let counter = 1;
       let filePath = folder.path ? `${folder.path}/${fileName}.md` : `${fileName}.md`;
 
-      // Check if file exists and increment counter if needed
       while (this.plugin.app.vault.getAbstractFileByPath(filePath)) {
         fileName = `Untitled ${String(counter)}`;
         filePath = folder.path ? `${folder.path}/${fileName}.md` : `${fileName}.md`;
         counter++;
       }
 
-      // Create the new file
       const file = await this.plugin.app.vault.create(filePath, '');
 
-      // Open the newly created file
       const leaf = this.plugin.app.workspace.getLeaf();
       await leaf.openFile(file);
 
-      // Focus on the title field after a short delay to ensure the file is rendered
       setTimeout(() => {
-        // Get the active view
         const view = this.plugin.app.workspace.getActiveViewOfType(MarkdownView);
         if (view) {
-          // Focus on the title container
           const titleEl = view.containerEl.querySelector('.inline-title') as HTMLElement;
           if (titleEl) {
             titleEl.focus();
-            // Select all text for easy replacement
             const range = document.createRange();
             range.selectNodeContents(titleEl);
             const selection = window.getSelection();

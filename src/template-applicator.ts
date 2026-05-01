@@ -72,10 +72,10 @@ export class TemplateApplicator {
     context: CommandContext = { isManualCommand: false },
     editor?: Editor
   ): Promise<ApplyResult> {
-    // Get template chain for inheritance support
+    // Get the SCHEMA.md chain for the file's location
     const chain = this.loader.getTemplateChain(file);
     if (chain.templates.length === 0) {
-      return { success: false, message: 'No template configured for this location' };
+      return { success: false, message: 'No SCHEMA.md found for this location' };
     }
 
     // Load all templates in chain
@@ -105,66 +105,6 @@ export class TemplateApplicator {
     }
 
     return result;
-  }
-
-  /**
-   * Apply a specific template to a file (for manual commands)
-   *
-   * @param file - The file to apply template to
-   * @param templatePath - Specific template to apply
-   * @param editor - Optional editor for cursor position
-   * @returns Application result
-   */
-  public async applySpecificTemplate(
-    file: MarkdownFile,
-    templatePath: string,
-    editor?: Editor
-  ): Promise<ApplyResult> {
-    try {
-      // Load the template
-      const templateContent = await this.loader.loadTemplate(templatePath);
-      if (templateContent === null) {
-        console.error(`Snowflake: Template not found: ${templatePath}`);
-        return {
-          success: false,
-          message: `Template not found: ${templatePath}`
-        };
-      }
-
-      // Remove delete property from template before applying
-      const cleanedTemplateContent = this.removeDeletePropertyFromTemplate(templateContent);
-
-      // Process template variables
-      const processedTemplate = this.variableProcessor.processTemplate(
-        cleanedTemplateContent,
-        file
-      );
-
-      // Apply the processed template
-      const result = await this.applyProcessedTemplate(file, processedTemplate.content, editor);
-
-      if (result.success) {
-        console.info(`Snowflake: Template "${templatePath}" applied to ${file.path}`);
-      }
-
-      return {
-        ...result,
-        hadSnowflakeId: processedTemplate.hasSnowflakeId
-      };
-    } catch (error) {
-      const errorContext: ErrorContext = {
-        operation: 'apply_template',
-        filePath: file.path,
-        templatePath: templatePath
-      };
-
-      const errorMessage = this.errorHandler.handleError(error, errorContext);
-
-      return {
-        success: false,
-        message: errorMessage
-      };
-    }
   }
 
   /**
@@ -534,30 +474,4 @@ export class TemplateApplicator {
     }
   }
 
-  /**
-   * Remove delete property from template content
-   *
-   * When applying a specific template, we don't want the delete property
-   * to be added to the file's frontmatter
-   *
-   * @param templateContent - The template content
-   * @returns Template content without delete property
-   */
-  private removeDeletePropertyFromTemplate(templateContent: string): string {
-    const parts = this.splitContent(templateContent);
-
-    if (parts.frontmatter === null || parts.frontmatter.trim() === '') {
-      return templateContent;
-    }
-
-    // Use processWithDeleteList with empty delete list to just remove the delete property
-    const result = this.frontmatterMerger.processWithDeleteList(parts.frontmatter, []);
-
-    if (result.processedContent.trim() === '') {
-      // If frontmatter becomes empty after removing delete property, return just the body
-      return parts.body;
-    }
-
-    return `---\n${result.processedContent}---\n${parts.body}`;
-  }
 }
