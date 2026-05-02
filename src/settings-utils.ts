@@ -19,21 +19,12 @@ export function areSettingsValid(settings: unknown): settings is SnowflakeSettin
 
   const s = settings as Record<string, unknown>;
 
-  if (
-    !(
-      'dateFormat' in s &&
-      typeof s.dateFormat === 'string' &&
-      'timeFormat' in s &&
-      typeof s.timeFormat === 'string' &&
-      'globalExcludePatterns' in s &&
-      Array.isArray(s.globalExcludePatterns) &&
-      (s.globalExcludePatterns as unknown[]).every((p: unknown) => typeof p === 'string')
-    )
-  ) {
-    return false;
-  }
-
-  return true;
+  return (
+    'dateFormat' in s &&
+    typeof s.dateFormat === 'string' &&
+    'timeFormat' in s &&
+    typeof s.timeFormat === 'string'
+  );
 }
 
 export function validateSettings(settings: unknown): { isValid: boolean; errors: string[] } {
@@ -45,7 +36,7 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
 
   const s = settings as Record<string, unknown>;
 
-  for (const field of ['dateFormat', 'timeFormat', 'globalExcludePatterns']) {
+  for (const field of ['dateFormat', 'timeFormat']) {
     if (!(field in s)) {
       errors.push(`Missing required field: ${field}`);
     }
@@ -57,22 +48,14 @@ export function validateSettings(settings: unknown): { isValid: boolean; errors:
   if ('timeFormat' in s && typeof s.timeFormat !== 'string') {
     errors.push('timeFormat must be a string');
   }
-  if ('globalExcludePatterns' in s) {
-    if (!Array.isArray(s.globalExcludePatterns)) {
-      errors.push('globalExcludePatterns must be an array');
-    } else if (
-      !(s.globalExcludePatterns as unknown[]).every((p: unknown) => typeof p === 'string')
-    ) {
-      errors.push('globalExcludePatterns must contain only strings');
-    }
-  }
 
   return { isValid: errors.length === 0, errors };
 }
 
 /**
  * Migrate possibly-old settings to the current shape, salvaging valid fields
- * and dropping anything else (including legacy templateMappings/templatesFolder).
+ * and dropping anything else (legacy templateMappings/templatesFolder, the
+ * removed globalExcludePatterns, etc.).
  */
 export function migrateSettings(settings: unknown): SnowflakeSettings {
   if (areSettingsValid(settings)) {
@@ -89,11 +72,13 @@ export function migrateSettings(settings: unknown): SnowflakeSettings {
     if (typeof s.timeFormat === 'string' && s.timeFormat.trim() !== '') {
       migrated.timeFormat = s.timeFormat;
     }
-    if (
-      Array.isArray(s.globalExcludePatterns) &&
-      (s.globalExcludePatterns as unknown[]).every((p: unknown) => typeof p === 'string')
-    ) {
-      migrated.globalExcludePatterns = s.globalExcludePatterns as string[];
+
+    if (Array.isArray(s.globalExcludePatterns) && s.globalExcludePatterns.length > 0) {
+      console.warn(
+        'Snowflake: globalExcludePatterns is no longer supported. ' +
+          'Move these patterns into an `exclude:` list in your vault-root ' +
+          '`.schema.yaml`.'
+      );
     }
 
     return migrated;
@@ -108,8 +93,7 @@ export function migrateSettings(settings: unknown): SnowflakeSettings {
 export function cleanSettings(settings: SnowflakeSettings): SnowflakeSettings {
   return {
     dateFormat: settings.dateFormat || DEFAULT_SETTINGS.dateFormat,
-    timeFormat: settings.timeFormat || DEFAULT_SETTINGS.timeFormat,
-    globalExcludePatterns: settings.globalExcludePatterns || DEFAULT_SETTINGS.globalExcludePatterns
+    timeFormat: settings.timeFormat || DEFAULT_SETTINGS.timeFormat
   };
 }
 

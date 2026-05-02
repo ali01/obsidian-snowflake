@@ -1,4 +1,4 @@
-import { matchesExclusionPattern, processExclusionPatterns } from './pattern-matcher';
+import { matchesExclusionPattern, matchesGlob, globToRegex } from './pattern-matcher';
 
 describe('PatternMatcher', () => {
   describe('matchesExclusionPattern', () => {
@@ -64,22 +64,18 @@ describe('PatternMatcher', () => {
 
       expect(matchesExclusionPattern('folder/test-123.tmp', patterns)).toBe(true);
       expect(matchesExclusionPattern('backup/2024/old-data.md', patterns)).toBe(true);
-      expect(matchesExclusionPattern('backup/old-data.md', patterns)).toBe(false); // Missing middle directory
+      expect(matchesExclusionPattern('backup/old-data.md', patterns)).toBe(false);
     });
 
     test('Should match directory patterns (ending with /)', () => {
       const patterns = ['Archive/', 'Drafts/'];
 
-      // Files directly under the directory
       expect(matchesExclusionPattern('Archive/old-file.md', patterns)).toBe(true);
       expect(matchesExclusionPattern('Drafts/draft.md', patterns)).toBe(true);
-
-      // Files in nested subdirectories
       expect(matchesExclusionPattern('Archive/2023/data.md', patterns)).toBe(true);
       expect(matchesExclusionPattern('Drafts/work/notes.md', patterns)).toBe(true);
       expect(matchesExclusionPattern('Archive/a/b/c/deep.md', patterns)).toBe(true);
 
-      // Files not under the directory
       expect(matchesExclusionPattern('Current/file.md', patterns)).toBe(false);
       expect(matchesExclusionPattern('Archive-related.md', patterns)).toBe(false);
       expect(matchesExclusionPattern('MyArchive/file.md', patterns)).toBe(false);
@@ -88,12 +84,10 @@ describe('PatternMatcher', () => {
     test('Should match nested directory patterns', () => {
       const patterns = ['Projects/Archive/', 'Work/Old/'];
 
-      // Match files in nested directories
       expect(matchesExclusionPattern('Projects/Archive/old.md', patterns)).toBe(true);
       expect(matchesExclusionPattern('Work/Old/data.md', patterns)).toBe(true);
       expect(matchesExclusionPattern('Projects/Archive/sub/deep.md', patterns)).toBe(true);
 
-      // Don't match files outside the directories
       expect(matchesExclusionPattern('Projects/Current/file.md', patterns)).toBe(false);
       expect(matchesExclusionPattern('Work/New/file.md', patterns)).toBe(false);
       expect(matchesExclusionPattern('Archive/file.md', patterns)).toBe(false);
@@ -102,90 +96,39 @@ describe('PatternMatcher', () => {
     test('Should handle mixed patterns (directory and glob)', () => {
       const patterns = ['Archive/', '*.tmp', '**/draft-*'];
 
-      // Directory pattern matches
       expect(matchesExclusionPattern('Archive/file.md', patterns)).toBe(true);
       expect(matchesExclusionPattern('Archive/sub/file.md', patterns)).toBe(true);
-
-      // Glob pattern matches
       expect(matchesExclusionPattern('test.tmp', patterns)).toBe(true);
       expect(matchesExclusionPattern('folder/draft-123.md', patterns)).toBe(true);
-
-      // No match
       expect(matchesExclusionPattern('Current/file.md', patterns)).toBe(false);
     });
   });
 
-  describe('processExclusionPatterns', () => {
-    test('Should handle empty input', () => {
-      expect(processExclusionPatterns('')).toEqual({
-        patterns: [],
-        isValid: true,
-        errors: []
-      });
-
-      expect(processExclusionPatterns('   ')).toEqual({
-        patterns: [],
-        isValid: true,
-        errors: []
-      });
+  describe('matchesGlob', () => {
+    test('Should match exactly the full string', () => {
+      expect(matchesGlob('Web/App/note.md', 'Web/**')).toBe(true);
+      expect(matchesGlob('Web/App/note.md', 'Web/*')).toBe(false);
+      expect(matchesGlob('Web/note.md', 'Web/*')).toBe(true);
     });
 
-    test('Should process valid patterns', () => {
-      const input = '*.tmp\nREADME.md\n**/draft-*';
-      const result = processExclusionPatterns(input);
-
-      expect(result).toEqual({
-        patterns: ['*.tmp', 'README.md', '**/draft-*'],
-        isValid: true,
-        errors: []
-      });
+    test('Should respect star vs double-star semantics', () => {
+      expect(matchesGlob('a/b/c.md', '*.md')).toBe(false); // single * stops at /
+      expect(matchesGlob('c.md', '*.md')).toBe(true);
+      expect(matchesGlob('a/b/c.md', '**/*.md')).toBe(true);
     });
 
-    test('Should normalize patterns', () => {
-      const input = '  /pattern.md  \n\n  another.md\n   ';
-      const result = processExclusionPatterns(input);
-
-      expect(result).toEqual({
-        patterns: ['pattern.md', 'another.md'],
-        isValid: true,
-        errors: []
-      });
+    test('Should return false for empty pattern', () => {
+      expect(matchesGlob('any.md', '')).toBe(false);
+      expect(matchesGlob('any.md', '   ')).toBe(false);
     });
+  });
 
-    test('Should skip empty lines', () => {
-      const input = 'first.md\n\n\nsecond.md\n   \nthird.md';
-      const result = processExclusionPatterns(input);
-
-      expect(result).toEqual({
-        patterns: ['first.md', 'second.md', 'third.md'],
-        isValid: true,
-        errors: []
-      });
-    });
-
-    test('Should detect null characters', () => {
-      const input = 'good.md\nbad\0pattern.md\nanother.md';
-      const result = processExclusionPatterns(input);
-
-      expect(result).toEqual({
-        patterns: ['good.md', 'another.md'],
-        isValid: false,
-        errors: ['Line 2: Pattern contains invalid null character']
-      });
-    });
-
-    test('Should handle multiple errors', () => {
-      const input = 'test\0.md\n\ngood.md\n\0bad.md';
-      const result = processExclusionPatterns(input);
-
-      expect(result).toEqual({
-        patterns: ['good.md'],
-        isValid: false,
-        errors: [
-          'Line 1: Pattern contains invalid null character',
-          'Line 4: Pattern contains invalid null character'
-        ]
-      });
+  describe('globToRegex', () => {
+    test('Anchors the pattern to the full string', () => {
+      const re = globToRegex('foo*.md');
+      expect(re.test('foo123.md')).toBe(true);
+      expect(re.test('xfoo123.md')).toBe(false);
+      expect(re.test('foo.mdx')).toBe(false);
     });
   });
 });

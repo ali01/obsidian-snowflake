@@ -1,106 +1,120 @@
 /**
  * Template Loader
  *
- * Resolves which SCHEMA.md files apply to a newly-created markdown file by
- * walking the folder hierarchy root → leaf and collecting every ancestor
- * folder's SCHEMA.md (if present).
+ * Resolves which schema applies to a given file by walking the folder
+ * hierarchy root → leaf and consulting each ancestor folder's `.schema.yaml`
+ * (or `.schema/schema.yaml`). Each schema either selects an inline template,
+ * routes to an external template `.md` file, or contributes nothing (in
+ * which case the walk continues through ancestors).
+ *
+ * The chain is materialized into `{ content }` strings and fed into the
+ * existing merge engine in `template-applicator.ts` unchanged.
  */
 
 import { TFile } from 'obsidian';
 import type { Vault } from 'obsidian';
+import { dump as dumpYaml } from 'js-yaml';
 import type {
-  SnowflakeSettings,
   MarkdownFile,
   ErrorContext,
   TemplateChain,
-  TemplateChainItem
+  TemplateChainItem,
+  ResolvedTemplate,
+  InlineTemplate
 } from './types';
-import { SCHEMA_FILE_NAME } from './constants';
+import { findSchemaFile } from './schema-locator';
+import { parseSchema } from './schema-parser';
+import { selectTemplate } from './schema-resolver';
 import { matchesExclusionPattern } from './pattern-matcher';
 import { ErrorHandler } from './error-handler';
 
 export class TemplateLoader {
   private readonly vault: Vault;
-  private settings: SnowflakeSettings;
   private readonly errorHandler: ErrorHandler;
 
-  constructor(vault: Vault, settings: SnowflakeSettings) {
+  constructor(vault: Vault) {
     this.vault = vault;
-    this.settings = settings;
     this.errorHandler = ErrorHandler.getInstance();
   }
 
   public async loadTemplate(templatePath: string): Promise<string | null> {
     try {
       const templateFile = this.vault.getAbstractFileByPath(templatePath);
-
       if (!templateFile || !(templateFile instanceof TFile)) {
         console.warn(`Template not found: ${templatePath}`);
         return null;
       }
-
-      const content = await this.vault.read(templateFile);
-      return content;
+      return await this.vault.read(templateFile);
     } catch (error) {
       const errorContext: ErrorContext = {
         operation: 'load_template',
-        templatePath: templatePath
+        templatePath
       };
       this.errorHandler.handleErrorSilently(error, errorContext);
       return null;
     }
   }
 
-  public updateSettings(settings: SnowflakeSettings): void {
-    this.settings = settings;
-  }
-
   /**
-   * Build the SCHEMA.md inheritance chain for a file.
+   * Build the schema inheritance chain for a file.
    *
-   * Walks from vault root down to the file's parent folder; every folder that
-   * contains a SCHEMA.md contributes one entry to the chain (root first).
-   * If the file matches a global exclude pattern, returns an empty chain.
+   * Walks from vault root down to the file's parent folder. At each level,
+   * looks up the governing schema, evaluates its `exclude:` (which
+   * short-circuits the entire chain), runs the rule resolver, and pushes a
+   * chain item if the schema selected a template.
+   *
+   * Phase 1 only — the chain item's `content` is materialized in
+   * `loadTemplateChain`.
    */
-  public getTemplateChain(file: MarkdownFile): TemplateChain {
-    if (this.isFileExcluded(file)) {
-      return { templates: [], hasInheritance: false };
-    }
-
+  public async getTemplateChain(file: MarkdownFile): Promise<TemplateChain> {
     const templates: TemplateChainItem[] = [];
     const folderPaths = this.getFolderHierarchy(file);
 
     for (let i = 0; i < folderPaths.length; i++) {
       const folderPath = folderPaths[i];
-      const schemaPath = this.schemaPathFor(folderPath);
-      const schemaFile = this.vault.getAbstractFileByPath(schemaPath);
+      const location = findSchemaFile(this.vault, folderPath);
+      if (!location) continue;
 
-      if (schemaFile instanceof TFile) {
-        templates.push({
-          path: schemaPath,
-          folderPath: folderPath,
-          depth: i
-        });
+      const yamlText = await this.loadTemplate(location.schemaPath);
+      if (yamlText === null) continue;
+
+      const config = parseSchema(yamlText, location.schemaPath);
+      if (config === null) continue;
+
+      const relativePath = relativeTo(file.path, location.matchAnchor);
+
+      // Hard exclude: any matching pattern aborts the chain entirely.
+      if (config.exclude && matchesExclusionPattern(relativePath, config.exclude)) {
+        return { templates: [], hasInheritance: false };
       }
+
+      const resolved = selectTemplate(config, relativePath);
+      if (!resolved) continue;
+
+      templates.push({
+        schemaPath: location.schemaPath,
+        folderPath: location.matchAnchor,
+        templateAnchor: location.templateAnchor,
+        depth: i,
+        resolvedTemplate: resolved
+      });
     }
 
-    return {
-      templates,
-      hasInheritance: templates.length > 1
-    };
+    return { templates, hasInheritance: templates.length > 1 };
   }
 
   public async loadTemplateChain(chain: TemplateChain): Promise<TemplateChain> {
     const loadedTemplates: TemplateChainItem[] = [];
 
-    for (const template of chain.templates) {
-      const content = await this.loadTemplate(template.path);
-
-      if (content !== null) {
-        loadedTemplates.push({ ...template, content });
-      } else {
-        console.warn(`Skipping missing template in chain: ${template.path}`);
+    for (const item of chain.templates) {
+      const content = await this.materializeContent(item.resolvedTemplate, item.templateAnchor);
+      if (content === null) {
+        console.warn(
+          `Skipping missing template in chain: ${describeResolved(item.resolvedTemplate)}`
+        );
+        continue;
       }
+      loadedTemplates.push({ ...item, content });
     }
 
     return {
@@ -133,37 +147,130 @@ export class TemplateLoader {
   }
 
   /**
-   * Returns the vault path of the SCHEMA.md that would govern files in the
-   * given folder. Empty/root folder yields a top-level SCHEMA.md.
+   * Materialize a resolved template into the standard
+   * `---\nfrontmatter\n---\nbody` content string consumed by the merger.
+   *
+   * - Inline templates are serialized via `js-yaml.dump`.
+   * - External templates are read from their resolved path.
+   * - In both cases, when `frontmatterDelete` is set, a `delete:` entry is
+   *   injected into the serialized frontmatter so the existing
+   *   `processWithDeleteList` / `mergeWithDeleteList` semantics apply
+   *   unchanged.
    */
-  private schemaPathFor(folderPath: string): string {
-    if (folderPath === '' || folderPath === '/') {
-      return SCHEMA_FILE_NAME;
+  private async materializeContent(
+    resolved: ResolvedTemplate,
+    templateAnchor: string
+  ): Promise<string | null> {
+    const fmDelete = resolved.frontmatterDelete;
+
+    if (typeof resolved.template === 'string') {
+      const path = resolveTemplatePath(resolved.template, templateAnchor);
+      if (path === null) {
+        console.warn(`Snowflake: template path escapes the vault: ${resolved.template}`);
+        return null;
+      }
+      const content = await this.loadTemplate(path);
+      if (content === null) return null;
+      return fmDelete ? injectDeleteList(content, fmDelete) : content;
     }
-    return `${folderPath}/${SCHEMA_FILE_NAME}`;
+
+    return serializeInlineTemplate(resolved.template, fmDelete);
+  }
+}
+
+/**
+ * Compute the path of a file relative to the schema's `matchAnchor` folder.
+ * The returned path uses forward slashes and has no leading slash.
+ */
+function relativeTo(filePath: string, anchor: string): string {
+  if (anchor === '' || anchor === '/') return filePath;
+  const prefix = anchor + '/';
+  if (filePath.startsWith(prefix)) return filePath.slice(prefix.length);
+  return filePath;
+}
+
+/**
+ * Resolve an external template reference against the schema's templateAnchor.
+ *
+ * - Leading `/` means vault-absolute (e.g. `/Templates/note.md`).
+ * - `./` and `../` segments are normalized.
+ * - Returns `null` if the path escapes the vault root.
+ */
+function resolveTemplatePath(ref: string, templateAnchor: string): string | null {
+  let combined: string;
+  if (ref.startsWith('/')) {
+    combined = ref.slice(1);
+  } else if (templateAnchor === '' || templateAnchor === '/') {
+    combined = ref;
+  } else {
+    combined = templateAnchor + '/' + ref;
   }
 
-  private isFileExcluded(file: MarkdownFile): boolean {
-    const patterns = this.settings.globalExcludePatterns;
-    if (!patterns || patterns.length === 0) {
-      return false;
+  const segments: string[] = [];
+  for (const segment of combined.split('/')) {
+    if (segment === '' || segment === '.') continue;
+    if (segment === '..') {
+      if (segments.length === 0) return null;
+      segments.pop();
+      continue;
     }
-
-    const filePath = file.path ?? '';
-    return matchesExclusionPattern(filePath, patterns);
+    segments.push(segment);
   }
+  return segments.join('/');
+}
+
+function serializeInlineTemplate(
+  template: InlineTemplate,
+  frontmatterDelete: string[] | undefined
+): string {
+  const fmObj: Record<string, unknown> = { ...(template.frontmatter ?? {}) };
+  if (frontmatterDelete && frontmatterDelete.length > 0) {
+    fmObj['delete'] = frontmatterDelete;
+  }
+
+  const fmKeys = Object.keys(fmObj);
+  const body = template.body ?? '';
+
+  if (fmKeys.length === 0) {
+    return body;
+  }
+
+  const yaml = dumpYaml(fmObj, { lineWidth: -1, noRefs: true });
+  const fmBlock = '---\n' + yaml + '---\n';
+  return body === '' ? fmBlock : fmBlock + body;
+}
+
+function injectDeleteList(content: string, deleteList: string[]): string {
+  const line = `delete: [${deleteList.map(quoteYamlScalar).join(', ')}]`;
+  const fmRegex = /^---\s*\n([\s\S]*?)\n---/;
+  const match = content.match(fmRegex);
+  if (match) {
+    const newFm = match[1] + '\n' + line;
+    return content.replace(fmRegex, '---\n' + newFm + '\n---');
+  }
+  return `---\n${line}\n---\n` + content;
+}
+
+function quoteYamlScalar(name: string): string {
+  if (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) return name;
+  return `"${name.replace(/"/g, '\\"')}"`;
+}
+
+function describeResolved(r: ResolvedTemplate): string {
+  return typeof r.template === 'string' ? r.template : '<inline template>';
 }
 
 /**
  * Test-only exports
  */
 export const TemplateLoaderTestUtils = {
-  isFileExcluded: (loader: TemplateLoader, file: MarkdownFile): boolean => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (loader as any).isFileExcluded(file);
-  },
-  schemaPathFor: (loader: TemplateLoader, folderPath: string): string => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (loader as any).schemaPathFor(folderPath);
-  }
+  resolveTemplatePath: (ref: string, templateAnchor: string): string | null =>
+    resolveTemplatePath(ref, templateAnchor),
+  serializeInlineTemplate: (
+    template: InlineTemplate,
+    frontmatterDelete: string[] | undefined
+  ): string => serializeInlineTemplate(template, frontmatterDelete),
+  injectDeleteList: (content: string, deleteList: string[]): string =>
+    injectDeleteList(content, deleteList),
+  relativeTo: (filePath: string, anchor: string): string => relativeTo(filePath, anchor)
 };

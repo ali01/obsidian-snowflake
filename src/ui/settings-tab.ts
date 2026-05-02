@@ -1,17 +1,14 @@
 /**
  * Settings tab for the Snowflake plugin.
  *
- * Templates are now declared by convention via SCHEMA.md files in folders, so
- * there's nothing folder-specific to configure here. The tab keeps only:
- *   1. Global exclude patterns
- *   2. Date / time variable formats
- *   3. Variable reference
+ * Templates and per-folder excludes are declared by convention via
+ * `.schema.yaml` files in folders, so the only user-tunable knobs left are
+ * the date and time variable formats.
  */
 
 import { PluginSettingTab, Setting } from 'obsidian';
 import type { App } from 'obsidian';
 import type SnowflakePlugin from '../main';
-import { processExclusionPatterns } from '../pattern-matcher';
 
 export class SnowflakeSettingTab extends PluginSettingTab {
   public plugin: SnowflakePlugin;
@@ -26,7 +23,6 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     containerEl.empty();
 
     this.addHeader(containerEl);
-    this.addGlobalExcludeSettings(containerEl);
     this.addVariableFormatSettings(containerEl);
     this.addHelpSection(containerEl);
   }
@@ -35,43 +31,12 @@ export class SnowflakeSettingTab extends PluginSettingTab {
     containerEl.createEl('h1', { text: 'Snowflake Settings' });
     containerEl.createEl('p', {
       text:
-        'Snowflake applies templates to new notes from a SCHEMA.md file ' +
-        'in their folder (and any ancestor folders, root → leaf). ' +
-        'Add a SCHEMA.md to any folder to make it Snowflake-managed.',
+        'Snowflake applies templates to new notes from a `.schema.yaml` (or ' +
+        '`.schema/schema.yaml`) in their folder, plus any ancestor folders. ' +
+        'Add one to a folder to make it Snowflake-managed, including ' +
+        'pattern-routed templates and per-folder file excludes.',
       cls: 'setting-item-description'
     });
-  }
-
-  private addGlobalExcludeSettings(containerEl: HTMLElement): void {
-    containerEl.createEl('h2', { text: 'Global Exclude Patterns' });
-    containerEl.createEl('p', {
-      text: 'Files matching these patterns are skipped by Snowflake. One pattern per line.',
-      cls: 'setting-item-description'
-    });
-
-    const patterns = this.plugin.settings.globalExcludePatterns;
-    const currentValue = patterns.length > 0 ? patterns.join('\n') : '';
-
-    new Setting(containerEl)
-      .setName('Exclude patterns')
-      .setDesc(
-        'Glob patterns: * matches characters,' +
-          ' ** matches directories,' +
-          ' ? matches single character'
-      )
-      .addTextArea((text) => {
-        text
-          .setPlaceholder('*.tmp\n_archive/**\n~*.md')
-          .setValue(currentValue)
-          .onChange(async (value) => {
-            const result = processExclusionPatterns(value);
-            this.plugin.settings.globalExcludePatterns = result.patterns;
-            await this.plugin.saveSettings();
-          });
-        text.inputEl.rows = 4;
-        text.inputEl.cols = 30;
-        return text;
-      });
   }
 
   private addVariableFormatSettings(containerEl: HTMLElement): void {
@@ -144,7 +109,7 @@ export class SnowflakeSettingTab extends PluginSettingTab {
   private addHelpSection(containerEl: HTMLElement): void {
     containerEl.createEl('h2', { text: 'Template Variables' });
     containerEl.createEl('p', {
-      text: 'You can use these variables in your SCHEMA.md templates:',
+      text: 'You can use these variables in your templates:',
       cls: 'setting-item-description'
     });
 
@@ -160,5 +125,13 @@ export class SnowflakeSettingTab extends PluginSettingTab {
       text: `{{time}} - Current time (using your format: ${this.plugin.settings.timeFormat})`
     });
     variableList.createEl('li', { text: '{{snowflake_id}} - Unique 10-character ID' });
+
+    containerEl.createEl('p', {
+      cls: 'setting-item-description',
+      text:
+        'File excludes: add an `exclude:` list to any `.schema.yaml` to skip ' +
+        'matching files in that subtree (replaces the old global exclude ' +
+        'patterns setting).'
+    });
   }
 }

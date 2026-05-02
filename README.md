@@ -1,251 +1,267 @@
-# Snowflake: Automatic Templates for Obsidian
+# Snowflake: Schema-driven Templates for Obsidian
 
-An Obsidian plugin that automatically applies templates to new notes based on their folder location. Create consistent note structures with dynamic variables like dates, times, and unique IDs.
-
-## Features
-
-- **Automatic Templates**: Assign templates to folders. New files get those templates automatically.
-- **Template Inheritance**: Nested folders inherit templates from parent folders
-- **Dynamic Variables**: Insert current date, time, note title, and unique IDs
-- **Smart Merging**: Safely merges templates with existing content without data loss
-- **Manual Commands**: Apply templates on-demand to existing notes
-- **Bulk Operations**: Apply templates to all notes in a folder at once
-
+Snowflake applies templates to new notes based on a `.schema.yaml` file in
+their folder (or any ancestor folder). A schema can route different files to
+different templates by path pattern, declare per-folder file excludes, and
+inherit from ancestor schemas.
 
 ## Quick Start
 
-1. **Create a templates folder** (default: "Templates")
-2. **Create template files** in that folder (e.g., `project-template.md`, `meeting-template.md`)
-3. **Configure folder mappings** in Settings → Snowflake
-4. **Create new notes** in mapped folders to see templates applied automatically
+1. Pick a folder you want Snowflake to manage.
+2. Create a `.schema.yaml` file at the root of that folder. Minimal example:
+   ```yaml
+   default:
+     template:
+       frontmatter:
+         type: note
+         tags: [auto]
+       body: |
+         # {{title}}
+         Created {{date}}
+   ```
+3. Create a new note in that folder. Snowflake applies the template
+   automatically.
 
-### Configuring Folder Mappings
+> **Note:** `.schema.yaml` starts with a dot, which Obsidian hides by default
+> in the file explorer. Edit it from the file system or an external editor,
+> or use a "show hidden files" setting if your platform exposes one.
 
-1. Open Settings → Snowflake
-2. Click "Add folder mapping"
-3. Select a folder and its corresponding template
-4. Notes created in that folder will now use the template
+## Schema Format
 
-### Template Inheritance
-
-Templates inherit from parent folders automatically:
-
-```
-Projects/              → uses: project-template.md
-  └── Web/             → uses: web-template.md
-      └── Frontend/    → inherits both templates with smart merging
-```
-
-### Manual Commands
-
-Access via Command Palette (Ctrl/Cmd + P):
-
-- **Apply template to current note**: Applies the appropriate template based on the note's location
-- **Apply specific template**: Choose any template to apply to the current note
-- **Apply templates to folder**: Bulk apply templates to all notes in a selected folder
-- **Create new note in folder**: Creates a new note in the selected folder and applies all mapped templates
-
-### Keyboard Shortcuts
-
-You can assign keyboard shortcuts to any Snowflake command:
-
-1. Go to Settings → Hotkeys
-2. Search for "Snowflake"
-3. Click the + icon next to any command
-4. Press your desired key combination
-
-**Tip**: Replace Obsidian's default "New note" behavior:
-Assign `Cmd/Ctrl + N` to "Snowflake: Create new note in folder." This gives you folder selection and automatic template application. The original Obsidian behavior can still be accessed via the Command Palette.
-
-## Advanced Features
-
-### Template Variables
-
-Snowflake supports the following dynamic variables that are replaced when templates are applied:
-
-- **`{{title}}`** - The filename without the .md extension
-  - Example: "Meeting Notes.md" → "Meeting Notes"
-- **`{{date}}`** - Current date (format customizable in settings)
-  - Default format: YYYY-MM-DD (e.g., "2024-01-15")
-- **`{{time}}`** - Current time (format customizable in settings)
-  - Default format: HH:mm (e.g., "14:30")
-- **`{{snowflake_id}}`** - A unique 10-character alphanumeric ID
-  - Format: Mix of letters and numbers (e.g., "x8K2n5pQ7A")
-  - Uses cryptographically secure random generation
-  - Multiple instances in the same template receive the same ID
-
-Example template with variables:
-```markdown
----
-id: {{snowflake_id}}
-created: {{date}} {{time}}
-modified: {{date}} {{time}}
----
-
-# {{title}}
-
-Created on {{date}} at {{time}}
-```
-
-### Custom Date/Time Formats
-
-In settings, customize formats using moment.js syntax:
-- Date: `DD/MM/YYYY`, `MMM DD, YYYY`, etc.
-- Time: `h:mm A`, `HH:mm:ss`, etc.
-
-### Template Property Exclusions (Delete Lists)
-
-Templates can exclude properties from parent templates using the `delete` property. This is useful when you want to remove inherited properties that don't apply to specific note types.
-
-#### Basic Usage
-
-Add a `delete` property to your template's frontmatter with an array of property names to exclude:
+A schema can declare three top-level fields, all optional:
 
 ```yaml
----
-delete: [author, project]
-category: personal
-tags: [diary]
----
+exclude:
+  - MEETINGS.md
+  - Archive/
+  - "**/*.tmp"
+
+default:
+  template: ./_templates/note.md
+
+rules:
+  - match: "Web/**"
+    template: ./_templates/web.md
+  - match: "**/quick-*.md"
+    template:
+      frontmatter:
+        type: quick
+      body: "# {{title}}"
+    frontmatter-delete: [scratch_only]
 ```
 
-#### How It Works
+### `exclude`
 
-1. Properties listed in `delete` are removed from the inherited template
-2. Child templates can re-add excluded properties by defining them explicitly
-3. The `delete` property itself is never included in the final note
+A list of patterns. If a new file matches any of them, no template is applied
+— ever, including from ancestor schemas. Patterns are evaluated relative to
+the schema's folder using gitignore-style semantics:
 
-#### Example Inheritance Chain
+| Pattern        | Matches                                                |
+| -------------- | ------------------------------------------------------ |
+| `MEETINGS.md`  | Any file named `MEETINGS.md` at any depth in subtree   |
+| `Archive/`     | Everything under the `Archive/` directory              |
+| `*.tmp`        | Files ending in `.tmp` (top level only)                |
+| `**/*.tmp`     | Files ending in `.tmp` at any depth                    |
+| `draft-*`      | Files whose name starts with `draft-` (top level)      |
+| `**/draft-*`   | Same, at any depth                                     |
 
-Consider this template hierarchy:
+This replaces the old plugin-wide "global exclude patterns" setting. To
+exclude vault-wide, put an `exclude:` list in a vault-root `.schema.yaml`.
 
-**base-template.md** (parent):
+### `default`
+
+The template to use when no `rules` entry matches.
+
+### `rules`
+
+An ordered list. Each rule has:
+
+- `match` — a glob pattern (`*`, `**`, `?` supported), evaluated relative to
+  the schema's folder. **First match wins.**
+- `template` — either an inline template (object with optional `frontmatter`
+  and `body`) or a path to a `.md` template file (string).
+- `frontmatter-delete` — optional list of property names to exclude from
+  inherited frontmatter when this rule's template is merged.
+
+If no rule matches, `default:` is used. If neither is set, the schema
+contributes nothing — but the inheritance walk continues through ancestors.
+
+### Inline vs external templates
+
+A `template:` value may be either inline:
+
 ```yaml
----
-author: Team
-project: Default Project
-status: draft
-tags: [base]
----
+default:
+  template:
+    frontmatter:
+      type: note
+      tags: [auto]
+    body: |
+      # {{title}}
+      Created {{date}}
 ```
 
-**personal-template.md** (child):
+…or an external `.md` file:
+
 ```yaml
----
-delete: [author, project]
-category: personal
-tags: [personal]
----
+default:
+  template: ./_templates/note.md
 ```
 
-**journal-template.md** (grandchild):
+Both forms support all variables (`{{title}}`, `{{date}}`, `{{time}}`,
+`{{snowflake_id}}`).
+
+#### External template paths
+
+- Bare and `./` paths resolve relative to the schema's folder
+  (`./web.md` from `Projects/.schema.yaml` → `Projects/web.md`).
+- `../` walks up one directory.
+- A leading `/` means vault-absolute (`/Templates/note.md`).
+- Paths that escape the vault root are rejected.
+
+## Two equivalent schema locations
+
+You can put the schema directly in the folder it governs, or bundle it in a
+`.schema/` subdirectory together with the template `.md` files it references.
+
+**Flat form:**
+```
+Projects/
+├── .schema.yaml
+├── note-1.md
+└── note-2.md
+```
+
+**Folder form:**
+```
+Projects/
+├── .schema/
+│   ├── schema.yaml      # note: no leading dot — parent is already hidden
+│   └── web.md           # bundled template referenced from schema.yaml
+├── note-1.md
+└── note-2.md
+```
+
+In the folder form, `./web.md` in `schema.yaml` resolves inside `.schema/`,
+so templates can be co-located with the schema that references them. The
+folder form wins if both forms exist in the same directory (a console
+warning is emitted).
+
+## Template Inheritance
+
+When a file is created at `Projects/Web/Frontend/note.md`, Snowflake walks
+the folder hierarchy root → leaf and consults every ancestor schema:
+
+```
+.schema.yaml                   → uses: root template
+Projects/.schema.yaml          → uses: project template
+Projects/Web/.schema.yaml      → uses: web template
+Projects/Web/Frontend/         → no schema, skipped
+```
+
+Templates merge root → leaf. Frontmatter values from descendants override
+ancestor values; arrays (e.g. `tags:`) concatenate; bodies append.
+
+### `frontmatter-delete`
+
+Use a rule's `frontmatter-delete` list to drop inherited keys at that level:
+
 ```yaml
----
-author: Me  # Re-adds the author property
-mood: neutral
-tags: [journal]
----
+default:
+  template: ./project.md
+  frontmatter-delete: [legacy_field]
 ```
 
-When a note uses the journal template:
-- `project` is excluded (removed by personal-template)
-- `author` is included with value "Me" (re-added by journal-template)
-- `status` is included (never excluded)
-- All tags are concatenated: `[base, personal, journal]`
+Per-rule and per-`default`-block only. There is no top-level
+`frontmatter-delete` — repeat it across rules if you need it everywhere.
 
-### File Exclusion Patterns
+## Variables
 
-Each folder mapping can have exclusion patterns to prevent templates from being
-applied to specific files or directories.
+| Variable           | Replacement                                          |
+| ------------------ | ---------------------------------------------------- |
+| `{{title}}`        | Filename without `.md`                               |
+| `{{date}}`         | Current date (configurable format, default `YYYY-MM-DD`) |
+| `{{time}}`         | Current time (configurable format, default `HH:mm`)  |
+| `{{snowflake_id}}` | Cryptographically-secure 10-character ID            |
 
-#### Pattern Types
+Customize date and time formats in **Settings → Snowflake**. Both fields
+accept moment.js format strings.
 
-**Exact filename**:
-- `README.md` - excludes files named exactly "README.md"
+## Commands
 
-**Wildcard patterns**:
-- `*.tmp` - excludes all files ending with .tmp
-- `draft-*` - excludes files starting with "draft-"
-- `test?.md` - excludes files like "test1.md", "testA.md"
+Available via the command palette (`Ctrl/Cmd + P`):
 
-**Directory patterns**:
-- `Archive/` - excludes all files under the Archive directory
-- `Old/Backups/` - excludes all files under the nested Old/Backups directory
+- **Apply schema to current note** — re-runs the schema chain on the active
+  file.
+- **Insert current date** / **Insert current time** — direct insertion at
+  cursor.
+- **Create new note in folder** — opens a folder picker, creates a new note,
+  and applies the matching schema's template.
 
-**Recursive patterns**:
-- `**/README.md` - excludes README.md files in any subdirectory
-- `**/draft-*` - excludes draft files at any depth
+## Migrating from `SCHEMA.md`
 
-#### Examples
+The previous version used a single `SCHEMA.md` file that doubled as both
+schema and template. The new format separates routing (schema) from content
+(template) and adds pattern matching.
 
-To exclude an entire subdirectory and some specific files:
-```
-Archive/
-*.tmp
-draft-notes.md
-```
+Manual migration:
 
-This will ignore:
-- Everything under `Projects/Archive/`
-- Any `.tmp` files
-- Files named exactly `draft-notes.md`
+1. Rename each `SCHEMA.md` to `.schema.yaml`.
+2. Wrap its frontmatter and body inside a `default: template:` block:
+   ```yaml
+   default:
+     template:
+       frontmatter:
+         type: note
+       body: |
+         # {{title}}
+   ```
+   Or move the body+frontmatter into a sibling `.md` file and reference it:
+   ```yaml
+   default:
+     template: ./note.md
+   ```
+3. If the old file had `delete: [...]` in its frontmatter, move it up to
+   `default.frontmatter-delete:` (or per-rule `frontmatter-delete:`). The
+   `delete:` key inside template frontmatter is no longer the canonical
+   location; using `frontmatter-delete` keeps template `.md` files clean.
+4. If you used the old "global exclude patterns" setting, port those
+   patterns to an `exclude:` list in a vault-root `.schema.yaml`.
 
 ## Development
 
-Built with TypeScript:
+```bash
+npm install
+npm run dev        # watch mode build
+npm run build      # production build
+npm test           # jest
+npm run check      # typecheck + tests (quality gate)
+npm run style:fix  # ESLint + Prettier auto-fix
+```
+
+Source layout:
 
 ```
 src/
-├── main.ts                    # Plugin entry point
-├── template-applicator.ts     # Core template logic
-├── template-loader.ts         # Template file management
-├── template-variables.ts      # Variable replacement
-├── frontmatter-merger.ts      # YAML merging logic
-├── commands.ts                # Command registration
-└── ui/                        # Settings and modals
+├── main.ts                    # plugin entry
+├── commands.ts                # command registration
+├── file-creation-handler.ts   # vault create/rename hooks
+├── template-applicator.ts     # orchestrates merging + variables
+├── template-loader.ts         # walks the schema chain & materializes templates
+├── schema-locator.ts          # finds .schema.yaml or .schema/schema.yaml
+├── schema-parser.ts           # validates and parses schema YAML
+├── schema-resolver.ts         # picks a template via rule + default fallthrough
+├── frontmatter-merger.ts      # YAML frontmatter merge engine
+├── pattern-matcher.ts         # glob → regex
+├── template-variables.ts      # {{title}} / {{date}} / {{time}} / {{snowflake_id}}
+├── nanoid.ts                  # ID generation
+└── ui/                        # settings + modals
 ```
-
-### Development Setup
-
-```bash
-# Clone and install
-git clone https://github.com/ali01/obsidian-snowflake.git
-cd obsidian-snowflake
-npm install
-
-# Development (with watch)
-npm run dev
-
-# Production build
-npm run build
-
-# Run tests
-npm test
-
-# Quality checks
-npm run check
-```
-
-## Compatibility
-
-- Requires Obsidian v0.12.0 or higher
-- Works with all themes and other plugins
-- No external dependencies
-
-## Community
-
-- **Issues**: [GitHub Issues](https://github.com/ali01/obsidian-snowflake/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/ali01/obsidian-snowflake/discussions)
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file
-
-## Acknowledgments
-
-- Built for the [Obsidian](https://obsidian.md) community
-- ID generation inspired by [Nano ID](https://github.com/ai/nanoid)
+MIT — see [LICENSE](LICENSE).
 
 ## Author
 
-**Ali Yahya**
+**Ali Yahya** ([@ali01](https://github.com/ali01))

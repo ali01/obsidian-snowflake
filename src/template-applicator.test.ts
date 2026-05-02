@@ -89,8 +89,7 @@ describe('TemplateApplicator', () => {
     // Default settings
     settings = {
       dateFormat: 'YYYY-MM-DD',
-      timeFormat: 'HH:mm',
-      globalExcludePatterns: []
+      timeFormat: 'HH:mm'
     };
 
     // Reset all mocks to default behavior
@@ -201,13 +200,13 @@ id: abc123
       // Setup mocks
       mockVault.read.mockResolvedValue(existingContent);
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/project.md', folderPath: 'Projects', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/project.md', folderPath: 'Projects', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/project.md',
+            schemaPath: 'Templates/project.md',
             folderPath: 'Projects',
             depth: 0,
             content: templateContent
@@ -255,13 +254,13 @@ id: abc123
       const existingContent = '# Test\n\nContent without trailing newline';
       mockVault.read.mockResolvedValue(existingContent);
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/test.md', folderPath: 'Test', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/test.md', folderPath: 'Test', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/test.md',
+            schemaPath: 'Templates/test.md',
             content: '# Template Content',
             folderPath: 'Test',
             depth: 0
@@ -295,13 +294,13 @@ id: abc123
       const existingContent = '# Test\n\nContent with multiple trailing newlines\n\n\n';
       mockVault.read.mockResolvedValue(existingContent);
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/test.md', folderPath: 'Test', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/test.md', folderPath: 'Test', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/test.md',
+            schemaPath: 'Templates/test.md',
             content: '', // Empty template
             folderPath: 'Test',
             depth: 0
@@ -328,7 +327,7 @@ id: abc123
     test('Should show error when template not found', async () => {
       mockVault.read.mockResolvedValue('');
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/missing.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/missing.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
@@ -351,13 +350,13 @@ Content`;
 
       mockVault.read.mockResolvedValue(contentWithId);
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: 'Template content'
@@ -395,13 +394,13 @@ title: test
 
       mockVault.read.mockResolvedValue('');
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: templateContent
@@ -438,13 +437,13 @@ title: test
 
       mockVault.read.mockResolvedValue(existingContent);
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: templateContent
@@ -476,13 +475,13 @@ title: test
     test('Should handle template processing errors', async () => {
       mockVault.read.mockResolvedValue('');
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: '{{invalid}}'
@@ -509,13 +508,13 @@ Template`;
 
       mockVault.read.mockResolvedValue('');
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: templateContent
@@ -543,13 +542,13 @@ Template`;
     test('Should show notice when template applied successfully', async () => {
       mockVault.read.mockResolvedValue('');
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: 'Template'
@@ -582,19 +581,19 @@ Template`;
       const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
 
       expect(result.success).toBe(false);
-      expect(result.message).toContain('No SCHEMA.md found');
+      expect(result.message).toContain('No schema found');
     });
 
     test('Should handle vault modify errors gracefully', async () => {
       mockVault.read.mockResolvedValue('');
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: 'Template'
@@ -630,7 +629,7 @@ Template`;
       const result = await applicator.applyTemplate(mockFile, { isManualCommand: false });
 
       expect(result.success).toBe(false);
-      expect(result.message).toContain('No SCHEMA.md found');
+      expect(result.message).toContain('No schema found');
       expect(mockVault.modify).not.toHaveBeenCalled();
     });
 
@@ -638,13 +637,13 @@ Template`;
       // Test case 1: Empty file with template
       mockVault.read.mockResolvedValue('');
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/test.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/test.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/test.md',
+            schemaPath: 'Templates/test.md',
             folderPath: '',
             depth: 0,
             content: '# Test\n\nContent\n'
@@ -716,13 +715,13 @@ This is template body content.`;
 
       mockVault.read.mockResolvedValue(existingContent);
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: templateContent
@@ -800,13 +799,13 @@ This is template body content.`;
 
       mockVault.read.mockResolvedValue(existingContent);
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: templateContent
@@ -868,13 +867,13 @@ date: 2024-01-01
 
       mockVault.read.mockResolvedValue(existingContent);
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/default.md', folderPath: '', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/default.md', folderPath: '', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/default.md',
+            schemaPath: 'Templates/default.md',
             folderPath: '',
             depth: 0,
             content: templateContent
@@ -923,8 +922,8 @@ date: 2024-01-01
 
       applicator.updateSettings(newSettings);
 
-      // Verify all dependencies are updated
-      expect(mockTemplateLoader.updateSettings).toHaveBeenCalledWith(newSettings);
+      // Loader no longer carries settings (its only setting-derived behavior
+      // — global excludes — moved into per-schema `exclude:`).
       expect(mockVariableProcessor.setDateFormat).toHaveBeenCalledWith(newSettings.dateFormat);
       expect(mockVariableProcessor.setTimeFormat).toHaveBeenCalledWith(newSettings.timeFormat);
     });
@@ -947,13 +946,13 @@ date: 2024-01-01
 
     test('REQ-033: Should apply single template without inheritance', async () => {
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/project.md', folderPath: 'Projects', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/project.md', folderPath: 'Projects', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/project.md',
+            schemaPath: 'Templates/project.md',
             folderPath: 'Projects',
             depth: 0,
             content: '---\ntags: [project]\n---\nProject template'
@@ -986,21 +985,21 @@ date: 2024-01-01
     test('REQ-033: Should merge multiple templates with child precedence', async () => {
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
-          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 }
+          { schemaPath: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { schemaPath: 'Templates/project.md', folderPath: 'Projects', depth: 1 }
         ],
         hasInheritance: true
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/base.md',
+            schemaPath: 'Templates/base.md',
             folderPath: '/',
             depth: 0,
             content: '---\nauthor: John\ntags: [base]\n---\nBase content'
           },
           {
-            path: 'Templates/project.md',
+            schemaPath: 'Templates/project.md',
             folderPath: 'Projects',
             depth: 1,
             content: '---\ntitle: Project\ntags: [project]\n---\nProject content'
@@ -1058,28 +1057,28 @@ date: 2024-01-01
     test('REQ-033a: Should concatenate lists across inheritance chain', async () => {
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
-          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 },
-          { path: 'Templates/dev.md', folderPath: 'Projects/Dev', depth: 2 }
+          { schemaPath: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { schemaPath: 'Templates/project.md', folderPath: 'Projects', depth: 1 },
+          { schemaPath: 'Templates/dev.md', folderPath: 'Projects/Dev', depth: 2 }
         ],
         hasInheritance: true
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/base.md',
+            schemaPath: 'Templates/base.md',
             folderPath: '/',
             depth: 0,
             content: '---\ntags: [base, global]\naliases: [doc]\n---\nBase'
           },
           {
-            path: 'Templates/project.md',
+            schemaPath: 'Templates/project.md',
             folderPath: 'Projects',
             depth: 1,
             content: '---\ntags: [project]\naliases: [proj]\nstatus: active\n---\nProject'
           },
           {
-            path: 'Templates/dev.md',
+            schemaPath: 'Templates/dev.md',
             folderPath: 'Projects/Dev',
             depth: 2,
             content: '---\ntags: [dev, code]\naliases: [development]\n---\nDev'
@@ -1149,21 +1148,21 @@ date: 2024-01-01
     test('Should handle templates with only body content', async () => {
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/simple1.md', folderPath: 'Notes', depth: 0 },
-          { path: 'Templates/simple2.md', folderPath: 'Notes/Sub', depth: 1 }
+          { schemaPath: 'Templates/simple1.md', folderPath: 'Notes', depth: 0 },
+          { schemaPath: 'Templates/simple2.md', folderPath: 'Notes/Sub', depth: 1 }
         ],
         hasInheritance: true
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/simple1.md',
+            schemaPath: 'Templates/simple1.md',
             folderPath: 'Notes',
             depth: 0,
             content: 'First template content'
           },
           {
-            path: 'Templates/simple2.md',
+            schemaPath: 'Templates/simple2.md',
             folderPath: 'Notes/Sub',
             depth: 1,
             content: 'Second template content'
@@ -1195,21 +1194,21 @@ date: 2024-01-01
 
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/with-fm.md', folderPath: 'Notes', depth: 0 },
-          { path: 'Templates/without-fm.md', folderPath: 'Notes/Sub', depth: 1 }
+          { schemaPath: 'Templates/with-fm.md', folderPath: 'Notes', depth: 0 },
+          { schemaPath: 'Templates/without-fm.md', folderPath: 'Notes/Sub', depth: 1 }
         ],
         hasInheritance: true
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/with-fm.md',
+            schemaPath: 'Templates/with-fm.md',
             folderPath: 'Notes',
             depth: 0,
             content: '---\ntitle: Test\n---\nWith frontmatter'
           },
           {
-            path: 'Templates/without-fm.md',
+            schemaPath: 'Templates/without-fm.md',
             folderPath: 'Notes/Sub',
             depth: 1,
             content: 'Without frontmatter'
@@ -1258,21 +1257,21 @@ date: 2024-01-01
 
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/empty.md', folderPath: 'Notes', depth: 0 },
-          { path: 'Templates/content.md', folderPath: 'Notes/Sub', depth: 1 }
+          { schemaPath: 'Templates/empty.md', folderPath: 'Notes', depth: 0 },
+          { schemaPath: 'Templates/content.md', folderPath: 'Notes/Sub', depth: 1 }
         ],
         hasInheritance: true
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/empty.md',
+            schemaPath: 'Templates/empty.md',
             folderPath: 'Notes',
             depth: 0,
             content: ''
           },
           {
-            path: 'Templates/content.md',
+            schemaPath: 'Templates/content.md',
             folderPath: 'Notes/Sub',
             depth: 1,
             content: '---\ntitle: Content\n---\nSome content'
@@ -1315,21 +1314,21 @@ date: 2024-01-01
 
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
-          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 }
+          { schemaPath: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { schemaPath: 'Templates/project.md', folderPath: 'Projects', depth: 1 }
         ],
         hasInheritance: true
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/base.md',
+            schemaPath: 'Templates/base.md',
             folderPath: '/',
             depth: 0,
             content: '---\ntags: [base, global]\naliases: [doc]\n---\nBase'
           },
           {
-            path: 'Templates/project.md',
+            schemaPath: 'Templates/project.md',
             folderPath: 'Projects',
             depth: 1,
             content: '---\ntags: [project]\naliases: [proj]\n---\nProject'
@@ -1400,13 +1399,13 @@ date: 2024-01-01
       jest.clearAllMocks();
 
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/with-delete.md', folderPath: 'Notes', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/with-delete.md', folderPath: 'Notes', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/with-delete.md',
+            schemaPath: 'Templates/with-delete.md',
             folderPath: 'Notes',
             depth: 0,
             content: '---\nauthor: John\ndate: 2024-01-01\ndelete: [author]\n---\nContent'
@@ -1448,9 +1447,9 @@ date: 2024-01-01
     test('REQ-035: Should handle cumulative delete list through inheritance chain', async () => {
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
-          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 },
-          { path: 'Templates/dev.md', folderPath: 'Projects/Dev', depth: 2 }
+          { schemaPath: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { schemaPath: 'Templates/project.md', folderPath: 'Projects', depth: 1 },
+          { schemaPath: 'Templates/dev.md', folderPath: 'Projects/Dev', depth: 2 }
         ],
         hasInheritance: true
       });
@@ -1458,19 +1457,19 @@ date: 2024-01-01
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/base.md',
+            schemaPath: 'Templates/base.md',
             folderPath: '/',
             depth: 0,
             content: '---\nauthor: John\ndate: 2024-01-01\ntags: [base]\n---\nBase'
           },
           {
-            path: 'Templates/project.md',
+            schemaPath: 'Templates/project.md',
             folderPath: 'Projects',
             depth: 1,
             content: '---\ndelete: [author, tags]\ncategory: project\n---\nProject'
           },
           {
-            path: 'Templates/dev.md',
+            schemaPath: 'Templates/dev.md',
             folderPath: 'Projects/Dev',
             depth: 2,
             content: '---\nauthor: Jane\ntags: [dev]\n---\nDev'
@@ -1522,8 +1521,8 @@ date: 2024-01-01
 
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/t1.md', folderPath: 'A', depth: 0 },
-          { path: 'Templates/t2.md', folderPath: 'A/B', depth: 1 }
+          { schemaPath: 'Templates/t1.md', folderPath: 'A', depth: 0 },
+          { schemaPath: 'Templates/t2.md', folderPath: 'A/B', depth: 1 }
         ],
         hasInheritance: true
       });
@@ -1531,13 +1530,13 @@ date: 2024-01-01
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/t1.md',
+            schemaPath: 'Templates/t1.md',
             folderPath: 'A',
             depth: 0,
             content: '---\ndelete: [prop1]\nprop1: value1\nprop2: value2\n---\nT1'
           },
           {
-            path: 'Templates/t2.md',
+            schemaPath: 'Templates/t2.md',
             folderPath: 'A/B',
             depth: 1,
             content: '---\ndelete: [prop2]\nprop3: value3\n---\nT2'
@@ -1583,14 +1582,14 @@ date: 2024-01-01
       jest.clearAllMocks();
 
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/override.md', folderPath: 'Notes', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/override.md', folderPath: 'Notes', depth: 0 }],
         hasInheritance: false
       });
 
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/override.md',
+            schemaPath: 'Templates/override.md',
             folderPath: 'Notes',
             depth: 0,
             content:
@@ -1637,8 +1636,8 @@ date: 2024-01-01
 
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
-          { path: 'Templates/child.md', folderPath: '/Sub', depth: 1 }
+          { schemaPath: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { schemaPath: 'Templates/child.md', folderPath: '/Sub', depth: 1 }
         ],
         hasInheritance: true
       });
@@ -1646,13 +1645,13 @@ date: 2024-01-01
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/base.md',
+            schemaPath: 'Templates/base.md',
             folderPath: '/',
             depth: 0,
             content: '---\ntags: [base, template]\naliases: [doc]\nauthor: BaseAuthor\n---\nBase'
           },
           {
-            path: 'Templates/child.md',
+            schemaPath: 'Templates/child.md',
             folderPath: '/Sub',
             depth: 1,
             content: '---\ndelete: [author]\ntags: [child, specific]\naliases: [subdoc]\n---\nChild'
@@ -1739,13 +1738,13 @@ Template content`;
 
       // Set up template chain
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/note.md', folderPath: 'Notes', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/note.md', folderPath: 'Notes', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/note.md',
+            schemaPath: 'Templates/note.md',
             folderPath: 'Notes',
             depth: 0,
             content: templateContent
@@ -1843,13 +1842,13 @@ Template content`;
 
       // Set up template chain
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/note.md', folderPath: 'Notes', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/note.md', folderPath: 'Notes', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/note.md',
+            schemaPath: 'Templates/note.md',
             folderPath: 'Notes',
             depth: 0,
             content: templateContent
@@ -1921,28 +1920,28 @@ Content`;
       // Set up template chain with inheritance
       mockTemplateLoader.getTemplateChain.mockReturnValue({
         templates: [
-          { path: 'Templates/base.md', folderPath: '/', depth: 0 },
-          { path: 'Templates/project.md', folderPath: 'Projects', depth: 1 },
-          { path: 'Templates/dev.md', folderPath: 'Projects/Dev', depth: 2 }
+          { schemaPath: 'Templates/base.md', folderPath: '/', depth: 0 },
+          { schemaPath: 'Templates/project.md', folderPath: 'Projects', depth: 1 },
+          { schemaPath: 'Templates/dev.md', folderPath: 'Projects/Dev', depth: 2 }
         ],
         hasInheritance: true
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/base.md',
+            schemaPath: 'Templates/base.md',
             folderPath: '/',
             depth: 0,
             content: '---\nbaseAuthor: \ntags: [base]\n---\nBase'
           },
           {
-            path: 'Templates/project.md',
+            schemaPath: 'Templates/project.md',
             folderPath: 'Projects',
             depth: 1,
             content: '---\nprojectLead: \ntags: [project]\n---\nProject'
           },
           {
-            path: 'Templates/dev.md',
+            schemaPath: 'Templates/dev.md',
             folderPath: 'Projects/Dev',
             depth: 2,
             content: '---\ndevLead: \ntags: [dev]\n---\nDev'
@@ -2026,13 +2025,13 @@ author: John
 Template`;
 
       mockTemplateLoader.getTemplateChain.mockReturnValue({
-        templates: [{ path: 'Templates/note.md', folderPath: 'Notes', depth: 0 }],
+        templates: [{ schemaPath: 'Templates/note.md', folderPath: 'Notes', depth: 0 }],
         hasInheritance: false
       });
       mockTemplateLoader.loadTemplateChain.mockResolvedValue({
         templates: [
           {
-            path: 'Templates/note.md',
+            schemaPath: 'Templates/note.md',
             folderPath: 'Notes',
             depth: 0,
             content: templateContent

@@ -34,8 +34,7 @@ describe('FileCreationHandler', () => {
 
     settings = {
       dateFormat: 'YYYY-MM-DD',
-      timeFormat: 'HH:mm',
-      globalExcludePatterns: []
+      timeFormat: 'HH:mm'
     };
 
     handler = new FileCreationHandler(mockPlugin, mockVault, settings);
@@ -88,8 +87,32 @@ describe('FileCreationHandler', () => {
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
-    test('Should never apply a template to a SCHEMA.md file itself', async () => {
-      const file = createMockFile('SCHEMA.md', 'Projects');
+    test('Should never apply a template to a flat-form .schema.yaml', async () => {
+      const file = createMockFile('.schema.yaml', 'Projects');
+      file.extension = 'yaml';
+      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue('');
+
+      await handleFileCreation(file);
+
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+    });
+
+    test('Should never apply a template to anything under a .schema/ directory', async () => {
+      const file = createMockFile('schema.yaml', 'Projects/.schema');
+      file.extension = 'yaml';
+      file.path = 'Projects/.schema/schema.yaml';
+      (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
+      (mockVault.read as jest.Mock).mockResolvedValue('');
+
+      await handleFileCreation(file);
+
+      expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
+    });
+
+    test('Should never apply a template to a bundled .md template inside .schema/', async () => {
+      const file = createMockFile('web.md', 'Projects/.schema');
+      file.path = 'Projects/.schema/web.md';
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
       (mockVault.read as jest.Mock).mockResolvedValue('');
 
@@ -238,12 +261,13 @@ describe('FileCreationHandler', () => {
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });
 
-    test('Should not template a SCHEMA.md when it is moved into a new folder', async () => {
-      const file = createMockFile('SCHEMA.md', 'Projects');
+    test('Should not template a .schema.yaml when it is moved into a new folder', async () => {
+      const file = createMockFile('.schema.yaml', 'Projects');
+      file.extension = 'yaml';
       (mockVault.getAbstractFileByPath as jest.Mock).mockReturnValue(file);
       (mockVault.read as jest.Mock).mockResolvedValue('');
 
-      await handleFileMove(file, 'Other/SCHEMA.md');
+      await handleFileMove(file, 'Other/.schema.yaml');
 
       expect(mockTemplateApplicator.applyTemplate).not.toHaveBeenCalled();
     });

@@ -61,8 +61,7 @@ describe('SnowflakeCommands', () => {
 
     settings = {
       dateFormat: 'YYYY-MM-DD',
-      timeFormat: 'HH:mm',
-      globalExcludePatterns: []
+      timeFormat: 'HH:mm'
     };
 
     commands = new SnowflakeCommands(mockPlugin, settings);

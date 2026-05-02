@@ -17,7 +17,7 @@ import { TFile } from 'obsidian';
 import type { TAbstractFile, Vault, Plugin, EventRef } from 'obsidian';
 import { isMarkdownFile } from './types';
 import type { SnowflakeSettings, CommandContext, ErrorContext, MarkdownFile } from './types';
-import { SCHEMA_FILE_NAME } from './constants';
+import { SCHEMA_FILE_NAME, SCHEMA_FOLDER_NAME } from './constants';
 import { TemplateApplicator } from './template-applicator';
 import { ErrorHandler } from './error-handler';
 
@@ -108,8 +108,10 @@ export class FileCreationHandler {
       return;
     }
 
-    // SCHEMA.md files are templates themselves; never apply a template to one.
-    if (file.name === SCHEMA_FILE_NAME) {
+    // Schema files (flat or folder form) declare templating; never apply a
+    // template to one. Also skip anything inside a `.schema/` directory so
+    // template `.md` files bundled there never get auto-templated.
+    if (isSchemaArtifact(file.path)) {
       return;
     }
 
@@ -212,6 +214,23 @@ export class FileCreationHandler {
   private getProcessingCount(): number {
     return this.processingQueue.size;
   }
+}
+
+/**
+ * Returns true for any file that belongs to the schema layer:
+ *   - the flat-form schema file (`.schema.yaml` at any depth)
+ *   - any file under a `.schema/` directory (folder-form schema + bundled
+ *     template `.md` files)
+ */
+function isSchemaArtifact(path: string): boolean {
+  const segments = path.split('/');
+  const fileName = segments[segments.length - 1];
+  if (fileName === SCHEMA_FILE_NAME) return true;
+  // Drop the filename so a file literally named `.schema` doesn't count.
+  for (let i = 0; i < segments.length - 1; i++) {
+    if (segments[i] === SCHEMA_FOLDER_NAME) return true;
+  }
+  return false;
 }
 
 /**

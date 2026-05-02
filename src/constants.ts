@@ -6,14 +6,22 @@ import type { SnowflakeSettings } from './types';
 
 export const DEFAULT_SETTINGS: SnowflakeSettings = {
   dateFormat: 'YYYY-MM-DD',
-  timeFormat: 'HH:mm',
-  globalExcludePatterns: []
+  timeFormat: 'HH:mm'
 };
 
 /**
- * The conventional filename used to declare a folder as Snowflake-managed.
+ * Filenames the plugin recognizes for declaring a folder as Snowflake-managed.
+ *
+ * Two equivalent forms:
+ *   1. Flat:   <dir>/.schema.yaml
+ *   2. Folder: <dir>/.schema/schema.yaml
+ *
+ * The folder form lets a schema bundle its own template `.md` files privately
+ * inside the `.schema/` directory.
  */
-export const SCHEMA_FILE_NAME = 'SCHEMA.md';
+export const SCHEMA_FILE_NAME = '.schema.yaml';
+export const SCHEMA_FOLDER_NAME = '.schema';
+export const SCHEMA_FOLDER_FILE_NAME = 'schema.yaml';
 
 export const ID_CONFIG = {
   length: 10,

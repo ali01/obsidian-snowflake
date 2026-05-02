@@ -1,8 +1,9 @@
 /**
  * Snowflake Plugin for Obsidian
  *
- * Applies SCHEMA.md templates to new notes by walking the folder hierarchy
- * root → leaf and collecting every ancestor folder's SCHEMA.md (if any).
+ * Applies templates to new notes by walking the folder hierarchy root → leaf
+ * and consulting each ancestor folder's `.schema.yaml` (or
+ * `.schema/schema.yaml`) for routing rules.
  *
  * Author: Ali Yahya
  */
@@ -86,9 +87,6 @@ export default class SnowflakePlugin extends Plugin {
     }
     if (typeof this.settings.timeFormat !== 'string' || this.settings.timeFormat.trim() === '') {
       this.settings.timeFormat = 'HH:mm';
-    }
-    if (!Array.isArray(this.settings.globalExcludePatterns)) {
-      this.settings.globalExcludePatterns = [];
     }
   }
 }

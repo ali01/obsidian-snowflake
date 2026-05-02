@@ -33,6 +33,14 @@ interface ApplyResult {
   hadSnowflakeId?: boolean;
 }
 
+function describeChainItem(item: TemplateChainItem): string {
+  if (!item.resolvedTemplate) return item.schemaPath;
+  const t = item.resolvedTemplate.template;
+  const target = typeof t === 'string' ? t : '<inline>';
+  if (target === item.schemaPath) return item.schemaPath;
+  return `${item.schemaPath} → ${target}`;
+}
+
 /**
  * TemplateApplicator: Orchestrates the template application process
  *
@@ -48,7 +56,7 @@ export class TemplateApplicator {
 
   constructor(vault: Vault, settings: SnowflakeSettings) {
     this.vault = vault;
-    this.loader = new TemplateLoader(vault, settings);
+    this.loader = new TemplateLoader(vault);
     this.variableProcessor = new TemplateVariableProcessor(
       settings.dateFormat,
       settings.timeFormat
@@ -72,10 +80,10 @@ export class TemplateApplicator {
     context: CommandContext = { isManualCommand: false },
     editor?: Editor
   ): Promise<ApplyResult> {
-    // Get the SCHEMA.md chain for the file's location
-    const chain = this.loader.getTemplateChain(file);
+    // Build the schema chain for the file's location
+    const chain = await this.loader.getTemplateChain(file);
     if (chain.templates.length === 0) {
-      return { success: false, message: 'No SCHEMA.md found for this location' };
+      return { success: false, message: 'No schema found for this location' };
     }
 
     // Load all templates in chain
@@ -100,7 +108,7 @@ export class TemplateApplicator {
     );
 
     if (result.success && context.isBatchOperation !== true) {
-      const templateNames = loadedChain.templates.map((t) => t.path).join(' → ');
+      const templateNames = loadedChain.templates.map((t) => describeChainItem(t)).join(' / ');
       console.info(`Snowflake: Template(s) "${templateNames}" applied to ${file.path}`);
     }
 
@@ -328,7 +336,6 @@ export class TemplateApplicator {
    * @param settings - New settings
    */
   public updateSettings(settings: SnowflakeSettings): void {
-    this.loader.updateSettings(settings);
     this.variableProcessor.setDateFormat(settings.dateFormat);
     this.variableProcessor.setTimeFormat(settings.timeFormat);
   }
@@ -473,5 +480,4 @@ export class TemplateApplicator {
       }
     }
   }
-
 }
