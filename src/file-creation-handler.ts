@@ -17,7 +17,7 @@ import { TFile } from 'obsidian';
 import type { TAbstractFile, Vault, Plugin, EventRef } from 'obsidian';
 import { isMarkdownFile } from './types';
 import type { SnowflakeSettings, CommandContext, ErrorContext, MarkdownFile } from './types';
-import { SCHEMA_FILE_NAME, SCHEMA_FOLDER_NAME } from './constants';
+import { SCHEMA_FILE_NAME, SCHEMA_MD_FILE_NAME, SCHEMA_FOLDER_NAME } from './constants';
 import { TemplateApplicator } from './template-applicator';
 import { ErrorHandler } from './error-handler';
 
@@ -153,7 +153,7 @@ export class FileCreationHandler {
 
     try {
       const context: CommandContext = { isManualCommand: false };
-      await this.templateApplicator.applyTemplate(file as MarkdownFile, context);
+      await this.templateApplicator.applyTemplate(file, context);
     } catch (error) {
       const errorContext: ErrorContext = {
         operation: 'apply_template',
@@ -226,6 +226,7 @@ function isSchemaArtifact(path: string): boolean {
   const segments = path.split('/');
   const fileName = segments[segments.length - 1];
   if (fileName === SCHEMA_FILE_NAME) return true;
+  if (fileName === SCHEMA_MD_FILE_NAME) return true;
   // Drop the filename so a file literally named `.schema` doesn't count.
   for (let i = 0; i < segments.length - 1; i++) {
     if (segments[i] === SCHEMA_FOLDER_NAME) return true;

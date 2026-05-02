@@ -10,14 +10,14 @@ inherit from ancestor schemas.
 1. Pick a folder you want Snowflake to manage.
 2. Create a `.schema.yaml` file at the root of that folder. Minimal example:
    ```yaml
-   default:
-     template:
-       frontmatter:
-         type: note
-         tags: [auto]
-       body: |
-         # {{title}}
-         Created {{date}}
+   rules:
+     - schema:
+         frontmatter:
+           type: note
+           tags: [auto]
+         body: |
+           # {{title}}
+           Created {{date}}
    ```
 3. Create a new note in that folder. Snowflake applies the template
    automatically.
@@ -28,7 +28,7 @@ inherit from ancestor schemas.
 
 ## Schema Format
 
-A schema can declare three top-level fields, all optional:
+A schema can declare two top-level fields, both optional:
 
 ```yaml
 exclude:
@@ -36,18 +36,16 @@ exclude:
   - Archive/
   - "**/*.tmp"
 
-default:
-  template: ./_templates/note.md
-
 rules:
   - match: "Web/**"
-    template: ./_templates/web.md
+    schema: ./_templates/web.md
   - match: "**/quick-*.md"
-    template:
+    schema:
       frontmatter:
         type: quick
       body: "# {{title}}"
     frontmatter-delete: [scratch_only]
+  - schema: ./_templates/note.md   # catch-all (no `match:`)
 ```
 
 ### `exclude`
@@ -68,44 +66,42 @@ the schema's folder using gitignore-style semantics:
 This replaces the old plugin-wide "global exclude patterns" setting. To
 exclude vault-wide, put an `exclude:` list in a vault-root `.schema.yaml`.
 
-### `default`
-
-The template to use when no `rules` entry matches.
-
 ### `rules`
 
 An ordered list. Each rule has:
 
-- `match` — a glob pattern (`*`, `**`, `?` supported), evaluated relative to
-  the schema's folder. **First match wins.**
-- `template` — either an inline template (object with optional `frontmatter`
+- `match` — optional glob pattern (`*`, `**`, `?` supported), evaluated
+  relative to the schema's folder. **First match wins.** A rule with no
+  `match:` is the catch-all and matches every file; any rule after it is
+  unreachable (the parser warns).
+- `schema` — either an inline schema (object with optional `frontmatter`
   and `body`) or a path to a `.md` template file (string).
 - `frontmatter-delete` — optional list of property names to exclude from
-  inherited frontmatter when this rule's template is merged.
+  inherited frontmatter when this rule's schema is merged.
 
-If no rule matches, `default:` is used. If neither is set, the schema
-contributes nothing — but the inheritance walk continues through ancestors.
+If no rule matches and there is no catch-all, the schema contributes nothing
+— but the inheritance walk continues through ancestors.
 
-### Inline vs external templates
+### Inline vs external schemas
 
-A `template:` value may be either inline:
+A `schema:` value may be either inline:
 
 ```yaml
-default:
-  template:
-    frontmatter:
-      type: note
-      tags: [auto]
-    body: |
-      # {{title}}
-      Created {{date}}
+rules:
+  - schema:
+      frontmatter:
+        type: note
+        tags: [auto]
+      body: |
+        # {{title}}
+        Created {{date}}
 ```
 
-…or an external `.md` file:
+…or a path to an external `.md` template file:
 
 ```yaml
-default:
-  template: ./_templates/note.md
+rules:
+  - schema: ./_templates/note.md
 ```
 
 Both forms support all variables (`{{title}}`, `{{date}}`, `{{time}}`,
@@ -119,12 +115,26 @@ Both forms support all variables (`{{title}}`, `{{date}}`, `{{time}}`,
 - A leading `/` means vault-absolute (`/Templates/note.md`).
 - Paths that escape the vault root are rejected.
 
-## Two equivalent schema locations
+## Three schema locations
 
-You can put the schema directly in the folder it governs, or bundle it in a
-`.schema/` subdirectory together with the template `.md` files it references.
+A folder can declare its schema in any of three forms; precedence runs
+folder > flat YAML > markdown when more than one is present (a console
+warning is emitted on conflict).
 
-**Flat form:**
+**Markdown shorthand (`.schema.md`):**
+```
+Projects/
+├── .schema.md           # the file's frontmatter + body IS the catch-all template
+├── note-1.md
+└── note-2.md
+```
+
+The simplest form, and the most common case: a single template applied to
+every new note in the folder. The whole `.schema.md` file (frontmatter + body)
+is the template — no `rules:`, `exclude:`, or `frontmatter-delete:`. Use a
+`.yaml` form below when you need any of those.
+
+**Flat YAML (`.schema.yaml`):**
 ```
 Projects/
 ├── .schema.yaml
@@ -132,7 +142,7 @@ Projects/
 └── note-2.md
 ```
 
-**Folder form:**
+**Folder form (`.schema/schema.yaml`):**
 ```
 Projects/
 ├── .schema/
@@ -143,9 +153,7 @@ Projects/
 ```
 
 In the folder form, `./web.md` in `schema.yaml` resolves inside `.schema/`,
-so templates can be co-located with the schema that references them. The
-folder form wins if both forms exist in the same directory (a console
-warning is emitted).
+so templates can be co-located with the schema that references them.
 
 ## Template Inheritance
 
@@ -167,13 +175,13 @@ ancestor values; arrays (e.g. `tags:`) concatenate; bodies append.
 Use a rule's `frontmatter-delete` list to drop inherited keys at that level:
 
 ```yaml
-default:
-  template: ./project.md
-  frontmatter-delete: [legacy_field]
+rules:
+  - schema: ./project.md
+    frontmatter-delete: [legacy_field]
 ```
 
-Per-rule and per-`default`-block only. There is no top-level
-`frontmatter-delete` — repeat it across rules if you need it everywhere.
+Per-rule only. There is no top-level `frontmatter-delete` — repeat it across
+rules if you need it everywhere.
 
 ## Variables
 
@@ -207,24 +215,24 @@ schema and template. The new format separates routing (schema) from content
 Manual migration:
 
 1. Rename each `SCHEMA.md` to `.schema.yaml`.
-2. Wrap its frontmatter and body inside a `default: template:` block:
+2. Wrap its frontmatter and body inside a single catch-all `rules:` entry:
    ```yaml
-   default:
-     template:
-       frontmatter:
-         type: note
-       body: |
-         # {{title}}
+   rules:
+     - schema:
+         frontmatter:
+           type: note
+         body: |
+           # {{title}}
    ```
    Or move the body+frontmatter into a sibling `.md` file and reference it:
    ```yaml
-   default:
-     template: ./note.md
+   rules:
+     - schema: ./note.md
    ```
 3. If the old file had `delete: [...]` in its frontmatter, move it up to
-   `default.frontmatter-delete:` (or per-rule `frontmatter-delete:`). The
-   `delete:` key inside template frontmatter is no longer the canonical
-   location; using `frontmatter-delete` keeps template `.md` files clean.
+   the rule's `frontmatter-delete:` list. The `delete:` key inside template
+   frontmatter is no longer the canonical location; using `frontmatter-delete`
+   keeps template `.md` files clean.
 4. If you used the old "global exclude patterns" setting, port those
    patterns to an `exclude:` list in a vault-root `.schema.yaml`.
 
@@ -250,7 +258,7 @@ src/
 ├── template-loader.ts         # walks the schema chain & materializes templates
 ├── schema-locator.ts          # finds .schema.yaml or .schema/schema.yaml
 ├── schema-parser.ts           # validates and parses schema YAML
-├── schema-resolver.ts         # picks a template via rule + default fallthrough
+├── schema-resolver.ts         # picks a template via first-match-wins (catch-all = no `match:`)
 ├── frontmatter-merger.ts      # YAML frontmatter merge engine
 ├── pattern-matcher.ts         # glob → regex
 ├── template-variables.ts      # {{title}} / {{date}} / {{time}} / {{snowflake_id}}

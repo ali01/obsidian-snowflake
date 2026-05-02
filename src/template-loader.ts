@@ -11,7 +11,6 @@
  * existing merge engine in `template-applicator.ts` unchanged.
  */
 
-import { TFile } from 'obsidian';
 import type { Vault } from 'obsidian';
 import { dump as dumpYaml } from 'js-yaml';
 import type {
@@ -20,7 +19,7 @@ import type {
   TemplateChain,
   TemplateChainItem,
   ResolvedTemplate,
-  InlineTemplate
+  InlineSchema
 } from './types';
 import { findSchemaFile } from './schema-locator';
 import { parseSchema } from './schema-parser';
@@ -39,12 +38,15 @@ export class TemplateLoader {
 
   public async loadTemplate(templatePath: string): Promise<string | null> {
     try {
-      const templateFile = this.vault.getAbstractFileByPath(templatePath);
-      if (!templateFile || !(templateFile instanceof TFile)) {
+      // Use the adapter rather than the indexed vault tree: schema files and
+      // any template files bundled inside `.schema/` are dotfile paths that
+      // `vault.getAbstractFileByPath` does not expose.
+      const exists = await this.vault.adapter.exists(templatePath);
+      if (!exists) {
         console.warn(`Template not found: ${templatePath}`);
         return null;
       }
-      return await this.vault.read(templateFile);
+      return await this.vault.adapter.read(templatePath);
     } catch (error) {
       const errorContext: ErrorContext = {
         operation: 'load_template',
@@ -72,8 +74,22 @@ export class TemplateLoader {
 
     for (let i = 0; i < folderPaths.length; i++) {
       const folderPath = folderPaths[i];
-      const location = findSchemaFile(this.vault, folderPath);
+      const location = await findSchemaFile(this.vault, folderPath);
       if (!location) continue;
+
+      // `.schema.md` shorthand: the file itself is the catch-all template.
+      // Skip YAML parsing and synthesize a single-rule chain item that
+      // points at the markdown file as a vault-absolute external template.
+      if (location.kind === 'markdown') {
+        templates.push({
+          schemaPath: location.schemaPath,
+          folderPath: location.matchAnchor,
+          templateAnchor: location.templateAnchor,
+          depth: i,
+          resolvedTemplate: { schema: '/' + location.schemaPath }
+        });
+        continue;
+      }
 
       const yamlText = await this.loadTemplate(location.schemaPath);
       if (yamlText === null) continue;
@@ -163,10 +179,10 @@ export class TemplateLoader {
   ): Promise<string | null> {
     const fmDelete = resolved.frontmatterDelete;
 
-    if (typeof resolved.template === 'string') {
-      const path = resolveTemplatePath(resolved.template, templateAnchor);
+    if (typeof resolved.schema === 'string') {
+      const path = resolveTemplatePath(resolved.schema, templateAnchor);
       if (path === null) {
-        console.warn(`Snowflake: template path escapes the vault: ${resolved.template}`);
+        console.warn(`Snowflake: template path escapes the vault: ${resolved.schema}`);
         return null;
       }
       const content = await this.loadTemplate(path);
@@ -174,7 +190,7 @@ export class TemplateLoader {
       return fmDelete ? injectDeleteList(content, fmDelete) : content;
     }
 
-    return serializeInlineTemplate(resolved.template, fmDelete);
+    return serializeInlineSchema(resolved.schema, fmDelete);
   }
 }
 
@@ -219,17 +235,17 @@ function resolveTemplatePath(ref: string, templateAnchor: string): string | null
   return segments.join('/');
 }
 
-function serializeInlineTemplate(
-  template: InlineTemplate,
+function serializeInlineSchema(
+  schema: InlineSchema,
   frontmatterDelete: string[] | undefined
 ): string {
-  const fmObj: Record<string, unknown> = { ...(template.frontmatter ?? {}) };
+  const fmObj: Record<string, unknown> = { ...(schema.frontmatter ?? {}) };
   if (frontmatterDelete && frontmatterDelete.length > 0) {
     fmObj['delete'] = frontmatterDelete;
   }
 
   const fmKeys = Object.keys(fmObj);
-  const body = template.body ?? '';
+  const body = schema.body ?? '';
 
   if (fmKeys.length === 0) {
     return body;
@@ -257,7 +273,7 @@ function quoteYamlScalar(name: string): string {
 }
 
 function describeResolved(r: ResolvedTemplate): string {
-  return typeof r.template === 'string' ? r.template : '<inline template>';
+  return typeof r.schema === 'string' ? r.schema : '<inline schema>';
 }
 
 /**
@@ -266,10 +282,10 @@ function describeResolved(r: ResolvedTemplate): string {
 export const TemplateLoaderTestUtils = {
   resolveTemplatePath: (ref: string, templateAnchor: string): string | null =>
     resolveTemplatePath(ref, templateAnchor),
-  serializeInlineTemplate: (
-    template: InlineTemplate,
+  serializeInlineSchema: (
+    schema: InlineSchema,
     frontmatterDelete: string[] | undefined
-  ): string => serializeInlineTemplate(template, frontmatterDelete),
+  ): string => serializeInlineSchema(schema, frontmatterDelete),
   injectDeleteList: (content: string, deleteList: string[]): string =>
     injectDeleteList(content, deleteList),
   relativeTo: (filePath: string, anchor: string): string => relativeTo(filePath, anchor)

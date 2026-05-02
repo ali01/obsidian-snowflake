@@ -20,44 +20,45 @@ describe('parseSchema', () => {
     expect(parseSchema('   \n  ')).toEqual({});
   });
 
-  test('Parses a simple default-only schema with external template', () => {
+  test('Parses a single catch-all rule with external schema', () => {
     const yaml = `
-default:
-  template: ./note.md
+rules:
+  - schema: ./note.md
 `;
     expect(parseSchema(yaml)).toEqual({
-      default: { template: './note.md' }
+      rules: [{ schema: './note.md' }]
     });
   });
 
-  test('Parses an inline default template', () => {
+  test('Parses a single catch-all rule with inline schema', () => {
     const yaml = `
-default:
-  template:
-    frontmatter:
-      type: note
-      tags: [a, b]
-    body: |
-      # {{title}}
+rules:
+  - schema:
+      frontmatter:
+        type: note
+        tags: [a, b]
+      body: |
+        # {{title}}
 `;
-    const result = parseSchema(yaml);
-    expect(result).toEqual({
-      default: {
-        template: {
-          frontmatter: { type: 'note', tags: ['a', 'b'] },
-          body: '# {{title}}\n'
+    expect(parseSchema(yaml)).toEqual({
+      rules: [
+        {
+          schema: {
+            frontmatter: { type: 'note', tags: ['a', 'b'] },
+            body: '# {{title}}\n'
+          }
         }
-      }
+      ]
     });
   });
 
-  test('Parses rules with mixed inline and external templates', () => {
+  test('Parses rules with mixed inline and external schemas', () => {
     const yaml = `
 rules:
   - match: "Web/**"
-    template: ./web.md
+    schema: ./web.md
   - match: "**/quick-*.md"
-    template:
+    schema:
       frontmatter:
         type: quick
       body: "# {{title}}"
@@ -65,12 +66,27 @@ rules:
 `;
     expect(parseSchema(yaml)).toEqual({
       rules: [
-        { match: 'Web/**', template: './web.md' },
+        { match: 'Web/**', schema: './web.md' },
         {
           match: '**/quick-*.md',
-          template: { frontmatter: { type: 'quick' }, body: '# {{title}}' },
+          schema: { frontmatter: { type: 'quick' }, body: '# {{title}}' },
           'frontmatter-delete': ['scratch']
         }
+      ]
+    });
+  });
+
+  test('Parses matched rules followed by a catch-all rule', () => {
+    const yaml = `
+rules:
+  - match: "Web/**"
+    schema: ./web.md
+  - schema: ./note.md
+`;
+    expect(parseSchema(yaml)).toEqual({
+      rules: [
+        { match: 'Web/**', schema: './web.md' },
+        { schema: './note.md' }
       ]
     });
   });
@@ -81,12 +97,12 @@ exclude:
   - MEETINGS.md
   - Archive/
   - "**/*.tmp"
-default:
-  template: ./note.md
+rules:
+  - schema: ./note.md
 `;
     expect(parseSchema(yaml)).toEqual({
       exclude: ['MEETINGS.md', 'Archive/', '**/*.tmp'],
-      default: { template: './note.md' }
+      rules: [{ schema: './note.md' }]
     });
   });
 
@@ -99,6 +115,18 @@ exclude:
   - "second"
 `;
     expect(parseSchema(yaml)).toEqual({ exclude: ['first', 'second'] });
+  });
+
+  test('Warns when a rule appears after a catch-all', () => {
+    const yaml = `
+rules:
+  - schema: ./note.md
+  - match: "Web/**"
+    schema: ./web.md
+`;
+    const result = parseSchema(yaml);
+    expect(result?.rules).toHaveLength(2);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unreachable'));
   });
 
   test('Returns null and warns on malformed YAML', () => {
@@ -117,69 +145,61 @@ exclude:
     expect(warnSpy).toHaveBeenCalled();
   });
 
-  test('Rejects a rule missing match', () => {
-    expect(
-      parseSchema(`
-rules:
-  - template: ./web.md
-`)
-    ).toBeNull();
-  });
-
   test('Rejects a rule with empty match', () => {
     expect(
       parseSchema(`
 rules:
   - match: ""
-    template: ./web.md
+    schema: ./web.md
 `)
     ).toBeNull();
   });
 
-  test('Rejects a template block missing template', () => {
+  test('Rejects a rule missing schema', () => {
     expect(
       parseSchema(`
-default:
-  frontmatter-delete: [foo]
+rules:
+  - match: "**"
+    frontmatter-delete: [foo]
 `)
     ).toBeNull();
   });
 
-  test('Rejects a template that is neither string nor mapping', () => {
+  test('Rejects a schema value that is neither string nor mapping', () => {
     expect(
       parseSchema(`
-default:
-  template: 42
+rules:
+  - schema: 42
 `)
     ).toBeNull();
   });
 
-  test('Rejects an inline template with non-mapping frontmatter', () => {
+  test('Rejects an inline schema with non-mapping frontmatter', () => {
     expect(
       parseSchema(`
-default:
-  template:
-    frontmatter: [a, b]
-    body: ""
+rules:
+  - schema:
+      frontmatter: [a, b]
+      body: ""
 `)
     ).toBeNull();
   });
 
-  test('Rejects an inline template with non-string body', () => {
+  test('Rejects an inline schema with non-string body', () => {
     expect(
       parseSchema(`
-default:
-  template:
-    body: 42
+rules:
+  - schema:
+      body: 42
 `)
     ).toBeNull();
   });
 
-  test('Rejects empty external template path', () => {
+  test('Rejects empty external schema path', () => {
     expect(
       parseSchema(`
-default:
-  template: ""
+rules:
+  - schema: ""
 `)
     ).toBeNull();
   });
@@ -187,9 +207,9 @@ default:
   test('Rejects frontmatter-delete that is not a list', () => {
     expect(
       parseSchema(`
-default:
-  template: ./note.md
-  frontmatter-delete: "foo"
+rules:
+  - schema: ./note.md
+    frontmatter-delete: "foo"
 `)
     ).toBeNull();
   });
@@ -197,9 +217,9 @@ default:
   test('Rejects frontmatter-delete entries that are not strings', () => {
     expect(
       parseSchema(`
-default:
-  template: ./note.md
-  frontmatter-delete: [foo, 1]
+rules:
+  - schema: ./note.md
+    frontmatter-delete: [foo, 1]
 `)
     ).toBeNull();
   });

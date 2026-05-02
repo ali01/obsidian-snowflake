@@ -76,46 +76,41 @@ export interface SettingsUpdateContext {
 }
 
 /**
- * InlineTemplate: a template defined directly inside a `.schema.yaml`.
+ * InlineSchema: a schema defined directly inside a rule.
  *
  * Either `frontmatter` or `body` (or both) may be omitted. When materialized
  * it produces a standard `---\nfrontmatter\n---\nbody` content string for the
  * downstream merge engine.
  */
-export interface InlineTemplate {
+export interface InlineSchema {
   frontmatter?: Record<string, unknown>;
   body?: string;
 }
 
 /**
- * SchemaTemplateBlock: shared shape of `default:` and each entry in `rules:`.
+ * SchemaRule: one ordered entry inside a `.schema.yaml`'s `rules:` list.
  *
- * `template` is either an external `.md` file path (string) or an inline
- * template object. `frontmatter-delete` lists property names to exclude from
- * the inherited frontmatter when this template is merged into the chain.
+ * `schema` is either an external `.md` template path (string) or an inline
+ * schema object. `frontmatter-delete` lists property names to exclude from
+ * the inherited frontmatter when this rule's schema is merged into the chain.
+ * `match` is optional — a rule with no `match:` is the catch-all and matches
+ * every file. Any rule appearing after a catch-all is unreachable.
  */
-export interface SchemaTemplateBlock {
-  template: InlineTemplate | string;
+export interface SchemaRule {
+  match?: string;
+  schema: InlineSchema | string;
   'frontmatter-delete'?: string[];
-}
-
-/**
- * SchemaRule: one ordered rule inside a `.schema.yaml`'s `rules:` list.
- */
-export interface SchemaRule extends SchemaTemplateBlock {
-  match: string;
 }
 
 /**
  * SchemaConfig: parsed shape of a `.schema.yaml` file.
  *
- * All fields are optional. A schema with no `default` and no matching `rules`
- * contributes nothing (the chain walk continues through ancestors). A
- * non-empty `exclude` short-circuits the chain entirely for matching files.
+ * All fields are optional. A schema with no matching `rules` contributes
+ * nothing (the chain walk continues through ancestors). A non-empty
+ * `exclude` short-circuits the chain entirely for matching files.
  */
 export interface SchemaConfig {
   exclude?: string[];
-  default?: SchemaTemplateBlock;
   rules?: SchemaRule[];
 }
 
@@ -124,7 +119,7 @@ export interface SchemaConfig {
  * SchemaConfig and a file's path-relative-to-schema-folder.
  */
 export interface ResolvedTemplate {
-  template: InlineTemplate | string;
+  schema: InlineSchema | string;
   frontmatterDelete?: string[];
 }
 

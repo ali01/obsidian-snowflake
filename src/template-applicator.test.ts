@@ -164,6 +164,23 @@ describe('TemplateApplicator', () => {
       }
     } as MarkdownFile;
 
+    test('Refuses to apply schemas to non-markdown files', async () => {
+      const nonMd = {
+        basename: 'image',
+        extension: 'png',
+        path: 'Projects/image.png',
+        name: 'image.png',
+        parent: { path: 'Projects' },
+        vault: {} as any,
+        stat: { ctime: 0, mtime: 0, size: 0 }
+      } as unknown as MarkdownFile;
+
+      const result = await applicator.applyTemplate(nonMd);
+      expect(result.success).toBe(false);
+      expect(result.message).toContain('markdown files');
+      expect(mockVault.modify).not.toHaveBeenCalled();
+    });
+
     test('REQ-006: Should merge template with existing content', async () => {
       // Existing content in file
       const existingContent = `---

@@ -11,7 +11,8 @@
  */
 
 // import { Notice } from 'obsidian';
-import type { Vault, Editor } from 'obsidian';
+import type { Vault, Editor, TFile } from 'obsidian';
+import { isMarkdownFile } from './types';
 import type {
   MarkdownFile,
   SnowflakeSettings,
@@ -35,7 +36,7 @@ interface ApplyResult {
 
 function describeChainItem(item: TemplateChainItem): string {
   if (!item.resolvedTemplate) return item.schemaPath;
-  const t = item.resolvedTemplate.template;
+  const t = item.resolvedTemplate.schema;
   const target = typeof t === 'string' ? t : '<inline>';
   if (target === item.schemaPath) return item.schemaPath;
   return `${item.schemaPath} → ${target}`;
@@ -76,10 +77,16 @@ export class TemplateApplicator {
    * @returns Application result
    */
   public async applyTemplate(
-    file: MarkdownFile,
+    file: TFile,
     context: CommandContext = { isManualCommand: false },
     editor?: Editor
   ): Promise<ApplyResult> {
+    // The single source of truth: Snowflake never touches non-markdown files.
+    // Every entry point converges here, so this guard is the central contract.
+    if (!isMarkdownFile(file)) {
+      return { success: false, message: 'Snowflake only applies schemas to markdown files.' };
+    }
+
     // Build the schema chain for the file's location
     const chain = await this.loader.getTemplateChain(file);
     if (chain.templates.length === 0) {

@@ -176,7 +176,7 @@ export class SnowflakeCommands {
     return Promise.all(
       batch.map((file) =>
         this.templateApplicator
-          .applyTemplate(file as MarkdownFile, context)
+          .applyTemplate(file, context)
           .then((result) => (result.success ? 1 : 0))
           .catch((error: unknown) => {
             const errorContext: ErrorContext = {

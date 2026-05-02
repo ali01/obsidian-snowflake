@@ -34,8 +34,17 @@ jest.mock('obsidian', () => {
   };
 });
 
-class MockVault implements Partial<Vault> {
+class MockVault {
   private files: Map<string, { content: string; file: TFile }> = new Map();
+
+  public adapter = {
+    exists: async (path: string): Promise<boolean> => this.files.has(path),
+    read: async (path: string): Promise<string> => {
+      const entry = this.files.get(path);
+      if (!entry) throw new Error('File not found');
+      return entry.content;
+    }
+  };
 
   public addFile(path: string, content = ''): void {
     const file = new TFile();
@@ -106,11 +115,11 @@ describe('TemplateLoader', () => {
       expect(chain.hasInheritance).toBe(false);
     });
 
-    test('Picks the default template when no rule matches', async () => {
+    test('Picks the catch-all template when no match-pattern fires', async () => {
       mockVault.addFile(
         'Projects/.schema.yaml',
-        `default:
-  template: ./project.md
+        `rules:
+  - schema: ./project.md
 `
       );
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
@@ -118,7 +127,7 @@ describe('TemplateLoader', () => {
       expect(chain.templates[0].schemaPath).toBe('Projects/.schema.yaml');
       expect(chain.templates[0].folderPath).toBe('Projects');
       expect(chain.templates[0].templateAnchor).toBe('Projects');
-      expect(chain.templates[0].resolvedTemplate.template).toBe('./project.md');
+      expect(chain.templates[0].resolvedTemplate.schema).toBe('./project.md');
     });
 
     test('Routes by first matching rule', async () => {
@@ -126,27 +135,26 @@ describe('TemplateLoader', () => {
         'Projects/.schema.yaml',
         `rules:
   - match: "Web/**"
-    template: ./web.md
+    schema: ./web.md
   - match: "Mobile/**"
-    template: ./mobile.md
-default:
-  template: ./project.md
+    schema: ./mobile.md
+  - schema: ./project.md
 `
       );
       const webChain = await loader.getTemplateChain(makeFile('Projects/Web/Frontend/note.md'));
-      expect(webChain.templates[0].resolvedTemplate.template).toBe('./web.md');
+      expect(webChain.templates[0].resolvedTemplate.schema).toBe('./web.md');
 
       const mobileChain = await loader.getTemplateChain(makeFile('Projects/Mobile/iOS/note.md'));
-      expect(mobileChain.templates[0].resolvedTemplate.template).toBe('./mobile.md');
+      expect(mobileChain.templates[0].resolvedTemplate.schema).toBe('./mobile.md');
 
       const fallbackChain = await loader.getTemplateChain(makeFile('Projects/Other/note.md'));
-      expect(fallbackChain.templates[0].resolvedTemplate.template).toBe('./project.md');
+      expect(fallbackChain.templates[0].resolvedTemplate.schema).toBe('./project.md');
     });
 
     test('Inherits from ancestor schemas root → leaf', async () => {
-      mockVault.addFile('.schema.yaml', `default:\n  template: ./root.md\n`);
-      mockVault.addFile('Projects/.schema.yaml', `default:\n  template: ./project.md\n`);
-      mockVault.addFile('Projects/Web/.schema.yaml', `default:\n  template: ./web.md\n`);
+      mockVault.addFile('.schema.yaml', `rules:\n  - schema: ./root.md\n`);
+      mockVault.addFile('Projects/.schema.yaml', `rules:\n  - schema: ./project.md\n`);
+      mockVault.addFile('Projects/Web/.schema.yaml', `rules:\n  - schema: ./web.md\n`);
 
       const chain = await loader.getTemplateChain(makeFile('Projects/Web/Frontend/note.md'));
       expect(chain.templates).toHaveLength(3);
@@ -155,13 +163,13 @@ default:
       expect(chain.templates.map((t) => t.folderPath)).toEqual(['', 'Projects', 'Projects/Web']);
     });
 
-    test('Schema with neither default nor matching rules contributes nothing', async () => {
-      mockVault.addFile('.schema.yaml', `default:\n  template: ./root.md\n`);
+    test('Schema with no matching rule contributes nothing', async () => {
+      mockVault.addFile('.schema.yaml', `rules:\n  - schema: ./root.md\n`);
       mockVault.addFile(
         'Projects/.schema.yaml',
         `rules:
   - match: "Special/**"
-    template: ./special.md
+    schema: ./special.md
 `
       );
 
@@ -171,14 +179,14 @@ default:
     });
 
     test('Hard exclude short-circuits the entire chain', async () => {
-      mockVault.addFile('.schema.yaml', `default:\n  template: ./root.md\n`);
+      mockVault.addFile('.schema.yaml', `rules:\n  - schema: ./root.md\n`);
       mockVault.addFile(
         'Projects/.schema.yaml',
         `exclude:
   - MEETINGS.md
   - Archive/
-default:
-  template: ./project.md
+rules:
+  - schema: ./project.md
 `
       );
 
@@ -198,13 +206,32 @@ default:
     });
 
     test('Folder form (.schema/schema.yaml) is preferred when both forms exist', async () => {
-      mockVault.addFile('Projects/.schema.yaml', `default:\n  template: ./flat.md\n`);
-      mockVault.addFile('Projects/.schema/schema.yaml', `default:\n  template: ./folder.md\n`);
+      mockVault.addFile('Projects/.schema.yaml', `rules:\n  - schema: ./flat.md\n`);
+      mockVault.addFile('Projects/.schema/schema.yaml', `rules:\n  - schema: ./folder.md\n`);
 
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
       expect(chain.templates).toHaveLength(1);
       expect(chain.templates[0].schemaPath).toBe('Projects/.schema/schema.yaml');
       expect(chain.templates[0].templateAnchor).toBe('Projects/.schema');
+    });
+
+    test('.schema.md shorthand applies the file itself as the catch-all template', async () => {
+      mockVault.addFile(
+        'Projects/.schema.md',
+        `---
+type: project
+---
+# {{title}}
+`
+      );
+      const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
+      expect(chain.templates).toHaveLength(1);
+      expect(chain.templates[0].schemaPath).toBe('Projects/.schema.md');
+      expect(chain.templates[0].resolvedTemplate.schema).toBe('/Projects/.schema.md');
+
+      const loaded = await loader.loadTemplateChain(chain);
+      expect(loaded.templates[0].content).toContain('type: project');
+      expect(loaded.templates[0].content).toContain('# {{title}}');
     });
 
     test('Malformed schema is skipped with a warning', async () => {
@@ -224,13 +251,13 @@ default:
     test('Materializes inline templates into frontmatter+body strings', async () => {
       mockVault.addFile(
         'Projects/.schema.yaml',
-        `default:
-  template:
-    frontmatter:
-      type: project
-      tags: [project]
-    body: |
-      # {{title}}
+        `rules:
+  - schema:
+      frontmatter:
+        type: project
+        tags: [project]
+      body: |
+        # {{title}}
 `
       );
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
@@ -246,7 +273,7 @@ default:
     });
 
     test('Loads external template content via path resolution', async () => {
-      mockVault.addFile('Projects/.schema.yaml', `default:\n  template: ./web.md\n`);
+      mockVault.addFile('Projects/.schema.yaml', `rules:\n  - schema: ./web.md\n`);
       mockVault.addFile(
         'Projects/web.md',
         `---
@@ -264,7 +291,7 @@ type: web
     });
 
     test('Resolves external paths relative to .schema/ when in folder form', async () => {
-      mockVault.addFile('Projects/.schema/schema.yaml', `default:\n  template: ./web.md\n`);
+      mockVault.addFile('Projects/.schema/schema.yaml', `rules:\n  - schema: ./web.md\n`);
       mockVault.addFile(
         'Projects/.schema/web.md',
         `---
@@ -283,11 +310,11 @@ body
     test('Injects rule frontmatter-delete as a delete: list', async () => {
       mockVault.addFile(
         'Projects/.schema.yaml',
-        `default:
-  template:
-    frontmatter:
-      type: project
-  frontmatter-delete: [legacy]
+        `rules:
+  - schema:
+      frontmatter:
+        type: project
+    frontmatter-delete: [legacy]
 `
       );
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
@@ -298,7 +325,7 @@ body
     });
 
     test('Skips chain items whose external template is missing', async () => {
-      mockVault.addFile('Projects/.schema.yaml', `default:\n  template: ./missing.md\n`);
+      mockVault.addFile('Projects/.schema.yaml', `rules:\n  - schema: ./missing.md\n`);
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
       const loaded = await loader.loadTemplateChain(chain);
       expect(loaded.templates).toHaveLength(0);
@@ -337,8 +364,8 @@ body
       expect(TemplateLoaderTestUtils.resolveTemplatePath('../../etc.md', 'A')).toBeNull();
     });
 
-    test('serializeInlineTemplate produces frontmatter+body', () => {
-      const out = TemplateLoaderTestUtils.serializeInlineTemplate(
+    test('serializeInlineSchema produces frontmatter+body', () => {
+      const out = TemplateLoaderTestUtils.serializeInlineSchema(
         { frontmatter: { type: 'note', tags: ['a'] }, body: '# Hello' },
         undefined
       );
@@ -347,8 +374,8 @@ body
       expect(out).toContain('# Hello');
     });
 
-    test('serializeInlineTemplate adds delete list when frontmatter-delete is set', () => {
-      const out = TemplateLoaderTestUtils.serializeInlineTemplate(
+    test('serializeInlineSchema adds delete list when frontmatter-delete is set', () => {
+      const out = TemplateLoaderTestUtils.serializeInlineSchema(
         { frontmatter: { type: 'note' } },
         ['legacy', 'old-field']
       );

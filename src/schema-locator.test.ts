@@ -3,20 +3,17 @@
  */
 
 import { findSchemaFile, _resetWarningCacheForTests } from './schema-locator';
-import { Vault, TFile } from 'obsidian';
+import type { Vault } from 'obsidian';
 
-class MockVault implements Partial<Vault> {
-  private files: Map<string, TFile> = new Map();
+class MockVault {
+  private files: Set<string> = new Set();
+
+  public adapter = {
+    exists: async (path: string): Promise<boolean> => this.files.has(path)
+  };
 
   addFile(path: string): void {
-    const file = new TFile();
-    file.path = path;
-    file.name = path.split('/').pop() ?? '';
-    this.files.set(path, file);
-  }
-
-  getAbstractFileByPath(path: string): TFile | null {
-    return this.files.get(path) ?? null;
+    this.files.add(path);
   }
 }
 
@@ -34,68 +31,109 @@ describe('findSchemaFile', () => {
     warnSpy.mockRestore();
   });
 
-  test('Returns null when no schema exists', () => {
-    expect(findSchemaFile(vault as unknown as Vault, 'Projects')).toBeNull();
+  test('Returns null when no schema exists', async () => {
+    expect(await findSchemaFile(vault as unknown as Vault, 'Projects')).toBeNull();
   });
 
-  test('Finds the flat form in a subfolder', () => {
+  test('Finds the flat YAML form in a subfolder', async () => {
     vault.addFile('Projects/.schema.yaml');
-    expect(findSchemaFile(vault as unknown as Vault, 'Projects')).toEqual({
+    expect(await findSchemaFile(vault as unknown as Vault, 'Projects')).toEqual({
       schemaPath: 'Projects/.schema.yaml',
+      kind: 'yaml',
       matchAnchor: 'Projects',
       templateAnchor: 'Projects'
     });
   });
 
-  test('Finds the flat form at the vault root', () => {
+  test('Finds the flat YAML form at the vault root', async () => {
     vault.addFile('.schema.yaml');
-    expect(findSchemaFile(vault as unknown as Vault, '')).toEqual({
+    expect(await findSchemaFile(vault as unknown as Vault, '')).toEqual({
       schemaPath: '.schema.yaml',
+      kind: 'yaml',
       matchAnchor: '',
       templateAnchor: ''
     });
   });
 
-  test('Finds the folder form in a subfolder', () => {
+  test('Finds the folder form in a subfolder', async () => {
     vault.addFile('Projects/.schema/schema.yaml');
-    expect(findSchemaFile(vault as unknown as Vault, 'Projects')).toEqual({
+    expect(await findSchemaFile(vault as unknown as Vault, 'Projects')).toEqual({
       schemaPath: 'Projects/.schema/schema.yaml',
+      kind: 'yaml',
       matchAnchor: 'Projects',
       templateAnchor: 'Projects/.schema'
     });
   });
 
-  test('Finds the folder form at the vault root', () => {
+  test('Finds the folder form at the vault root', async () => {
     vault.addFile('.schema/schema.yaml');
-    expect(findSchemaFile(vault as unknown as Vault, '')).toEqual({
+    expect(await findSchemaFile(vault as unknown as Vault, '')).toEqual({
       schemaPath: '.schema/schema.yaml',
+      kind: 'yaml',
       matchAnchor: '',
       templateAnchor: '.schema'
     });
   });
 
-  test('Folder form wins when both forms are present', () => {
+  test('Finds the markdown shorthand form in a subfolder', async () => {
+    vault.addFile('Projects/.schema.md');
+    expect(await findSchemaFile(vault as unknown as Vault, 'Projects')).toEqual({
+      schemaPath: 'Projects/.schema.md',
+      kind: 'markdown',
+      matchAnchor: 'Projects',
+      templateAnchor: 'Projects'
+    });
+  });
+
+  test('Finds the markdown shorthand form at the vault root', async () => {
+    vault.addFile('.schema.md');
+    expect(await findSchemaFile(vault as unknown as Vault, '')).toEqual({
+      schemaPath: '.schema.md',
+      kind: 'markdown',
+      matchAnchor: '',
+      templateAnchor: ''
+    });
+  });
+
+  test('Folder form wins over flat YAML when both are present', async () => {
     vault.addFile('Projects/.schema.yaml');
     vault.addFile('Projects/.schema/schema.yaml');
-    const result = findSchemaFile(vault as unknown as Vault, 'Projects');
+    const result = await findSchemaFile(vault as unknown as Vault, 'Projects');
     expect(result?.schemaPath).toBe('Projects/.schema/schema.yaml');
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect((warnSpy.mock.calls[0][0] as string).toLowerCase()).toContain('both');
   });
 
-  test('Conflict warning fires only once per directory', () => {
-    vault.addFile('A/.schema.yaml');
-    vault.addFile('A/.schema/schema.yaml');
-    findSchemaFile(vault as unknown as Vault, 'A');
-    findSchemaFile(vault as unknown as Vault, 'A');
-    findSchemaFile(vault as unknown as Vault, 'A');
+  test('Flat YAML wins over markdown when both are present', async () => {
+    vault.addFile('Projects/.schema.yaml');
+    vault.addFile('Projects/.schema.md');
+    const result = await findSchemaFile(vault as unknown as Vault, 'Projects');
+    expect(result?.schemaPath).toBe('Projects/.schema.yaml');
+    expect(result?.kind).toBe('yaml');
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
-  test('Treats `/` as the vault root', () => {
+  test('Folder form wins over markdown when both are present', async () => {
+    vault.addFile('Projects/.schema/schema.yaml');
+    vault.addFile('Projects/.schema.md');
+    const result = await findSchemaFile(vault as unknown as Vault, 'Projects');
+    expect(result?.schemaPath).toBe('Projects/.schema/schema.yaml');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('Conflict warning fires only once per directory', async () => {
+    vault.addFile('A/.schema.yaml');
+    vault.addFile('A/.schema/schema.yaml');
+    await findSchemaFile(vault as unknown as Vault, 'A');
+    await findSchemaFile(vault as unknown as Vault, 'A');
+    await findSchemaFile(vault as unknown as Vault, 'A');
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
+  test('Treats `/` as the vault root', async () => {
     vault.addFile('.schema.yaml');
-    expect(findSchemaFile(vault as unknown as Vault, '/')).toEqual({
+    expect(await findSchemaFile(vault as unknown as Vault, '/')).toEqual({
       schemaPath: '.schema.yaml',
+      kind: 'yaml',
       matchAnchor: '',
       templateAnchor: ''
     });

@@ -29,7 +29,7 @@ __export(main_exports, {
   default: () => SnowflakePlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian10 = require("obsidian");
+var import_obsidian8 = require("obsidian");
 
 // src/ui/settings-tab.ts
 var import_obsidian = require("obsidian");
@@ -135,6 +135,7 @@ var DEFAULT_SETTINGS = {
   timeFormat: "HH:mm"
 };
 var SCHEMA_FILE_NAME = ".schema.yaml";
+var SCHEMA_MD_FILE_NAME = ".schema.md";
 var SCHEMA_FOLDER_NAME = ".schema";
 var SCHEMA_FOLDER_FILE_NAME = "schema.yaml";
 var ID_CONFIG = {
@@ -180,15 +181,12 @@ function cleanSettings(settings) {
 }
 
 // src/file-creation-handler.ts
-var import_obsidian6 = require("obsidian");
+var import_obsidian4 = require("obsidian");
 
 // src/types.ts
 function isMarkdownFile(file) {
   return file.extension === "md";
 }
-
-// src/template-loader.ts
-var import_obsidian4 = require("obsidian");
 
 // node_modules/js-yaml/dist/js-yaml.mjs
 function isNothing(subject) {
@@ -2778,37 +2776,53 @@ var safeLoadAll = renamed("safeLoadAll", "loadAll");
 var safeDump = renamed("safeDump", "dump");
 
 // src/schema-locator.ts
-var import_obsidian2 = require("obsidian");
 var warnedConflicts = /* @__PURE__ */ new Set();
-function findSchemaFile(vault, folderPath) {
+async function findSchemaFile(vault, folderPath) {
   const dirPrefix = folderPath === "" || folderPath === "/" ? "" : folderPath + "/";
-  const flatPath = dirPrefix + SCHEMA_FILE_NAME;
   const folderFilePath = dirPrefix + SCHEMA_FOLDER_NAME + "/" + SCHEMA_FOLDER_FILE_NAME;
-  const flatFile = vault.getAbstractFileByPath(flatPath);
-  const folderFile = vault.getAbstractFileByPath(folderFilePath);
-  const flatExists = flatFile instanceof import_obsidian2.TFile;
-  const folderExists = folderFile instanceof import_obsidian2.TFile;
-  if (folderExists && flatExists) {
+  const flatPath = dirPrefix + SCHEMA_FILE_NAME;
+  const mdPath = dirPrefix + SCHEMA_MD_FILE_NAME;
+  const [folderExists, flatExists, mdExists] = await Promise.all([
+    vault.adapter.exists(folderFilePath),
+    vault.adapter.exists(flatPath),
+    vault.adapter.exists(mdPath)
+  ]);
+  const present = [];
+  if (folderExists) present.push(folderFilePath);
+  if (flatExists) present.push(flatPath);
+  if (mdExists) present.push(mdPath);
+  if (present.length > 1) {
     const key = folderPath || "/";
     if (!warnedConflicts.has(key)) {
       warnedConflicts.add(key);
       console.warn(
-        `Snowflake: both ${flatPath} and ${folderFilePath} exist; using the ${SCHEMA_FOLDER_NAME}/ form. Remove one to silence this warning.`
+        `Snowflake: multiple schema forms exist (${present.join(", ")}); using ${present[0]}. Remove the others to silence this warning.`
       );
     }
   }
+  const matchAnchor = folderPath === "/" ? "" : folderPath;
   if (folderExists) {
     return {
       schemaPath: folderFilePath,
-      matchAnchor: folderPath === "/" ? "" : folderPath,
+      kind: "yaml",
+      matchAnchor,
       templateAnchor: dirPrefix + SCHEMA_FOLDER_NAME
     };
   }
   if (flatExists) {
     return {
       schemaPath: flatPath,
-      matchAnchor: folderPath === "/" ? "" : folderPath,
-      templateAnchor: folderPath === "/" ? "" : folderPath
+      kind: "yaml",
+      matchAnchor,
+      templateAnchor: matchAnchor
+    };
+  }
+  if (mdExists) {
+    return {
+      schemaPath: mdPath,
+      kind: "markdown",
+      matchAnchor,
+      templateAnchor: matchAnchor
     };
   }
   return null;
@@ -2837,20 +2851,22 @@ function parseSchema(yamlText, schemaPath = "<schema>") {
     if (exclude === null) return null;
     if (exclude.length > 0) config.exclude = exclude;
   }
-  if ("default" in raw && raw.default !== void 0 && raw.default !== null) {
-    const block = parseTemplateBlock(raw.default, schemaPath, "default");
-    if (block === null) return null;
-    config.default = block;
-  }
   if ("rules" in raw && raw.rules !== void 0 && raw.rules !== null) {
     if (!Array.isArray(raw.rules)) {
       console.warn(`Snowflake: ${schemaPath}: \`rules\` must be a list.`);
       return null;
     }
     const rules = [];
+    let catchAllIndex = -1;
     for (let i = 0; i < raw.rules.length; i++) {
       const rule = parseRule(raw.rules[i], schemaPath, i);
       if (rule === null) return null;
+      if (catchAllIndex !== -1) {
+        console.warn(
+          `Snowflake: ${schemaPath}: rules[${String(i)}] is unreachable; rules[${String(catchAllIndex)}] is a catch-all (no \`match\`).`
+        );
+      }
+      if (rule.match === void 0) catchAllIndex = i;
       rules.push(rule);
     }
     if (rules.length > 0) config.rules = rules;
@@ -2862,43 +2878,39 @@ function parseRule(raw, schemaPath, index) {
     console.warn(`Snowflake: ${schemaPath}: rules[${String(index)}] must be a mapping.`);
     return null;
   }
-  if (typeof raw.match !== "string" || raw.match.trim() === "") {
-    console.warn(
-      `Snowflake: ${schemaPath}: rules[${String(index)}] is missing a non-empty \`match\`.`
-    );
+  let match;
+  if ("match" in raw && raw.match !== void 0 && raw.match !== null) {
+    if (typeof raw.match !== "string" || raw.match.trim() === "") {
+      console.warn(
+        `Snowflake: ${schemaPath}: rules[${String(index)}] has an empty or non-string \`match\`.`
+      );
+      return null;
+    }
+    match = raw.match;
+  }
+  if (!("schema" in raw)) {
+    console.warn(`Snowflake: ${schemaPath}: rules[${String(index)}] is missing \`schema\`.`);
     return null;
   }
-  const block = parseTemplateBlock(raw, schemaPath, `rules[${String(index)}]`);
-  if (block === null) return null;
-  return { match: raw.match, ...block };
-}
-function parseTemplateBlock(raw, schemaPath, context) {
-  if (!isPlainObject(raw)) {
-    console.warn(`Snowflake: ${schemaPath}: ${context} must be a mapping.`);
-    return null;
-  }
-  if (!("template" in raw)) {
-    console.warn(`Snowflake: ${schemaPath}: ${context} is missing \`template\`.`);
-    return null;
-  }
-  const template = parseTemplate(raw.template, schemaPath, context);
-  if (template === null) return null;
-  const block = { template };
+  const schema2 = parseRuleSchema(raw.schema, schemaPath, `rules[${String(index)}]`);
+  if (schema2 === null) return null;
+  const rule = { schema: schema2 };
+  if (match !== void 0) rule.match = match;
   if ("frontmatter-delete" in raw) {
     const list = parseStringList(
       raw["frontmatter-delete"],
       schemaPath,
-      `${context}.frontmatter-delete`
+      `rules[${String(index)}].frontmatter-delete`
     );
     if (list === null) return null;
-    if (list.length > 0) block["frontmatter-delete"] = list;
+    if (list.length > 0) rule["frontmatter-delete"] = list;
   }
-  return block;
+  return rule;
 }
-function parseTemplate(raw, schemaPath, context) {
+function parseRuleSchema(raw, schemaPath, context) {
   if (typeof raw === "string") {
     if (raw.trim() === "") {
-      console.warn(`Snowflake: ${schemaPath}: ${context}.template path is empty.`);
+      console.warn(`Snowflake: ${schemaPath}: ${context}.schema path is empty.`);
       return null;
     }
     return raw;
@@ -2908,7 +2920,7 @@ function parseTemplate(raw, schemaPath, context) {
     if ("frontmatter" in raw && raw.frontmatter !== void 0 && raw.frontmatter !== null) {
       if (!isPlainObject(raw.frontmatter)) {
         console.warn(
-          `Snowflake: ${schemaPath}: ${context}.template.frontmatter must be a mapping.`
+          `Snowflake: ${schemaPath}: ${context}.schema.frontmatter must be a mapping.`
         );
         return null;
       }
@@ -2916,7 +2928,7 @@ function parseTemplate(raw, schemaPath, context) {
     }
     if ("body" in raw && raw.body !== void 0 && raw.body !== null) {
       if (typeof raw.body !== "string") {
-        console.warn(`Snowflake: ${schemaPath}: ${context}.template.body must be a string.`);
+        console.warn(`Snowflake: ${schemaPath}: ${context}.schema.body must be a string.`);
         return null;
       }
       inline.body = raw.body;
@@ -2924,7 +2936,7 @@ function parseTemplate(raw, schemaPath, context) {
     return inline;
   }
   console.warn(
-    `Snowflake: ${schemaPath}: ${context}.template must be a path string or inline mapping.`
+    `Snowflake: ${schemaPath}: ${context}.schema must be a path string or inline mapping.`
   );
   return null;
 }
@@ -2985,21 +2997,17 @@ function globToRegex(glob) {
 
 // src/schema-resolver.ts
 function selectTemplate(config, relativePath) {
-  if (config.rules) {
-    for (const rule of config.rules) {
-      if (matchesGlob(relativePath, rule.match)) {
-        return blockToResolved(rule);
-      }
+  if (!config.rules) return null;
+  for (const rule of config.rules) {
+    if (rule.match === void 0 || matchesGlob(relativePath, rule.match)) {
+      return ruleToResolved(rule);
     }
-  }
-  if (config.default) {
-    return blockToResolved(config.default);
   }
   return null;
 }
-function blockToResolved(block) {
-  const resolved = { template: block.template };
-  const fmDelete = block["frontmatter-delete"];
+function ruleToResolved(rule) {
+  const resolved = { schema: rule.schema };
+  const fmDelete = rule["frontmatter-delete"];
   if (fmDelete && fmDelete.length > 0) {
     resolved.frontmatterDelete = fmDelete;
   }
@@ -3007,7 +3015,7 @@ function blockToResolved(block) {
 }
 
 // src/error-handler.ts
-var import_obsidian3 = require("obsidian");
+var import_obsidian2 = require("obsidian");
 var ErrorHandler = class _ErrorHandler {
   constructor() {
     this.debugMode = false;
@@ -3037,7 +3045,7 @@ var ErrorHandler = class _ErrorHandler {
     const errorType = this.categorizeError(error);
     const userMessage = this.getUserMessage(errorType, context, error);
     this.logError(error, context, errorType);
-    new import_obsidian3.Notice(userMessage);
+    new import_obsidian2.Notice(userMessage);
     return userMessage;
   }
   /**
@@ -3207,12 +3215,12 @@ var TemplateLoader = class {
   }
   async loadTemplate(templatePath) {
     try {
-      const templateFile = this.vault.getAbstractFileByPath(templatePath);
-      if (!templateFile || !(templateFile instanceof import_obsidian4.TFile)) {
+      const exists = await this.vault.adapter.exists(templatePath);
+      if (!exists) {
         console.warn(`Template not found: ${templatePath}`);
         return null;
       }
-      return await this.vault.read(templateFile);
+      return await this.vault.adapter.read(templatePath);
     } catch (error) {
       const errorContext = {
         operation: "load_template",
@@ -3238,8 +3246,18 @@ var TemplateLoader = class {
     const folderPaths = this.getFolderHierarchy(file);
     for (let i = 0; i < folderPaths.length; i++) {
       const folderPath = folderPaths[i];
-      const location = findSchemaFile(this.vault, folderPath);
+      const location = await findSchemaFile(this.vault, folderPath);
       if (!location) continue;
+      if (location.kind === "markdown") {
+        templates.push({
+          schemaPath: location.schemaPath,
+          folderPath: location.matchAnchor,
+          templateAnchor: location.templateAnchor,
+          depth: i,
+          resolvedTemplate: { schema: "/" + location.schemaPath }
+        });
+        continue;
+      }
       const yamlText = await this.loadTemplate(location.schemaPath);
       if (yamlText === null) continue;
       const config = parseSchema(yamlText, location.schemaPath);
@@ -3309,17 +3327,17 @@ var TemplateLoader = class {
    */
   async materializeContent(resolved, templateAnchor) {
     const fmDelete = resolved.frontmatterDelete;
-    if (typeof resolved.template === "string") {
-      const path = resolveTemplatePath(resolved.template, templateAnchor);
+    if (typeof resolved.schema === "string") {
+      const path = resolveTemplatePath(resolved.schema, templateAnchor);
       if (path === null) {
-        console.warn(`Snowflake: template path escapes the vault: ${resolved.template}`);
+        console.warn(`Snowflake: template path escapes the vault: ${resolved.schema}`);
         return null;
       }
       const content = await this.loadTemplate(path);
       if (content === null) return null;
       return fmDelete ? injectDeleteList(content, fmDelete) : content;
     }
-    return serializeInlineTemplate(resolved.template, fmDelete);
+    return serializeInlineSchema(resolved.schema, fmDelete);
   }
 };
 function relativeTo(filePath, anchor) {
@@ -3349,14 +3367,14 @@ function resolveTemplatePath(ref, templateAnchor) {
   }
   return segments.join("/");
 }
-function serializeInlineTemplate(template, frontmatterDelete) {
+function serializeInlineSchema(schema2, frontmatterDelete) {
   var _a, _b;
-  const fmObj = { ...(_a = template.frontmatter) != null ? _a : {} };
+  const fmObj = { ...(_a = schema2.frontmatter) != null ? _a : {} };
   if (frontmatterDelete && frontmatterDelete.length > 0) {
     fmObj["delete"] = frontmatterDelete;
   }
   const fmKeys = Object.keys(fmObj);
-  const body = (_b = template.body) != null ? _b : "";
+  const body = (_b = schema2.body) != null ? _b : "";
   if (fmKeys.length === 0) {
     return body;
   }
@@ -3382,7 +3400,7 @@ function quoteYamlScalar(name) {
   return `"${name.replace(/"/g, '\\"')}"`;
 }
 function describeResolved(r) {
-  return typeof r.template === "string" ? r.template : "<inline template>";
+  return typeof r.schema === "string" ? r.schema : "<inline schema>";
 }
 
 // src/nanoid.ts
@@ -3397,7 +3415,7 @@ function generateNanoID(size = ID_CONFIG.length) {
 }
 
 // src/template-variables.ts
-var import_obsidian5 = require("obsidian");
+var import_obsidian3 = require("obsidian");
 var VARIABLE_REGEX = /\{\{(\w+)\}\}/g;
 var DEFAULT_DATE_FORMAT = "YYYY-MM-DD";
 var DEFAULT_TIME_FORMAT = "HH:mm";
@@ -3445,7 +3463,7 @@ var TemplateVariableProcessor = class {
    * @returns Variable context
    */
   buildContext(file, generateId) {
-    const now = (0, import_obsidian5.moment)();
+    const now = (0, import_obsidian3.moment)();
     const context = {
       title: file.basename,
       // filename without .md extension
@@ -4070,7 +4088,7 @@ ${mergedFrontmatter}---`;
 // src/template-applicator.ts
 function describeChainItem(item) {
   if (!item.resolvedTemplate) return item.schemaPath;
-  const t = item.resolvedTemplate.template;
+  const t = item.resolvedTemplate.schema;
   const target = typeof t === "string" ? t : "<inline>";
   if (target === item.schemaPath) return item.schemaPath;
   return `${item.schemaPath} \u2192 ${target}`;
@@ -4097,6 +4115,9 @@ var TemplateApplicator = class {
    * @returns Application result
    */
   async applyTemplate(file, context = { isManualCommand: false }, editor) {
+    if (!isMarkdownFile(file)) {
+      return { success: false, message: "Snowflake only applies schemas to markdown files." };
+    }
     const chain = await this.loader.getTemplateChain(file);
     if (chain.templates.length === 0) {
       return { success: false, message: "No schema found for this location" };
@@ -4409,14 +4430,14 @@ var FileCreationHandler = class {
    */
   start() {
     this.createEventRef = this.vault.on("create", (file) => {
-      if (file instanceof import_obsidian6.TFile) {
+      if (file instanceof import_obsidian4.TFile) {
         this.handleFileCreation(file).catch(() => {
         });
       }
     });
     this.plugin.registerEvent(this.createEventRef);
     this.renameEventRef = this.vault.on("rename", (file, oldPath) => {
-      if (file instanceof import_obsidian6.TFile) {
+      if (file instanceof import_obsidian4.TFile) {
         this.handleFileMove(file, oldPath).catch(() => {
         });
       }
@@ -4541,6 +4562,7 @@ function isSchemaArtifact(path) {
   const segments = path.split("/");
   const fileName = segments[segments.length - 1];
   if (fileName === SCHEMA_FILE_NAME) return true;
+  if (fileName === SCHEMA_MD_FILE_NAME) return true;
   for (let i = 0; i < segments.length - 1; i++) {
     if (segments[i] === SCHEMA_FOLDER_NAME) return true;
   }
@@ -4548,11 +4570,11 @@ function isSchemaArtifact(path) {
 }
 
 // src/commands.ts
-var import_obsidian9 = require("obsidian");
+var import_obsidian7 = require("obsidian");
 
 // src/ui/confirmation-modal.ts
-var import_obsidian7 = require("obsidian");
-var ConfirmationModal = class extends import_obsidian7.Modal {
+var import_obsidian5 = require("obsidian");
+var ConfirmationModal = class extends import_obsidian5.Modal {
   constructor(app, title, message, onConfirm, onCancel) {
     super(app);
     this.title = title;
@@ -4564,7 +4586,7 @@ var ConfirmationModal = class extends import_obsidian7.Modal {
     const { contentEl } = this;
     contentEl.createEl("h2", { text: this.title });
     contentEl.createEl("p", { text: this.message });
-    new import_obsidian7.Setting(contentEl).addButton(
+    new import_obsidian5.Setting(contentEl).addButton(
       (btn) => btn.setButtonText("Cancel").onClick(() => {
         this.close();
         this.onCancel();
@@ -4583,8 +4605,8 @@ var ConfirmationModal = class extends import_obsidian7.Modal {
 };
 
 // src/ui/folder-modal.ts
-var import_obsidian8 = require("obsidian");
-var FolderSuggestModal = class extends import_obsidian8.FuzzySuggestModal {
+var import_obsidian6 = require("obsidian");
+var FolderSuggestModal = class extends import_obsidian6.FuzzySuggestModal {
   constructor(app, onChoose) {
     super(app);
     this.onChoose = onChoose;
@@ -4595,7 +4617,7 @@ var FolderSuggestModal = class extends import_obsidian8.FuzzySuggestModal {
     folders.push(rootFolder);
     const addFolders = (folder) => {
       for (const child of folder.children) {
-        if (child instanceof import_obsidian8.TFolder) {
+        if (child instanceof import_obsidian6.TFolder) {
           folders.push(child);
           addFolders(child);
         }
@@ -4654,18 +4676,18 @@ var SnowflakeCommands = class {
   async applyTemplateToCurrentNote(editor, view) {
     const file = "file" in view ? view.file : view;
     if (!file) {
-      new import_obsidian9.Notice("No active file");
+      new import_obsidian7.Notice("No active file");
       return;
     }
     if (!isMarkdownFile(file)) {
-      new import_obsidian9.Notice("Current file is not a markdown file");
+      new import_obsidian7.Notice("Current file is not a markdown file");
       return;
     }
     const context = { isManualCommand: true };
     try {
       const result = await this.templateApplicator.applyTemplate(file, context, editor);
       if (!result.success) {
-        new import_obsidian9.Notice(result.message);
+        new import_obsidian7.Notice(result.message);
       }
     } catch (error) {
       const errorContext = {
@@ -4679,7 +4701,7 @@ var SnowflakeCommands = class {
     const markdownFiles = this.getMarkdownFiles(folder);
     if (markdownFiles.length === 0) {
       if (!skipConfirmation) {
-        new import_obsidian9.Notice("No markdown files found in selected folder");
+        new import_obsidian7.Notice("No markdown files found in selected folder");
       }
       return null;
     }
@@ -4697,9 +4719,9 @@ var SnowflakeCommands = class {
   }
   async applyTemplateToFolderPath(folderPath, skipConfirmation = false) {
     const folder = this.plugin.app.vault.getAbstractFileByPath(folderPath);
-    if (!folder || !(folder instanceof import_obsidian9.TFolder)) {
+    if (!folder || !(folder instanceof import_obsidian7.TFolder)) {
       if (!skipConfirmation) {
-        new import_obsidian9.Notice(`Folder not found: ${folderPath}`);
+        new import_obsidian7.Notice(`Folder not found: ${folderPath}`);
       }
       return null;
     }
@@ -4741,9 +4763,9 @@ var SnowflakeCommands = class {
   }
   showCompletionNotice(result) {
     if (result.success === result.total) {
-      new import_obsidian9.Notice(`Templates applied to ${String(result.success)} notes`);
+      new import_obsidian7.Notice(`Templates applied to ${String(result.success)} notes`);
     } else {
-      new import_obsidian9.Notice(`Templates applied to ${String(result.success)} of ${String(result.total)} notes`);
+      new import_obsidian7.Notice(`Templates applied to ${String(result.success)} of ${String(result.total)} notes`);
     }
   }
   confirmBatchOperation(folder, fileCount) {
@@ -4764,9 +4786,9 @@ var SnowflakeCommands = class {
   }
   collectMarkdownFiles(folder, files) {
     for (const child of folder.children) {
-      if (child instanceof import_obsidian9.TFile && isMarkdownFile(child)) {
+      if (child instanceof import_obsidian7.TFile && isMarkdownFile(child)) {
         files.push(child);
-      } else if (child instanceof import_obsidian9.TFolder) {
+      } else if (child instanceof import_obsidian7.TFolder) {
         this.collectMarkdownFiles(child, files);
       }
     }
@@ -4809,7 +4831,7 @@ var SnowflakeCommands = class {
       const leaf = this.plugin.app.workspace.getLeaf();
       await leaf.openFile(file);
       setTimeout(() => {
-        const view = this.plugin.app.workspace.getActiveViewOfType(import_obsidian9.MarkdownView);
+        const view = this.plugin.app.workspace.getActiveViewOfType(import_obsidian7.MarkdownView);
         if (view) {
           const titleEl = view.containerEl.querySelector(".inline-title");
           if (titleEl) {
@@ -4835,7 +4857,7 @@ var SnowflakeCommands = class {
 };
 
 // src/main.ts
-var SnowflakePlugin = class extends import_obsidian10.Plugin {
+var SnowflakePlugin = class extends import_obsidian8.Plugin {
   async onload() {
     await this.loadSettings();
     this.commands = new SnowflakeCommands(this, this.settings);
