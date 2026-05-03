@@ -2,39 +2,48 @@
  * Tests for schema-resolver
  */
 
-import { selectTemplate } from './schema-resolver';
+import { selectTemplates } from './schema-resolver';
 import type { SchemaConfig } from './types';
 
-describe('selectTemplate', () => {
-  test('Returns null when there are no rules', () => {
-    expect(selectTemplate({}, 'note.md')).toBeNull();
+describe('selectTemplates', () => {
+  test('Returns empty list when there are no rules', () => {
+    expect(selectTemplates({}, 'note.md')).toEqual([]);
   });
 
-  test('First matching rule wins', () => {
+  test('Returns every matching rule in declaration order', () => {
     const config: SchemaConfig = {
       rules: [
-        { match: 'Web/**', schema: './web.md' },
-        { match: 'Web/Admin/**', schema: './admin.md' }
+        { match: 'Web/**', schema: { 'body-file': './web.md' } },
+        { match: 'Web/Admin/**', schema: { 'body-file': './admin.md' } }
       ]
     };
-    expect(selectTemplate(config, 'Web/Admin/note.md')).toEqual({ schema: './web.md' });
+    expect(selectTemplates(config, 'Web/Admin/note.md')).toEqual([
+      { schema: { 'body-file': './web.md' } },
+      { schema: { 'body-file': './admin.md' } }
+    ]);
   });
 
-  test('Falls through to a trailing catch-all rule when no match fires', () => {
+  test('Catch-all rule fires for every file (overlay model)', () => {
     const config: SchemaConfig = {
       rules: [
-        { match: 'Web/**', schema: './web.md' },
-        { schema: './note.md' }
+        { schema: { frontmatter: { type: 'note' } } },
+        { match: 'Web/**', schema: { 'body-file': './web.md' } }
       ]
     };
-    expect(selectTemplate(config, 'Mobile/note.md')).toEqual({ schema: './note.md' });
+    expect(selectTemplates(config, 'Mobile/note.md')).toEqual([
+      { schema: { frontmatter: { type: 'note' } } }
+    ]);
+    expect(selectTemplates(config, 'Web/note.md')).toEqual([
+      { schema: { frontmatter: { type: 'note' } } },
+      { schema: { 'body-file': './web.md' } }
+    ]);
   });
 
-  test('Returns null when no rule matches and there is no catch-all', () => {
+  test('Returns empty list when no rule matches and there is no catch-all', () => {
     const config: SchemaConfig = {
-      rules: [{ match: 'Web/**', schema: './web.md' }]
+      rules: [{ match: 'Web/**', schema: { 'body-file': './web.md' } }]
     };
-    expect(selectTemplate(config, 'Mobile/note.md')).toBeNull();
+    expect(selectTemplates(config, 'Mobile/note.md')).toEqual([]);
   });
 
   test('Carries through frontmatter-delete from a matched rule', () => {
@@ -47,56 +56,102 @@ describe('selectTemplate', () => {
         }
       ]
     };
-    expect(selectTemplate(config, 'quick-foo.md')).toEqual({
-      schema: { frontmatter: { type: 'quick' } },
-      frontmatterDelete: ['scratch']
-    });
-  });
-
-  test('Carries through frontmatter-delete from a catch-all rule', () => {
-    const config: SchemaConfig = {
-      rules: [{ schema: './note.md', 'frontmatter-delete': ['legacy'] }]
-    };
-    expect(selectTemplate(config, 'note.md')).toEqual({
-      schema: './note.md',
-      frontmatterDelete: ['legacy']
-    });
+    expect(selectTemplates(config, 'quick-foo.md')).toEqual([
+      {
+        schema: { frontmatter: { type: 'quick' } },
+        frontmatterDelete: ['scratch']
+      }
+    ]);
   });
 
   test('Honors glob edge cases (single * does not cross /)', () => {
     const config: SchemaConfig = {
       rules: [
-        { match: '*.md', schema: './only-root.md' },
-        { schema: './nested.md' }
+        { match: '*.md', schema: { 'body-file': './only-root.md' } },
+        { schema: { 'body-file': './nested.md' } }
       ]
     };
-    expect(selectTemplate(config, 'note.md')?.schema).toBe('./only-root.md');
-    expect(selectTemplate(config, 'sub/note.md')?.schema).toBe('./nested.md');
+    const rootHits = selectTemplates(config, 'note.md');
+    expect(rootHits.map((r) => r.schema)).toEqual([
+      { 'body-file': './only-root.md' },
+      { 'body-file': './nested.md' }
+    ]);
+    const subHits = selectTemplates(config, 'sub/note.md');
+    expect(subHits.map((r) => r.schema)).toEqual([{ 'body-file': './nested.md' }]);
   });
 
   test('Supports exact-filename rule', () => {
     const config: SchemaConfig = {
       rules: [
-        { match: 'INDEX.md', schema: './index.md' },
-        { schema: './note.md' }
+        { match: 'INDEX.md', schema: { 'body-file': './index.md' } }
       ]
     };
-    expect(selectTemplate(config, 'INDEX.md')?.schema).toBe('./index.md');
-    expect(selectTemplate(config, 'foo/INDEX.md')?.schema).toBe('./note.md');
+    expect(selectTemplates(config, 'INDEX.md')).toEqual([
+      { schema: { 'body-file': './index.md' } }
+    ]);
+    expect(selectTemplates(config, 'foo/INDEX.md')).toEqual([]);
   });
 
   test('Supports `**/x` filename-anywhere rule', () => {
     const config: SchemaConfig = {
-      rules: [{ match: '**/INDEX.md', schema: './index.md' }]
+      rules: [{ match: '**/INDEX.md', schema: { 'body-file': './index.md' } }]
     };
-    expect(selectTemplate(config, 'foo/bar/INDEX.md')?.schema).toBe('./index.md');
+    expect(selectTemplates(config, 'foo/bar/INDEX.md')).toEqual([
+      { schema: { 'body-file': './index.md' } }
+    ]);
   });
 
   test('Supports `?` single-character matching', () => {
     const config: SchemaConfig = {
-      rules: [{ match: 'log?.md', schema: './log.md' }]
+      rules: [{ match: 'log?.md', schema: { 'body-file': './log.md' } }]
     };
-    expect(selectTemplate(config, 'log1.md')?.schema).toBe('./log.md');
-    expect(selectTemplate(config, 'log12.md')).toBeNull();
+    expect(selectTemplates(config, 'log1.md')).toEqual([
+      { schema: { 'body-file': './log.md' } }
+    ]);
+    expect(selectTemplates(config, 'log12.md')).toEqual([]);
+  });
+
+  test('A match list fires when any of its patterns matches', () => {
+    const config: SchemaConfig = {
+      rules: [
+        {
+          match: ['think/**', 'scratch/**'],
+          schema: { frontmatter: { type: 'atom' } }
+        }
+      ]
+    };
+    expect(selectTemplates(config, 'think/idea.md')).toEqual([
+      { schema: { frontmatter: { type: 'atom' } } }
+    ]);
+    expect(selectTemplates(config, 'scratch/note.md')).toEqual([
+      { schema: { frontmatter: { type: 'atom' } } }
+    ]);
+    expect(selectTemplates(config, 'base/page.md')).toEqual([]);
+  });
+
+  test('A specific overlay layers on top of a general rule', () => {
+    const config: SchemaConfig = {
+      rules: [
+        {
+          match: ['inbox/**', 'source/**'],
+          schema: { frontmatter: { id: '{{snowflake_id}}', title: null } }
+        },
+        {
+          match: ['inbox/archive/**', 'source/archive/**'],
+          schema: { frontmatter: { archived: '{{time}}' } }
+        }
+      ]
+    };
+    // Library item, no archive overlay.
+    expect(selectTemplates(config, 'inbox/foo.md').map((r) => r.schema)).toEqual([
+      { frontmatter: { id: '{{snowflake_id}}', title: null } }
+    ]);
+    // Archive item: both rules contribute.
+    expect(
+      selectTemplates(config, 'inbox/archive/foo.md').map((r) => r.schema)
+    ).toEqual([
+      { frontmatter: { id: '{{snowflake_id}}', title: null } },
+      { frontmatter: { archived: '{{time}}' } }
+    ]);
   });
 });

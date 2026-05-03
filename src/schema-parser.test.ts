@@ -20,16 +20,6 @@ describe('parseSchema', () => {
     expect(parseSchema('   \n  ')).toEqual({});
   });
 
-  test('Parses a single catch-all rule with external schema', () => {
-    const yaml = `
-rules:
-  - schema: ./note.md
-`;
-    expect(parseSchema(yaml)).toEqual({
-      rules: [{ schema: './note.md' }]
-    });
-  });
-
   test('Parses a single catch-all rule with inline schema', () => {
     const yaml = `
 rules:
@@ -52,11 +42,34 @@ rules:
     });
   });
 
-  test('Parses rules with mixed inline and external schemas', () => {
+  test('Parses inline schema with body-file reference', () => {
+    const yaml = `
+rules:
+  - schema:
+      frontmatter:
+        type: note
+      body-file: ./body.md
+`;
+    expect(parseSchema(yaml)).toEqual({
+      rules: [
+        {
+          schema: {
+            frontmatter: { type: 'note' },
+            'body-file': './body.md'
+          }
+        }
+      ]
+    });
+  });
+
+  test('Parses rules with mixed inline-body and body-file schemas', () => {
     const yaml = `
 rules:
   - match: "Web/**"
-    schema: ./web.md
+    schema:
+      frontmatter:
+        type: web
+      body-file: ./web.md
   - match: "**/quick-*.md"
     schema:
       frontmatter:
@@ -66,7 +79,10 @@ rules:
 `;
     expect(parseSchema(yaml)).toEqual({
       rules: [
-        { match: 'Web/**', schema: './web.md' },
+        {
+          match: 'Web/**',
+          schema: { frontmatter: { type: 'web' }, 'body-file': './web.md' }
+        },
         {
           match: '**/quick-*.md',
           schema: { frontmatter: { type: 'quick' }, body: '# {{title}}' },
@@ -80,13 +96,17 @@ rules:
     const yaml = `
 rules:
   - match: "Web/**"
-    schema: ./web.md
-  - schema: ./note.md
+    schema:
+      frontmatter:
+        type: web
+  - schema:
+      frontmatter:
+        type: note
 `;
     expect(parseSchema(yaml)).toEqual({
       rules: [
-        { match: 'Web/**', schema: './web.md' },
-        { schema: './note.md' }
+        { match: 'Web/**', schema: { frontmatter: { type: 'web' } } },
+        { schema: { frontmatter: { type: 'note' } } }
       ]
     });
   });
@@ -98,11 +118,13 @@ exclude:
   - Archive/
   - "**/*.tmp"
 rules:
-  - schema: ./note.md
+  - schema:
+      frontmatter:
+        type: note
 `;
     expect(parseSchema(yaml)).toEqual({
       exclude: ['MEETINGS.md', 'Archive/', '**/*.tmp'],
-      rules: [{ schema: './note.md' }]
+      rules: [{ schema: { frontmatter: { type: 'note' } } }]
     });
   });
 
@@ -117,16 +139,25 @@ exclude:
     expect(parseSchema(yaml)).toEqual({ exclude: ['first', 'second'] });
   });
 
-  test('Warns when a rule appears after a catch-all', () => {
+  test('Allows specific rules after a catch-all (overlay model)', () => {
     const yaml = `
 rules:
-  - schema: ./note.md
+  - schema:
+      frontmatter:
+        type: note
   - match: "Web/**"
-    schema: ./web.md
+    schema:
+      frontmatter:
+        type: web
 `;
     const result = parseSchema(yaml);
     expect(result?.rules).toHaveLength(2);
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unreachable'));
+    // No "unreachable" warning — second rule is now an overlay on top of
+    // the catch-all base.
+    const messages = warnSpy.mock.calls.map((c) => c[0] as string);
+    for (const m of messages) {
+      expect(m).not.toContain('unreachable');
+    }
   });
 
   test('Returns null and warns on malformed YAML', () => {
@@ -150,7 +181,60 @@ rules:
       parseSchema(`
 rules:
   - match: ""
-    schema: ./web.md
+    schema:
+      frontmatter:
+        type: note
+`)
+    ).toBeNull();
+  });
+
+  test('Parses a match list (multiple patterns share one schema)', () => {
+    const yaml = `
+rules:
+  - match: ["think/**", "scratch/**"]
+    schema:
+      frontmatter:
+        type: atom
+`;
+    expect(parseSchema(yaml)).toEqual({
+      rules: [
+        {
+          match: ['think/**', 'scratch/**'],
+          schema: { frontmatter: { type: 'atom' } }
+        }
+      ]
+    });
+  });
+
+  test('Rejects an empty match list', () => {
+    expect(
+      parseSchema(`
+rules:
+  - match: []
+    schema:
+      frontmatter:
+        type: note
+`)
+    ).toBeNull();
+  });
+
+  test('Rejects a match list whose entries are not non-empty strings', () => {
+    expect(
+      parseSchema(`
+rules:
+  - match: ["ok", ""]
+    schema:
+      frontmatter:
+        type: note
+`)
+    ).toBeNull();
+    expect(
+      parseSchema(`
+rules:
+  - match: ["ok", 1]
+    schema:
+      frontmatter:
+        type: note
 `)
     ).toBeNull();
   });
@@ -163,6 +247,16 @@ rules:
     frontmatter-delete: [foo]
 `)
     ).toBeNull();
+  });
+
+  test('Rejects schema given as a bare string (frontmatter must be inline)', () => {
+    expect(
+      parseSchema(`
+rules:
+  - schema: ./note.md
+`)
+    ).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('must be a mapping'));
   });
 
   test('Rejects a schema value that is neither string nor mapping', () => {
@@ -195,20 +289,44 @@ rules:
     ).toBeNull();
   });
 
-  test('Rejects empty external schema path', () => {
+  test('Rejects body-file that is empty or non-string', () => {
     expect(
       parseSchema(`
 rules:
-  - schema: ""
+  - schema:
+      body-file: ""
 `)
     ).toBeNull();
+    expect(
+      parseSchema(`
+rules:
+  - schema:
+      body-file: 42
+`)
+    ).toBeNull();
+  });
+
+  test('Rejects setting both body and body-file on the same schema', () => {
+    expect(
+      parseSchema(`
+rules:
+  - schema:
+      body: "# inline"
+      body-file: ./body.md
+`)
+    ).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('cannot set both `body` and `body-file`')
+    );
   });
 
   test('Rejects frontmatter-delete that is not a list', () => {
     expect(
       parseSchema(`
 rules:
-  - schema: ./note.md
+  - schema:
+      frontmatter:
+        type: note
     frontmatter-delete: "foo"
 `)
     ).toBeNull();
@@ -218,7 +336,9 @@ rules:
     expect(
       parseSchema(`
 rules:
-  - schema: ./note.md
+  - schema:
+      frontmatter:
+        type: note
     frontmatter-delete: [foo, 1]
 `)
     ).toBeNull();

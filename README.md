@@ -37,16 +37,25 @@ exclude:
   - "**/*.tmp"
 
 rules:
-  - match: "Web/**"
-    schema: ./_templates/web.md
+  - match: ["Web/**", "Mobile/**"]      # list = match any of the patterns
+    schema:
+      frontmatter:
+        type: app
+      body-file: ./_templates/app.md   # external body (no frontmatter inside)
   - match: "**/quick-*.md"
     schema:
       frontmatter:
         type: quick
       body: "# {{title}}"
     frontmatter-delete: [scratch_only]
-  - schema: ./_templates/note.md   # catch-all (no `match:`)
+  - schema:                            # catch-all (no `match:`)
+      frontmatter:
+        type: note
 ```
+
+**Frontmatter always lives in `schema.yaml`.** External `.md` files
+referenced via `body-file:` must contain the body only — Snowflake rejects
+any `body-file` whose contents start with a `---` frontmatter delimiter.
 
 ### `exclude`
 
@@ -70,21 +79,50 @@ exclude vault-wide, put an `exclude:` list in a vault-root `.schema.yaml`.
 
 An ordered list. Each rule has:
 
-- `match` — optional glob pattern (`*`, `**`, `?` supported), evaluated
-  relative to the schema's folder. **First match wins.** A rule with no
-  `match:` is the catch-all and matches every file; any rule after it is
-  unreachable (the parser warns).
-- `schema` — either an inline schema (object with optional `frontmatter`
-  and `body`) or a path to a `.md` template file (string).
+- `match` — optional glob (`*`, `**`, `?` supported) evaluated relative to
+  the schema's folder. May be a single string or a list of patterns; a list
+  matches when **any** of its patterns matches. **Every rule whose `match:`
+  fires contributes**, in declaration order — later rules override earlier
+  ones for scalar frontmatter and append to lists. A rule with no `match:`
+  is a base layer that fires for every file; rules after it are overlays,
+  not "unreachable".
+- `schema` — an inline mapping with any of:
+  - `frontmatter` — inline frontmatter map (the only place frontmatter
+    can live).
+  - `body` — inline literal body string.
+  - `body-file` — path to an external body-only `.md` file. Mutually
+    exclusive with `body`.
 - `frontmatter-delete` — optional list of property names to exclude from
   inherited frontmatter when this rule's schema is merged.
 
 If no rule matches and there is no catch-all, the schema contributes nothing
 — but the inheritance walk continues through ancestors.
 
-### Inline vs external schemas
+#### Layering rules within one schema
 
-A `schema:` value may be either inline:
+Because all matching rules contribute, a more-specific rule can layer extra
+fields on top of a more-general rule without restating the general fields:
+
+```yaml
+rules:
+  - match: ["inbox/**", "source/**"]
+    schema:
+      frontmatter:
+        id: "{{snowflake_id}}"
+        title:
+        author:
+        # …all the library fields…
+
+  # Archive items get everything above, plus `archived:`.
+  - match: ["inbox/archive/**", "source/archive/**"]
+    schema:
+      frontmatter:
+        archived: "{{time}}"
+```
+
+### Body: inline vs external file
+
+Use `body:` for short, inline bodies:
 
 ```yaml
 rules:
@@ -97,17 +135,21 @@ rules:
         Created {{date}}
 ```
 
-…or a path to an external `.md` template file:
+Use `body-file:` to load the body from a body-only `.md` file (the file
+must contain no frontmatter):
 
 ```yaml
 rules:
-  - schema: ./_templates/note.md
+  - schema:
+      frontmatter:
+        type: note
+      body-file: ./_templates/note.md
 ```
 
 Both forms support all variables (`{{title}}`, `{{date}}`, `{{time}}`,
 `{{snowflake_id}}`).
 
-#### External template paths
+#### `body-file` paths
 
 - Bare and `./` paths resolve relative to the schema's folder
   (`./web.md` from `Projects/.schema.yaml` → `Projects/web.md`).
@@ -162,7 +204,9 @@ Use a rule's `frontmatter-delete` list to drop inherited keys at that level:
 
 ```yaml
 rules:
-  - schema: ./project.md
+  - schema:
+      frontmatter:
+        type: project
     frontmatter-delete: [legacy_field]
 ```
 
@@ -192,35 +236,18 @@ Available via the command palette (`Ctrl/Cmd + P`):
 - **Create new note in folder** — opens a folder picker, creates a new note,
   and applies the matching schema's template.
 
-## Migrating from `SCHEMA.md`
+## Migrating from earlier formats
 
-The previous version used a single `SCHEMA.md` file that doubled as both
-schema and template. The new format separates routing (schema) from content
-(template) and adds pattern matching.
-
-Manual migration:
-
-1. Rename each `SCHEMA.md` to `.schema.yaml`.
-2. Wrap its frontmatter and body inside a single catch-all `rules:` entry:
-   ```yaml
-   rules:
-     - schema:
-         frontmatter:
-           type: note
-         body: |
-           # {{title}}
-   ```
-   Or move the body+frontmatter into a sibling `.md` file and reference it:
-   ```yaml
-   rules:
-     - schema: ./note.md
-   ```
-3. If the old file had `delete: [...]` in its frontmatter, move it up to
-   the rule's `frontmatter-delete:` list. The `delete:` key inside template
-   frontmatter is no longer the canonical location; using `frontmatter-delete`
-   keeps template `.md` files clean.
-4. If you used the old "global exclude patterns" setting, port those
-   patterns to an `exclude:` list in a vault-root `.schema.yaml`.
+- **`SCHEMA.md`** (the original combined schema-and-template file) — rename
+  each to `.schema.yaml` and wrap its frontmatter and body inside a single
+  catch-all `rules:` entry. If the old file had a `delete: [...]` key in its
+  frontmatter, move it to the rule's `frontmatter-delete:` list.
+- **String-form `schema:` paths** (e.g. `schema: ./note.md`) — replace with
+  an inline mapping. Move the `.md` template's frontmatter into the rule's
+  `schema.frontmatter:`, strip the frontmatter from the `.md` file, and
+  reference the now body-only file via `body-file:`.
+- **Global exclude patterns setting** — port those patterns to an
+  `exclude:` list in a vault-root `.schema.yaml`.
 
 ## Development
 

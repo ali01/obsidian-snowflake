@@ -2840,16 +2840,9 @@ function parseSchema(yamlText, schemaPath = "<schema>") {
       return null;
     }
     const rules = [];
-    let catchAllIndex = -1;
     for (let i = 0; i < raw.rules.length; i++) {
       const rule = parseRule(raw.rules[i], schemaPath, i);
       if (rule === null) return null;
-      if (catchAllIndex !== -1) {
-        console.warn(
-          `Snowflake: ${schemaPath}: rules[${String(i)}] is unreachable; rules[${String(catchAllIndex)}] is a catch-all (no \`match\`).`
-        );
-      }
-      if (rule.match === void 0) catchAllIndex = i;
       rules.push(rule);
     }
     if (rules.length > 0) config.rules = rules;
@@ -2863,13 +2856,9 @@ function parseRule(raw, schemaPath, index) {
   }
   let match;
   if ("match" in raw && raw.match !== void 0 && raw.match !== null) {
-    if (typeof raw.match !== "string" || raw.match.trim() === "") {
-      console.warn(
-        `Snowflake: ${schemaPath}: rules[${String(index)}] has an empty or non-string \`match\`.`
-      );
-      return null;
-    }
-    match = raw.match;
+    const parsed = parseMatch(raw.match, schemaPath, index);
+    if (parsed === null) return null;
+    match = parsed;
   }
   if (!("schema" in raw)) {
     console.warn(`Snowflake: ${schemaPath}: rules[${String(index)}] is missing \`schema\`.`);
@@ -2890,38 +2879,84 @@ function parseRule(raw, schemaPath, index) {
   }
   return rule;
 }
-function parseRuleSchema(raw, schemaPath, context) {
+function parseMatch(raw, schemaPath, index) {
   if (typeof raw === "string") {
     if (raw.trim() === "") {
-      console.warn(`Snowflake: ${schemaPath}: ${context}.schema path is empty.`);
+      console.warn(
+        `Snowflake: ${schemaPath}: rules[${String(index)}] has an empty \`match\`.`
+      );
       return null;
     }
     return raw;
   }
-  if (isPlainObject(raw)) {
-    const inline = {};
-    if ("frontmatter" in raw && raw.frontmatter !== void 0 && raw.frontmatter !== null) {
-      if (!isPlainObject(raw.frontmatter)) {
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) {
+      console.warn(
+        `Snowflake: ${schemaPath}: rules[${String(index)}].match list is empty.`
+      );
+      return null;
+    }
+    const patterns = [];
+    for (const item of raw) {
+      if (typeof item !== "string" || item.trim() === "") {
         console.warn(
-          `Snowflake: ${schemaPath}: ${context}.schema.frontmatter must be a mapping.`
+          `Snowflake: ${schemaPath}: rules[${String(index)}].match entries must all be non-empty strings.`
         );
         return null;
       }
-      inline.frontmatter = raw.frontmatter;
+      patterns.push(item);
     }
-    if ("body" in raw && raw.body !== void 0 && raw.body !== null) {
-      if (typeof raw.body !== "string") {
-        console.warn(`Snowflake: ${schemaPath}: ${context}.schema.body must be a string.`);
-        return null;
-      }
-      inline.body = raw.body;
-    }
-    return inline;
+    return patterns;
   }
   console.warn(
-    `Snowflake: ${schemaPath}: ${context}.schema must be a path string or inline mapping.`
+    `Snowflake: ${schemaPath}: rules[${String(index)}].match must be a string or list of strings.`
   );
   return null;
+}
+function parseRuleSchema(raw, schemaPath, context) {
+  if (typeof raw === "string") {
+    console.warn(
+      `Snowflake: ${schemaPath}: ${context}.schema must be a mapping. Frontmatter belongs in schema.yaml; reference body-only templates with \`body-file:\` instead of a bare string.`
+    );
+    return null;
+  }
+  if (!isPlainObject(raw)) {
+    console.warn(`Snowflake: ${schemaPath}: ${context}.schema must be a mapping.`);
+    return null;
+  }
+  const inline = {};
+  if ("frontmatter" in raw && raw.frontmatter !== void 0 && raw.frontmatter !== null) {
+    if (!isPlainObject(raw.frontmatter)) {
+      console.warn(
+        `Snowflake: ${schemaPath}: ${context}.schema.frontmatter must be a mapping.`
+      );
+      return null;
+    }
+    inline.frontmatter = raw.frontmatter;
+  }
+  if ("body" in raw && raw.body !== void 0 && raw.body !== null) {
+    if (typeof raw.body !== "string") {
+      console.warn(`Snowflake: ${schemaPath}: ${context}.schema.body must be a string.`);
+      return null;
+    }
+    inline.body = raw.body;
+  }
+  if ("body-file" in raw && raw["body-file"] !== void 0 && raw["body-file"] !== null) {
+    if (typeof raw["body-file"] !== "string" || raw["body-file"].trim() === "") {
+      console.warn(
+        `Snowflake: ${schemaPath}: ${context}.schema.body-file must be a non-empty path string.`
+      );
+      return null;
+    }
+    inline["body-file"] = raw["body-file"];
+  }
+  if (inline.body !== void 0 && inline["body-file"] !== void 0) {
+    console.warn(
+      `Snowflake: ${schemaPath}: ${context}.schema cannot set both \`body\` and \`body-file\`.`
+    );
+    return null;
+  }
+  return inline;
 }
 function parseStringList(raw, schemaPath, context) {
   if (raw === void 0 || raw === null) return [];
@@ -2979,14 +3014,20 @@ function globToRegex(glob) {
 }
 
 // src/schema-resolver.ts
-function selectTemplate(config, relativePath) {
-  if (!config.rules) return null;
+function selectTemplates(config, relativePath) {
+  if (!config.rules) return [];
+  const out = [];
   for (const rule of config.rules) {
-    if (rule.match === void 0 || matchesGlob(relativePath, rule.match)) {
-      return ruleToResolved(rule);
+    if (ruleMatches(rule, relativePath)) {
+      out.push(ruleToResolved(rule));
     }
   }
-  return null;
+  return out;
+}
+function ruleMatches(rule, relativePath) {
+  if (rule.match === void 0) return true;
+  const patterns = Array.isArray(rule.match) ? rule.match : [rule.match];
+  return patterns.some((p) => matchesGlob(relativePath, p));
 }
 function ruleToResolved(rule) {
   const resolved = { schema: rule.schema };
@@ -3239,15 +3280,16 @@ var TemplateLoader = class {
       if (config.exclude && matchesExclusionPattern(relativePath, config.exclude)) {
         return { templates: [], hasInheritance: false };
       }
-      const resolved = selectTemplate(config, relativePath);
-      if (!resolved) continue;
-      templates.push({
-        schemaPath: location.schemaPath,
-        folderPath: location.matchAnchor,
-        templateAnchor: location.templateAnchor,
-        depth: i,
-        resolvedTemplate: resolved
-      });
+      const resolvedRules = selectTemplates(config, relativePath);
+      for (const resolved of resolvedRules) {
+        templates.push({
+          schemaPath: location.schemaPath,
+          folderPath: location.matchAnchor,
+          templateAnchor: location.templateAnchor,
+          depth: i,
+          resolvedTemplate: resolved
+        });
+      }
     }
     return { templates, hasInheritance: templates.length > 1 };
   }
@@ -3291,28 +3333,42 @@ var TemplateLoader = class {
    * Materialize a resolved template into the standard
    * `---\nfrontmatter\n---\nbody` content string consumed by the merger.
    *
-   * - Inline templates are serialized via `js-yaml.dump`.
-   * - External templates are read from their resolved path.
-   * - In both cases, when `frontmatterDelete` is set, a `delete:` entry is
-   *   injected into the serialized frontmatter so the existing
-   *   `processWithDeleteList` / `mergeWithDeleteList` semantics apply
-   *   unchanged.
+   * Frontmatter always comes from the inline schema. The body is either the
+   * inline `body:` literal or the contents of the file referenced by
+   * `body-file:` (which must be body-only — frontmatter in that file is
+   * rejected). When `frontmatterDelete` is set, a `delete:` entry is
+   * injected into the serialized frontmatter so the existing
+   * `processWithDeleteList` / `mergeWithDeleteList` semantics apply
+   * unchanged.
    */
   async materializeContent(resolved, templateAnchor) {
-    const fmDelete = resolved.frontmatterDelete;
-    if (typeof resolved.schema === "string") {
-      const path = resolveTemplatePath(resolved.schema, templateAnchor);
+    var _a;
+    const inline = resolved.schema;
+    let body = (_a = inline.body) != null ? _a : "";
+    const bodyFile = inline["body-file"];
+    if (bodyFile !== void 0) {
+      const path = resolveTemplatePath(bodyFile, templateAnchor);
       if (path === null) {
-        console.warn(`Snowflake: template path escapes the vault: ${resolved.schema}`);
+        console.warn(`Snowflake: body-file path escapes the vault: ${bodyFile}`);
         return null;
       }
-      const content = await this.loadTemplate(path);
-      if (content === null) return null;
-      return fmDelete ? injectDeleteList(content, fmDelete) : content;
+      const fileContent = await this.loadTemplate(path);
+      if (fileContent === null) return null;
+      if (FRONTMATTER_LEAD.test(fileContent)) {
+        console.warn(
+          `Snowflake: body-file ${path} must not contain frontmatter \u2014 frontmatter belongs in schema.yaml.`
+        );
+        return null;
+      }
+      body = fileContent;
     }
-    return serializeInlineSchema(resolved.schema, fmDelete);
+    return serializeInlineSchema(
+      { frontmatter: inline.frontmatter, body },
+      resolved.frontmatterDelete
+    );
   }
 };
+var FRONTMATTER_LEAD = /^---\s*\n/;
 function relativeTo(filePath, anchor) {
   if (anchor === "" || anchor === "/") return filePath;
   const prefix = anchor + "/";
@@ -3359,25 +3415,10 @@ function serializeInlineSchema(schema2, frontmatterDelete) {
   const fmBlock = "---\n" + yaml + "---\n";
   return body === "" ? fmBlock : fmBlock + body;
 }
-function injectDeleteList(content, deleteList) {
-  const line = `delete: [${deleteList.map(quoteYamlScalar).join(", ")}]`;
-  const fmRegex = /^---\s*\n([\s\S]*?)\n---/;
-  const match = content.match(fmRegex);
-  if (match) {
-    const newFm = match[1] + "\n" + line;
-    return content.replace(fmRegex, "---\n" + newFm + "\n---");
-  }
-  return `---
-${line}
----
-` + content;
-}
-function quoteYamlScalar(name) {
-  if (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) return name;
-  return `"${name.replace(/"/g, '\\"')}"`;
-}
 function describeResolved(r) {
-  return typeof r.schema === "string" ? r.schema : "<inline schema>";
+  const bodyFile = r.schema["body-file"];
+  if (bodyFile !== void 0) return bodyFile;
+  return "<inline schema>";
 }
 
 // src/nanoid.ts

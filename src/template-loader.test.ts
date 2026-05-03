@@ -1,10 +1,10 @@
 /**
  * Tests for Template Loader
  *
- * The loader now reads `.schema.yaml` (or `.schema/schema.yaml`) at each
- * folder level, evaluates `exclude:` and the rule resolver, and produces a
- * chain of resolved templates. `getTemplateChain` is async because it reads
- * schema YAML files from the vault.
+ * The loader reads `.schema.yaml` (or `.schema/schema.yaml`) at each folder
+ * level, evaluates `exclude:` and the rule resolver, and produces a chain of
+ * resolved templates. Frontmatter always lives in the inline schema; bodies
+ * may be inline or loaded from a body-only `.md` file via `body-file:`.
  */
 
 import { TemplateLoader, TemplateLoaderTestUtils } from './template-loader';
@@ -119,7 +119,9 @@ describe('TemplateLoader', () => {
       mockVault.addFile(
         'Projects/.schema.yaml',
         `rules:
-  - schema: ./project.md
+  - schema:
+      frontmatter:
+        type: project
 `
       );
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
@@ -127,34 +129,85 @@ describe('TemplateLoader', () => {
       expect(chain.templates[0].schemaPath).toBe('Projects/.schema.yaml');
       expect(chain.templates[0].folderPath).toBe('Projects');
       expect(chain.templates[0].templateAnchor).toBe('Projects');
-      expect(chain.templates[0].resolvedTemplate.schema).toBe('./project.md');
+      expect(chain.templates[0].resolvedTemplate.schema).toEqual({
+        frontmatter: { type: 'project' }
+      });
     });
 
-    test('Routes by first matching rule', async () => {
+    test('Returns one chain item per matching rule, in declaration order', async () => {
       mockVault.addFile(
         'Projects/.schema.yaml',
         `rules:
   - match: "Web/**"
-    schema: ./web.md
+    schema:
+      frontmatter:
+        type: web
   - match: "Mobile/**"
-    schema: ./mobile.md
-  - schema: ./project.md
+    schema:
+      frontmatter:
+        type: mobile
+  - schema:
+      frontmatter:
+        type: project
 `
       );
+      // Catch-all + Web/** overlay both fire for a Web file.
       const webChain = await loader.getTemplateChain(makeFile('Projects/Web/Frontend/note.md'));
-      expect(webChain.templates[0].resolvedTemplate.schema).toBe('./web.md');
+      expect(webChain.templates.map((t) => t.resolvedTemplate.schema)).toEqual([
+        { frontmatter: { type: 'web' } },
+        { frontmatter: { type: 'project' } }
+      ]);
 
-      const mobileChain = await loader.getTemplateChain(makeFile('Projects/Mobile/iOS/note.md'));
-      expect(mobileChain.templates[0].resolvedTemplate.schema).toBe('./mobile.md');
-
+      // Catch-all only for an unmatched path.
       const fallbackChain = await loader.getTemplateChain(makeFile('Projects/Other/note.md'));
-      expect(fallbackChain.templates[0].resolvedTemplate.schema).toBe('./project.md');
+      expect(fallbackChain.templates.map((t) => t.resolvedTemplate.schema)).toEqual([
+        { frontmatter: { type: 'project' } }
+      ]);
+    });
+
+    test('Overlay rule layers extra fields on top of a general rule', async () => {
+      mockVault.addFile(
+        'Projects/.schema.yaml',
+        `rules:
+  - match: ["inbox/**", "source/**"]
+    schema:
+      frontmatter:
+        id: "{{snowflake_id}}"
+        title:
+  - match: ["inbox/archive/**", "source/archive/**"]
+    schema:
+      frontmatter:
+        archived: "{{time}}"
+`
+      );
+      const archiveChain = await loader.getTemplateChain(
+        makeFile('Projects/inbox/archive/foo.md')
+      );
+      expect(archiveChain.templates.map((t) => t.resolvedTemplate.schema)).toEqual([
+        { frontmatter: { id: '{{snowflake_id}}', title: null } },
+        { frontmatter: { archived: '{{time}}' } }
+      ]);
+
+      const loaded = await loader.loadTemplateChain(archiveChain);
+      const merged = loaded.templates.map((t) => t.content!).join('\n');
+      expect(merged).toContain('id:');
+      expect(merged).toContain('title:');
+      expect(merged).toContain('archived:');
     });
 
     test('Inherits from ancestor schemas root → leaf', async () => {
-      mockVault.addFile('.schema.yaml', `rules:\n  - schema: ./root.md\n`);
-      mockVault.addFile('Projects/.schema.yaml', `rules:\n  - schema: ./project.md\n`);
-      mockVault.addFile('Projects/Web/.schema.yaml', `rules:\n  - schema: ./web.md\n`);
+      mockVault.addFile(
+        '.schema.yaml',
+        `rules:\n  - schema:\n      frontmatter:\n        scope: root\n`
+      );
+      mockVault.addFile(
+        'Projects/.schema.yaml',
+        `rules:\n  - schema:\n      frontmatter:\n        scope: project\n`
+      );
+      mockVault.addFile(
+        'Projects/Web/.schema.yaml',
+        `rules:\n  - schema:\n      frontmatter:\n        scope: web\n`
+      );
 
       const chain = await loader.getTemplateChain(makeFile('Projects/Web/Frontend/note.md'));
       expect(chain.templates).toHaveLength(3);
@@ -164,12 +217,17 @@ describe('TemplateLoader', () => {
     });
 
     test('Schema with no matching rule contributes nothing', async () => {
-      mockVault.addFile('.schema.yaml', `rules:\n  - schema: ./root.md\n`);
+      mockVault.addFile(
+        '.schema.yaml',
+        `rules:\n  - schema:\n      frontmatter:\n        scope: root\n`
+      );
       mockVault.addFile(
         'Projects/.schema.yaml',
         `rules:
   - match: "Special/**"
-    schema: ./special.md
+    schema:
+      frontmatter:
+        scope: special
 `
       );
 
@@ -179,14 +237,19 @@ describe('TemplateLoader', () => {
     });
 
     test('Hard exclude short-circuits the entire chain', async () => {
-      mockVault.addFile('.schema.yaml', `rules:\n  - schema: ./root.md\n`);
+      mockVault.addFile(
+        '.schema.yaml',
+        `rules:\n  - schema:\n      frontmatter:\n        scope: root\n`
+      );
       mockVault.addFile(
         'Projects/.schema.yaml',
         `exclude:
   - MEETINGS.md
   - Archive/
 rules:
-  - schema: ./project.md
+  - schema:
+      frontmatter:
+        scope: project
 `
       );
 
@@ -206,8 +269,14 @@ rules:
     });
 
     test('Folder form (.schema/schema.yaml) is preferred when both forms exist', async () => {
-      mockVault.addFile('Projects/.schema.yaml', `rules:\n  - schema: ./flat.md\n`);
-      mockVault.addFile('Projects/.schema/schema.yaml', `rules:\n  - schema: ./folder.md\n`);
+      mockVault.addFile(
+        'Projects/.schema.yaml',
+        `rules:\n  - schema:\n      frontmatter:\n        scope: flat\n`
+      );
+      mockVault.addFile(
+        'Projects/.schema/schema.yaml',
+        `rules:\n  - schema:\n      frontmatter:\n        scope: folder\n`
+      );
 
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
       expect(chain.templates).toHaveLength(1);
@@ -253,39 +322,66 @@ rules:
       expect(content).toContain('# {{title}}');
     });
 
-    test('Loads external template content via path resolution', async () => {
-      mockVault.addFile('Projects/.schema.yaml', `rules:\n  - schema: ./web.md\n`);
+    test('Loads body-file content and pairs it with inline frontmatter', async () => {
       mockVault.addFile(
-        'Projects/web.md',
-        `---
-type: web
----
-# Web project
+        'Projects/.schema.yaml',
+        `rules:
+  - schema:
+      frontmatter:
+        type: web
+      body-file: ./web.md
 `
       );
+      mockVault.addFile('Projects/web.md', '# Web project\n');
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
       const loaded = await loader.loadTemplateChain(chain);
 
       expect(loaded.templates).toHaveLength(1);
-      expect(loaded.templates[0].content).toContain('type: web');
-      expect(loaded.templates[0].content).toContain('# Web project');
+      const content = loaded.templates[0].content!;
+      expect(content).toContain('type: web');
+      expect(content).toContain('# Web project');
     });
 
-    test('Resolves external paths relative to .schema/ when in folder form', async () => {
-      mockVault.addFile('Projects/.schema/schema.yaml', `rules:\n  - schema: ./web.md\n`);
+    test('Resolves body-file paths relative to .schema/ when in folder form', async () => {
       mockVault.addFile(
-        'Projects/.schema/web.md',
-        `---
-type: web
----
-body
+        'Projects/.schema/schema.yaml',
+        `rules:
+  - schema:
+      frontmatter:
+        type: web
+      body-file: ./web.md
 `
       );
+      mockVault.addFile('Projects/.schema/web.md', '# Web body\n');
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
       const loaded = await loader.loadTemplateChain(chain);
 
       expect(loaded.templates).toHaveLength(1);
       expect(loaded.templates[0].content).toContain('type: web');
+      expect(loaded.templates[0].content).toContain('# Web body');
+    });
+
+    test('Rejects a body-file that contains frontmatter', async () => {
+      mockVault.addFile(
+        'Projects/.schema.yaml',
+        `rules:
+  - schema:
+      frontmatter:
+        type: web
+      body-file: ./web.md
+`
+      );
+      mockVault.addFile(
+        'Projects/web.md',
+        `---\ntype: web\n---\n# Web body\n`
+      );
+      const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
+      const loaded = await loader.loadTemplateChain(chain);
+
+      expect(loaded.templates).toHaveLength(0);
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('must not contain frontmatter')
+      );
     });
 
     test('Injects rule frontmatter-delete as a delete: list', async () => {
@@ -305,8 +401,16 @@ body
       expect(loaded.templates[0].content).toContain('legacy');
     });
 
-    test('Skips chain items whose external template is missing', async () => {
-      mockVault.addFile('Projects/.schema.yaml', `rules:\n  - schema: ./missing.md\n`);
+    test('Skips chain items whose body-file is missing', async () => {
+      mockVault.addFile(
+        'Projects/.schema.yaml',
+        `rules:
+  - schema:
+      frontmatter:
+        type: project
+      body-file: ./missing.md
+`
+      );
       const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
       const loaded = await loader.loadTemplateChain(chain);
       expect(loaded.templates).toHaveLength(0);
@@ -372,24 +476,6 @@ body
       );
       expect(out).toContain('delete:');
       expect(out).toContain('legacy');
-    });
-
-    test('injectDeleteList appends to existing frontmatter', () => {
-      const original = `---
-type: note
----
-body`;
-      const out = TemplateLoaderTestUtils.injectDeleteList(original, ['legacy']);
-      expect(out).toContain('type: note');
-      expect(out).toContain('delete: [legacy]');
-      expect(out).toContain('body');
-    });
-
-    test('injectDeleteList adds a frontmatter block when none exists', () => {
-      const out = TemplateLoaderTestUtils.injectDeleteList('# heading', ['legacy']);
-      expect(out.startsWith('---\n')).toBe(true);
-      expect(out).toContain('delete: [legacy]');
-      expect(out).toContain('# heading');
     });
   });
 });

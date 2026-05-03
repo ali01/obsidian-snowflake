@@ -1,12 +1,14 @@
 /**
  * Template Loader
  *
- * Resolves which schema applies to a given file by walking the folder
+ * Resolves which schemas apply to a given file by walking the folder
  * hierarchy root → leaf and consulting each ancestor folder's `.schema.yaml`
- * (or `.schema/schema.yaml`). Each schema either selects an inline template,
- * routes to an external template `.md` file, or contributes nothing (in
- * which case the walk continues through ancestors).
+ * (or `.schema/schema.yaml`). Within a single schema, every rule whose
+ * `match:` fires contributes a chain item, in declaration order — later
+ * items override earlier ones for scalar frontmatter, arrays concatenate.
  *
+ * Frontmatter always lives in the inline schema; bodies may be inline
+ * (`body:`) or loaded from an external body-only `.md` file (`body-file:`).
  * The chain is materialized into `{ content }` strings and fed into the
  * existing merge engine in `template-applicator.ts` unchanged.
  */
@@ -23,7 +25,7 @@ import type {
 } from './types';
 import { findSchemaFile } from './schema-locator';
 import { parseSchema } from './schema-parser';
-import { selectTemplate } from './schema-resolver';
+import { selectTemplates } from './schema-resolver';
 import { matchesExclusionPattern } from './pattern-matcher';
 import { ErrorHandler } from './error-handler';
 
@@ -90,16 +92,16 @@ export class TemplateLoader {
         return { templates: [], hasInheritance: false };
       }
 
-      const resolved = selectTemplate(config, relativePath);
-      if (!resolved) continue;
-
-      templates.push({
-        schemaPath: location.schemaPath,
-        folderPath: location.matchAnchor,
-        templateAnchor: location.templateAnchor,
-        depth: i,
-        resolvedTemplate: resolved
-      });
+      const resolvedRules = selectTemplates(config, relativePath);
+      for (const resolved of resolvedRules) {
+        templates.push({
+          schemaPath: location.schemaPath,
+          folderPath: location.matchAnchor,
+          templateAnchor: location.templateAnchor,
+          depth: i,
+          resolvedTemplate: resolved
+        });
+      }
     }
 
     return { templates, hasInheritance: templates.length > 1 };
@@ -152,33 +154,48 @@ export class TemplateLoader {
    * Materialize a resolved template into the standard
    * `---\nfrontmatter\n---\nbody` content string consumed by the merger.
    *
-   * - Inline templates are serialized via `js-yaml.dump`.
-   * - External templates are read from their resolved path.
-   * - In both cases, when `frontmatterDelete` is set, a `delete:` entry is
-   *   injected into the serialized frontmatter so the existing
-   *   `processWithDeleteList` / `mergeWithDeleteList` semantics apply
-   *   unchanged.
+   * Frontmatter always comes from the inline schema. The body is either the
+   * inline `body:` literal or the contents of the file referenced by
+   * `body-file:` (which must be body-only — frontmatter in that file is
+   * rejected). When `frontmatterDelete` is set, a `delete:` entry is
+   * injected into the serialized frontmatter so the existing
+   * `processWithDeleteList` / `mergeWithDeleteList` semantics apply
+   * unchanged.
    */
   private async materializeContent(
     resolved: ResolvedTemplate,
     templateAnchor: string
   ): Promise<string | null> {
-    const fmDelete = resolved.frontmatterDelete;
+    const inline = resolved.schema;
+    let body = inline.body ?? '';
 
-    if (typeof resolved.schema === 'string') {
-      const path = resolveTemplatePath(resolved.schema, templateAnchor);
+    const bodyFile = inline['body-file'];
+    if (bodyFile !== undefined) {
+      const path = resolveTemplatePath(bodyFile, templateAnchor);
       if (path === null) {
-        console.warn(`Snowflake: template path escapes the vault: ${resolved.schema}`);
+        console.warn(`Snowflake: body-file path escapes the vault: ${bodyFile}`);
         return null;
       }
-      const content = await this.loadTemplate(path);
-      if (content === null) return null;
-      return fmDelete ? injectDeleteList(content, fmDelete) : content;
+      const fileContent = await this.loadTemplate(path);
+      if (fileContent === null) return null;
+      if (FRONTMATTER_LEAD.test(fileContent)) {
+        console.warn(
+          `Snowflake: body-file ${path} must not contain frontmatter — ` +
+            `frontmatter belongs in schema.yaml.`
+        );
+        return null;
+      }
+      body = fileContent;
     }
 
-    return serializeInlineSchema(resolved.schema, fmDelete);
+    return serializeInlineSchema(
+      { frontmatter: inline.frontmatter, body },
+      resolved.frontmatterDelete
+    );
   }
 }
+
+const FRONTMATTER_LEAD = /^---\s*\n/;
 
 /**
  * Compute the path of a file relative to the schema's `matchAnchor` folder.
@@ -249,24 +266,10 @@ function serializeInlineSchema(
   return body === '' ? fmBlock : fmBlock + body;
 }
 
-function injectDeleteList(content: string, deleteList: string[]): string {
-  const line = `delete: [${deleteList.map(quoteYamlScalar).join(', ')}]`;
-  const fmRegex = /^---\s*\n([\s\S]*?)\n---/;
-  const match = content.match(fmRegex);
-  if (match) {
-    const newFm = match[1] + '\n' + line;
-    return content.replace(fmRegex, '---\n' + newFm + '\n---');
-  }
-  return `---\n${line}\n---\n` + content;
-}
-
-function quoteYamlScalar(name: string): string {
-  if (/^[A-Za-z_][A-Za-z0-9_-]*$/.test(name)) return name;
-  return `"${name.replace(/"/g, '\\"')}"`;
-}
-
 function describeResolved(r: ResolvedTemplate): string {
-  return typeof r.schema === 'string' ? r.schema : '<inline schema>';
+  const bodyFile = r.schema['body-file'];
+  if (bodyFile !== undefined) return bodyFile;
+  return '<inline schema>';
 }
 
 /**
@@ -279,7 +282,5 @@ export const TemplateLoaderTestUtils = {
     schema: InlineSchema,
     frontmatterDelete: string[] | undefined
   ): string => serializeInlineSchema(schema, frontmatterDelete),
-  injectDeleteList: (content: string, deleteList: string[]): string =>
-    injectDeleteList(content, deleteList),
   relativeTo: (filePath: string, anchor: string): string => relativeTo(filePath, anchor)
 };

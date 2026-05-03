@@ -78,27 +78,32 @@ export interface SettingsUpdateContext {
 /**
  * InlineSchema: a schema defined directly inside a rule.
  *
- * Either `frontmatter` or `body` (or both) may be omitted. When materialized
- * it produces a standard `---\nfrontmatter\n---\nbody` content string for the
- * downstream merge engine.
+ * Frontmatter always lives in `schema.yaml` — external `.md` templates are
+ * body-only. `body` (literal) and `body-file` (path to a body-only `.md`)
+ * are mutually exclusive. Any field may be omitted; an empty schema
+ * contributes nothing to the merge chain.
  */
 export interface InlineSchema {
   frontmatter?: Record<string, unknown>;
   body?: string;
+  'body-file'?: string;
 }
 
 /**
  * SchemaRule: one ordered entry inside a `.schema.yaml`'s `rules:` list.
  *
- * `schema` is either an external `.md` template path (string) or an inline
- * schema object. `frontmatter-delete` lists property names to exclude from
- * the inherited frontmatter when this rule's schema is merged into the chain.
- * `match` is optional — a rule with no `match:` is the catch-all and matches
- * every file. Any rule appearing after a catch-all is unreachable.
+ * `schema` is always an inline object (no string form). `frontmatter-delete`
+ * lists property names to exclude from the inherited frontmatter when this
+ * rule's schema is merged into the chain.
+ *
+ * `match` is optional. It can be a single glob (string) or a list of globs
+ * (string[]) — a list matches when any of its patterns matches. A rule with
+ * no `match:` is the catch-all and matches every file. Any rule appearing
+ * after a catch-all is unreachable.
  */
 export interface SchemaRule {
-  match?: string;
-  schema: InlineSchema | string;
+  match?: string | string[];
+  schema: InlineSchema;
   'frontmatter-delete'?: string[];
 }
 
@@ -119,7 +124,7 @@ export interface SchemaConfig {
  * SchemaConfig and a file's path-relative-to-schema-folder.
  */
 export interface ResolvedTemplate {
-  schema: InlineSchema | string;
+  schema: InlineSchema;
   frontmatterDelete?: string[];
 }
 
@@ -127,8 +132,8 @@ export interface ResolvedTemplate {
  * One level in a template inheritance chain.
  *
  * Phase 1 (`getTemplateChain`) populates everything except `content`.
- * Phase 2 (`loadTemplateChain`) materializes `content` from the resolved
- * template (loading the external `.md` file or serializing the inline form),
+ * Phase 2 (`loadTemplateChain`) materializes `content` by loading any
+ * `body-file` referenced by the inline schema and serializing the result,
  * with the rule's `frontmatter-delete` injected as a `delete:` list so the
  * existing merge engine handles it unchanged.
  */

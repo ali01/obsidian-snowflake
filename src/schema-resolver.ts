@@ -2,28 +2,35 @@
  * Schema resolver
  *
  * Given a parsed `SchemaConfig` and a file's path relative to the schema's
- * folder, returns the matched rule's `schema` value and its
- * `frontmatter-delete` list.
- *
- * Matching strategy: first matching rule wins (top-down order). A rule with
- * no `match:` is the catch-all and matches every file. Returns `null` when no
- * rule matches.
+ * folder, returns every rule whose `match:` fires for that file, in
+ * declaration order. Each becomes one item in the template chain and is
+ * merged by the existing engine — later items override earlier ones for
+ * scalars, arrays concatenate. A rule with no `match:` is a base layer
+ * that fires for every file; rules listed after it are overlays, not
+ * "unreachable".
  */
 
 import type { SchemaConfig, SchemaRule, ResolvedTemplate } from './types';
 import { matchesGlob } from './pattern-matcher';
 
-export function selectTemplate(
+export function selectTemplates(
   config: SchemaConfig,
   relativePath: string
-): ResolvedTemplate | null {
-  if (!config.rules) return null;
+): ResolvedTemplate[] {
+  if (!config.rules) return [];
+  const out: ResolvedTemplate[] = [];
   for (const rule of config.rules) {
-    if (rule.match === undefined || matchesGlob(relativePath, rule.match)) {
-      return ruleToResolved(rule);
+    if (ruleMatches(rule, relativePath)) {
+      out.push(ruleToResolved(rule));
     }
   }
-  return null;
+  return out;
+}
+
+function ruleMatches(rule: SchemaRule, relativePath: string): boolean {
+  if (rule.match === undefined) return true;
+  const patterns = Array.isArray(rule.match) ? rule.match : [rule.match];
+  return patterns.some((p) => matchesGlob(relativePath, p));
 }
 
 function ruleToResolved(rule: SchemaRule): ResolvedTemplate {

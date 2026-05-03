@@ -55,17 +55,9 @@ export function parseSchema(yamlText: string, schemaPath = '<schema>'): SchemaCo
       return null;
     }
     const rules: SchemaRule[] = [];
-    let catchAllIndex = -1;
     for (let i = 0; i < raw.rules.length; i++) {
       const rule = parseRule(raw.rules[i], schemaPath, i);
       if (rule === null) return null;
-      if (catchAllIndex !== -1) {
-        console.warn(
-          `Snowflake: ${schemaPath}: rules[${String(i)}] is unreachable; ` +
-            `rules[${String(catchAllIndex)}] is a catch-all (no \`match\`).`
-        );
-      }
-      if (rule.match === undefined) catchAllIndex = i;
       rules.push(rule);
     }
     if (rules.length > 0) config.rules = rules;
@@ -80,15 +72,11 @@ function parseRule(raw: unknown, schemaPath: string, index: number): SchemaRule 
     return null;
   }
 
-  let match: string | undefined;
+  let match: string | string[] | undefined;
   if ('match' in raw && raw.match !== undefined && raw.match !== null) {
-    if (typeof raw.match !== 'string' || raw.match.trim() === '') {
-      console.warn(
-        `Snowflake: ${schemaPath}: rules[${String(index)}] has an empty or non-string \`match\`.`
-      );
-      return null;
-    }
-    match = raw.match;
+    const parsed = parseMatch(raw.match, schemaPath, index);
+    if (parsed === null) return null;
+    match = parsed;
   }
 
   if (!('schema' in raw)) {
@@ -114,42 +102,97 @@ function parseRule(raw: unknown, schemaPath: string, index: number): SchemaRule 
   return rule;
 }
 
-function parseRuleSchema(
+function parseMatch(
   raw: unknown,
   schemaPath: string,
-  context: string
-): string | InlineSchema | null {
+  index: number
+): string | string[] | null {
   if (typeof raw === 'string') {
     if (raw.trim() === '') {
-      console.warn(`Snowflake: ${schemaPath}: ${context}.schema path is empty.`);
+      console.warn(
+        `Snowflake: ${schemaPath}: rules[${String(index)}] has an empty \`match\`.`
+      );
       return null;
     }
     return raw;
   }
-  if (isPlainObject(raw)) {
-    const inline: InlineSchema = {};
-    if ('frontmatter' in raw && raw.frontmatter !== undefined && raw.frontmatter !== null) {
-      if (!isPlainObject(raw.frontmatter)) {
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) {
+      console.warn(
+        `Snowflake: ${schemaPath}: rules[${String(index)}].match list is empty.`
+      );
+      return null;
+    }
+    const patterns: string[] = [];
+    for (const item of raw) {
+      if (typeof item !== 'string' || item.trim() === '') {
         console.warn(
-          `Snowflake: ${schemaPath}: ${context}.schema.frontmatter must be a mapping.`
+          `Snowflake: ${schemaPath}: rules[${String(index)}].match entries ` +
+            `must all be non-empty strings.`
         );
         return null;
       }
-      inline.frontmatter = raw.frontmatter;
+      patterns.push(item);
     }
-    if ('body' in raw && raw.body !== undefined && raw.body !== null) {
-      if (typeof raw.body !== 'string') {
-        console.warn(`Snowflake: ${schemaPath}: ${context}.schema.body must be a string.`);
-        return null;
-      }
-      inline.body = raw.body;
-    }
-    return inline;
+    return patterns;
   }
   console.warn(
-    `Snowflake: ${schemaPath}: ${context}.schema must be a path string or inline mapping.`
+    `Snowflake: ${schemaPath}: rules[${String(index)}].match must be a string or list of strings.`
   );
   return null;
+}
+
+function parseRuleSchema(
+  raw: unknown,
+  schemaPath: string,
+  context: string
+): InlineSchema | null {
+  if (typeof raw === 'string') {
+    console.warn(
+      `Snowflake: ${schemaPath}: ${context}.schema must be a mapping. ` +
+        `Frontmatter belongs in schema.yaml; reference body-only ` +
+        `templates with \`body-file:\` instead of a bare string.`
+    );
+    return null;
+  }
+  if (!isPlainObject(raw)) {
+    console.warn(`Snowflake: ${schemaPath}: ${context}.schema must be a mapping.`);
+    return null;
+  }
+
+  const inline: InlineSchema = {};
+  if ('frontmatter' in raw && raw.frontmatter !== undefined && raw.frontmatter !== null) {
+    if (!isPlainObject(raw.frontmatter)) {
+      console.warn(
+        `Snowflake: ${schemaPath}: ${context}.schema.frontmatter must be a mapping.`
+      );
+      return null;
+    }
+    inline.frontmatter = raw.frontmatter;
+  }
+  if ('body' in raw && raw.body !== undefined && raw.body !== null) {
+    if (typeof raw.body !== 'string') {
+      console.warn(`Snowflake: ${schemaPath}: ${context}.schema.body must be a string.`);
+      return null;
+    }
+    inline.body = raw.body;
+  }
+  if ('body-file' in raw && raw['body-file'] !== undefined && raw['body-file'] !== null) {
+    if (typeof raw['body-file'] !== 'string' || raw['body-file'].trim() === '') {
+      console.warn(
+        `Snowflake: ${schemaPath}: ${context}.schema.body-file must be a non-empty path string.`
+      );
+      return null;
+    }
+    inline['body-file'] = raw['body-file'];
+  }
+  if (inline.body !== undefined && inline['body-file'] !== undefined) {
+    console.warn(
+      `Snowflake: ${schemaPath}: ${context}.schema cannot set both \`body\` and \`body-file\`.`
+    );
+    return null;
+  }
+  return inline;
 }
 
 function parseStringList(raw: unknown, schemaPath: string, context: string): string[] | null {
