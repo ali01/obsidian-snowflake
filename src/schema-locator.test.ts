@@ -39,7 +39,6 @@ describe('findSchemaFile', () => {
     vault.addFile('Projects/.schema.yaml');
     expect(await findSchemaFile(vault as unknown as Vault, 'Projects')).toEqual({
       schemaPath: 'Projects/.schema.yaml',
-      kind: 'yaml',
       matchAnchor: 'Projects',
       templateAnchor: 'Projects'
     });
@@ -49,7 +48,6 @@ describe('findSchemaFile', () => {
     vault.addFile('.schema.yaml');
     expect(await findSchemaFile(vault as unknown as Vault, '')).toEqual({
       schemaPath: '.schema.yaml',
-      kind: 'yaml',
       matchAnchor: '',
       templateAnchor: ''
     });
@@ -59,7 +57,6 @@ describe('findSchemaFile', () => {
     vault.addFile('Projects/.schema/schema.yaml');
     expect(await findSchemaFile(vault as unknown as Vault, 'Projects')).toEqual({
       schemaPath: 'Projects/.schema/schema.yaml',
-      kind: 'yaml',
       matchAnchor: 'Projects',
       templateAnchor: 'Projects/.schema'
     });
@@ -69,52 +66,14 @@ describe('findSchemaFile', () => {
     vault.addFile('.schema/schema.yaml');
     expect(await findSchemaFile(vault as unknown as Vault, '')).toEqual({
       schemaPath: '.schema/schema.yaml',
-      kind: 'yaml',
       matchAnchor: '',
       templateAnchor: '.schema'
-    });
-  });
-
-  test('Finds the markdown shorthand form in a subfolder', async () => {
-    vault.addFile('Projects/.schema.md');
-    expect(await findSchemaFile(vault as unknown as Vault, 'Projects')).toEqual({
-      schemaPath: 'Projects/.schema.md',
-      kind: 'markdown',
-      matchAnchor: 'Projects',
-      templateAnchor: 'Projects'
-    });
-  });
-
-  test('Finds the markdown shorthand form at the vault root', async () => {
-    vault.addFile('.schema.md');
-    expect(await findSchemaFile(vault as unknown as Vault, '')).toEqual({
-      schemaPath: '.schema.md',
-      kind: 'markdown',
-      matchAnchor: '',
-      templateAnchor: ''
     });
   });
 
   test('Folder form wins over flat YAML when both are present', async () => {
     vault.addFile('Projects/.schema.yaml');
     vault.addFile('Projects/.schema/schema.yaml');
-    const result = await findSchemaFile(vault as unknown as Vault, 'Projects');
-    expect(result?.schemaPath).toBe('Projects/.schema/schema.yaml');
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-  });
-
-  test('Flat YAML wins over markdown when both are present', async () => {
-    vault.addFile('Projects/.schema.yaml');
-    vault.addFile('Projects/.schema.md');
-    const result = await findSchemaFile(vault as unknown as Vault, 'Projects');
-    expect(result?.schemaPath).toBe('Projects/.schema.yaml');
-    expect(result?.kind).toBe('yaml');
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-  });
-
-  test('Folder form wins over markdown when both are present', async () => {
-    vault.addFile('Projects/.schema/schema.yaml');
-    vault.addFile('Projects/.schema.md');
     const result = await findSchemaFile(vault as unknown as Vault, 'Projects');
     expect(result?.schemaPath).toBe('Projects/.schema/schema.yaml');
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -133,7 +92,6 @@ describe('findSchemaFile', () => {
     vault.addFile('.schema.yaml');
     expect(await findSchemaFile(vault as unknown as Vault, '/')).toEqual({
       schemaPath: '.schema.yaml',
-      kind: 'yaml',
       matchAnchor: '',
       templateAnchor: ''
     });

@@ -12,16 +12,11 @@ export const DEFAULT_SETTINGS: SnowflakeSettings = {
 /**
  * Filenames the plugin recognizes for declaring a folder as Snowflake-managed.
  *
- * Three forms (precedence: folder > yaml > md):
- *   1. Folder:   <dir>/.schema/schema.yaml — full power, can bundle templates.
- *   2. Flat YAML: <dir>/.schema.yaml — full power.
- *   3. Markdown: <dir>/.schema.md — shorthand. The whole file (frontmatter +
- *      body) IS the catch-all template applied to every new note in the
- *      folder. No `rules:`, `exclude:`, or `frontmatter-delete:` available;
- *      use a `.yaml` form when those are needed.
+ * Two forms (precedence: folder > flat):
+ *   1. Folder:   <dir>/.schema/schema.yaml — can bundle templates alongside.
+ *   2. Flat YAML: <dir>/.schema.yaml — single-file form.
  */
 export const SCHEMA_FILE_NAME = '.schema.yaml';
-export const SCHEMA_MD_FILE_NAME = '.schema.md';
 export const SCHEMA_FOLDER_NAME = '.schema';
 export const SCHEMA_FOLDER_FILE_NAME = 'schema.yaml';
 

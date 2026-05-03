@@ -115,24 +115,10 @@ Both forms support all variables (`{{title}}`, `{{date}}`, `{{time}}`,
 - A leading `/` means vault-absolute (`/Templates/note.md`).
 - Paths that escape the vault root are rejected.
 
-## Three schema locations
+## Two schema locations
 
-A folder can declare its schema in any of three forms; precedence runs
-folder > flat YAML > markdown when more than one is present (a console
-warning is emitted on conflict).
-
-**Markdown shorthand (`.schema.md`):**
-```
-Projects/
-├── .schema.md           # the file's frontmatter + body IS the catch-all template
-├── note-1.md
-└── note-2.md
-```
-
-The simplest form, and the most common case: a single template applied to
-every new note in the folder. The whole `.schema.md` file (frontmatter + body)
-is the template — no `rules:`, `exclude:`, or `frontmatter-delete:`. Use a
-`.yaml` form below when you need any of those.
+A folder can declare its schema in either form; the folder form wins over
+the flat form when both coexist (a console warning is emitted on conflict).
 
 **Flat YAML (`.schema.yaml`):**
 ```

@@ -77,20 +77,6 @@ export class TemplateLoader {
       const location = await findSchemaFile(this.vault, folderPath);
       if (!location) continue;
 
-      // `.schema.md` shorthand: the file itself is the catch-all template.
-      // Skip YAML parsing and synthesize a single-rule chain item that
-      // points at the markdown file as a vault-absolute external template.
-      if (location.kind === 'markdown') {
-        templates.push({
-          schemaPath: location.schemaPath,
-          folderPath: location.matchAnchor,
-          templateAnchor: location.templateAnchor,
-          depth: i,
-          resolvedTemplate: { schema: '/' + location.schemaPath }
-        });
-        continue;
-      }
-
       const yamlText = await this.loadTemplate(location.schemaPath);
       if (yamlText === null) continue;
 
@@ -251,7 +237,14 @@ function serializeInlineSchema(
     return body;
   }
 
-  const yaml = dumpYaml(fmObj, { lineWidth: -1, noRefs: true });
+  // `'!!null': 'empty'` makes `key: null` render as `key:` (empty value)
+  // so an inline `frontmatter: { foo: }` produces `foo:` in the rendered
+  // template — matching how a hand-written placeholder field looks.
+  const yaml = dumpYaml(fmObj, {
+    lineWidth: -1,
+    noRefs: true,
+    styles: { '!!null': 'empty' }
+  });
   const fmBlock = '---\n' + yaml + '---\n';
   return body === '' ? fmBlock : fmBlock + body;
 }

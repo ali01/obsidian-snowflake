@@ -135,7 +135,6 @@ var DEFAULT_SETTINGS = {
   timeFormat: "HH:mm"
 };
 var SCHEMA_FILE_NAME = ".schema.yaml";
-var SCHEMA_MD_FILE_NAME = ".schema.md";
 var SCHEMA_FOLDER_NAME = ".schema";
 var SCHEMA_FOLDER_FILE_NAME = "schema.yaml";
 var ID_CONFIG = {
@@ -2781,22 +2780,16 @@ async function findSchemaFile(vault, folderPath) {
   const dirPrefix = folderPath === "" || folderPath === "/" ? "" : folderPath + "/";
   const folderFilePath = dirPrefix + SCHEMA_FOLDER_NAME + "/" + SCHEMA_FOLDER_FILE_NAME;
   const flatPath = dirPrefix + SCHEMA_FILE_NAME;
-  const mdPath = dirPrefix + SCHEMA_MD_FILE_NAME;
-  const [folderExists, flatExists, mdExists] = await Promise.all([
+  const [folderExists, flatExists] = await Promise.all([
     vault.adapter.exists(folderFilePath),
-    vault.adapter.exists(flatPath),
-    vault.adapter.exists(mdPath)
+    vault.adapter.exists(flatPath)
   ]);
-  const present = [];
-  if (folderExists) present.push(folderFilePath);
-  if (flatExists) present.push(flatPath);
-  if (mdExists) present.push(mdPath);
-  if (present.length > 1) {
+  if (folderExists && flatExists) {
     const key = folderPath || "/";
     if (!warnedConflicts.has(key)) {
       warnedConflicts.add(key);
       console.warn(
-        `Snowflake: multiple schema forms exist (${present.join(", ")}); using ${present[0]}. Remove the others to silence this warning.`
+        `Snowflake: both ${folderFilePath} and ${flatPath} exist; using ${folderFilePath}. Remove the other to silence this warning.`
       );
     }
   }
@@ -2804,7 +2797,6 @@ async function findSchemaFile(vault, folderPath) {
   if (folderExists) {
     return {
       schemaPath: folderFilePath,
-      kind: "yaml",
       matchAnchor,
       templateAnchor: dirPrefix + SCHEMA_FOLDER_NAME
     };
@@ -2812,15 +2804,6 @@ async function findSchemaFile(vault, folderPath) {
   if (flatExists) {
     return {
       schemaPath: flatPath,
-      kind: "yaml",
-      matchAnchor,
-      templateAnchor: matchAnchor
-    };
-  }
-  if (mdExists) {
-    return {
-      schemaPath: mdPath,
-      kind: "markdown",
       matchAnchor,
       templateAnchor: matchAnchor
     };
@@ -3248,16 +3231,6 @@ var TemplateLoader = class {
       const folderPath = folderPaths[i];
       const location = await findSchemaFile(this.vault, folderPath);
       if (!location) continue;
-      if (location.kind === "markdown") {
-        templates.push({
-          schemaPath: location.schemaPath,
-          folderPath: location.matchAnchor,
-          templateAnchor: location.templateAnchor,
-          depth: i,
-          resolvedTemplate: { schema: "/" + location.schemaPath }
-        });
-        continue;
-      }
       const yamlText = await this.loadTemplate(location.schemaPath);
       if (yamlText === null) continue;
       const config = parseSchema(yamlText, location.schemaPath);
@@ -3378,7 +3351,11 @@ function serializeInlineSchema(schema2, frontmatterDelete) {
   if (fmKeys.length === 0) {
     return body;
   }
-  const yaml = dump(fmObj, { lineWidth: -1, noRefs: true });
+  const yaml = dump(fmObj, {
+    lineWidth: -1,
+    noRefs: true,
+    styles: { "!!null": "empty" }
+  });
   const fmBlock = "---\n" + yaml + "---\n";
   return body === "" ? fmBlock : fmBlock + body;
 }
@@ -4562,7 +4539,6 @@ function isSchemaArtifact(path) {
   const segments = path.split("/");
   const fileName = segments[segments.length - 1];
   if (fileName === SCHEMA_FILE_NAME) return true;
-  if (fileName === SCHEMA_MD_FILE_NAME) return true;
   for (let i = 0; i < segments.length - 1; i++) {
     if (segments[i] === SCHEMA_FOLDER_NAME) return true;
   }

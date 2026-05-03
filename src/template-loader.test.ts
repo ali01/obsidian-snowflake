@@ -215,25 +215,6 @@ rules:
       expect(chain.templates[0].templateAnchor).toBe('Projects/.schema');
     });
 
-    test('.schema.md shorthand applies the file itself as the catch-all template', async () => {
-      mockVault.addFile(
-        'Projects/.schema.md',
-        `---
-type: project
----
-# {{title}}
-`
-      );
-      const chain = await loader.getTemplateChain(makeFile('Projects/note.md'));
-      expect(chain.templates).toHaveLength(1);
-      expect(chain.templates[0].schemaPath).toBe('Projects/.schema.md');
-      expect(chain.templates[0].resolvedTemplate.schema).toBe('/Projects/.schema.md');
-
-      const loaded = await loader.loadTemplateChain(chain);
-      expect(loaded.templates[0].content).toContain('type: project');
-      expect(loaded.templates[0].content).toContain('# {{title}}');
-    });
-
     test('Malformed schema is skipped with a warning', async () => {
       mockVault.addFile(
         'Projects/.schema.yaml',
@@ -372,6 +353,16 @@ body
       expect(out).toMatch(/^---\n/);
       expect(out).toContain('type: note');
       expect(out).toContain('# Hello');
+    });
+
+    test('serializeInlineSchema renders null fields as empty placeholders', () => {
+      const out = TemplateLoaderTestUtils.serializeInlineSchema(
+        { frontmatter: { related: null, category: null } },
+        undefined
+      );
+      expect(out).toContain('related:');
+      expect(out).toContain('category:');
+      expect(out).not.toContain('null');
     });
 
     test('serializeInlineSchema adds delete list when frontmatter-delete is set', () => {

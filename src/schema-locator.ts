@@ -2,16 +2,13 @@
  * Schema locator
  *
  * For a given folder, finds the schema file that governs files in that folder.
- * Three forms are supported, in precedence order:
+ * Two forms are supported, in precedence order:
  *
- *   1. `.schema/schema.yaml` (folder form) — full power; can bundle templates.
- *   2. `.schema.yaml`        (flat YAML)   — full power.
- *   3. `.schema.md`          (markdown)    — shorthand: the file IS the
- *                                            catch-all template applied to
- *                                            every new note in the folder.
+ *   1. `.schema/schema.yaml` (folder form) — can bundle templates alongside.
+ *   2. `.schema.yaml`        (flat YAML)   — single-file form.
  *
- * Higher-precedence form wins when multiple coexist; a console warning is
- * emitted once per directory where the conflict occurs.
+ * Higher-precedence form wins when both coexist; a console warning is emitted
+ * once per directory where the conflict occurs.
  *
  * Existence checks go through `vault.adapter` rather than the indexed file
  * tree because Obsidian's high-level vault API does not expose dotfiles, and
@@ -21,7 +18,6 @@
 import type { Vault } from 'obsidian';
 import {
   SCHEMA_FILE_NAME,
-  SCHEMA_MD_FILE_NAME,
   SCHEMA_FOLDER_NAME,
   SCHEMA_FOLDER_FILE_NAME
 } from './constants';
@@ -29,18 +25,12 @@ import {
 export interface SchemaLocation {
   /** Path of the schema file inside the vault. */
   schemaPath: string;
-  /**
-   * `'yaml'` — the file is parsed as a `SchemaConfig`.
-   * `'markdown'` — the whole file is the catch-all template.
-   */
-  kind: 'yaml' | 'markdown';
   /** Folder that the schema "owns" — used for relative pattern matching. */
   matchAnchor: string;
   /**
    * Folder for resolving relative external template paths. Equals
-   * `matchAnchor` for the flat and markdown forms; equals
-   * `matchAnchor + '/.schema'` for the folder form (so `./web.md` resolves
-   * inside `.schema/`).
+   * `matchAnchor` for the flat form; equals `matchAnchor + '/.schema'` for
+   * the folder form (so `./web.md` resolves inside `.schema/`).
    */
   templateAnchor: string;
 }
@@ -54,26 +44,19 @@ export async function findSchemaFile(
   const dirPrefix = folderPath === '' || folderPath === '/' ? '' : folderPath + '/';
   const folderFilePath = dirPrefix + SCHEMA_FOLDER_NAME + '/' + SCHEMA_FOLDER_FILE_NAME;
   const flatPath = dirPrefix + SCHEMA_FILE_NAME;
-  const mdPath = dirPrefix + SCHEMA_MD_FILE_NAME;
 
-  const [folderExists, flatExists, mdExists] = await Promise.all([
+  const [folderExists, flatExists] = await Promise.all([
     vault.adapter.exists(folderFilePath),
-    vault.adapter.exists(flatPath),
-    vault.adapter.exists(mdPath)
+    vault.adapter.exists(flatPath)
   ]);
 
-  const present: string[] = [];
-  if (folderExists) present.push(folderFilePath);
-  if (flatExists) present.push(flatPath);
-  if (mdExists) present.push(mdPath);
-
-  if (present.length > 1) {
+  if (folderExists && flatExists) {
     const key = folderPath || '/';
     if (!warnedConflicts.has(key)) {
       warnedConflicts.add(key);
       console.warn(
-        `Snowflake: multiple schema forms exist (${present.join(', ')}); ` +
-          `using ${present[0]}. Remove the others to silence this warning.`
+        `Snowflake: both ${folderFilePath} and ${flatPath} exist; ` +
+          `using ${folderFilePath}. Remove the other to silence this warning.`
       );
     }
   }
@@ -83,7 +66,6 @@ export async function findSchemaFile(
   if (folderExists) {
     return {
       schemaPath: folderFilePath,
-      kind: 'yaml',
       matchAnchor,
       templateAnchor: dirPrefix + SCHEMA_FOLDER_NAME
     };
@@ -92,16 +74,6 @@ export async function findSchemaFile(
   if (flatExists) {
     return {
       schemaPath: flatPath,
-      kind: 'yaml',
-      matchAnchor,
-      templateAnchor: matchAnchor
-    };
-  }
-
-  if (mdExists) {
-    return {
-      schemaPath: mdPath,
-      kind: 'markdown',
       matchAnchor,
       templateAnchor: matchAnchor
     };
