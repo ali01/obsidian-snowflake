@@ -90,6 +90,54 @@ export interface InlineSchema {
 }
 
 /**
+ * Closed set of keys that mark a frontmatter field's value as a structured
+ * field spec rather than a literal default. Mapping values containing any of
+ * these keys (or any `$`-prefixed key) are interpreted as specs at
+ * materialization time: the plugin extracts `default:` (or null if absent)
+ * and writes that into the new note's frontmatter. Tools that consume the
+ * spec directly (lint, ingest) recognize the full vocabulary.
+ *
+ * Note: the plugin only acts on `default:` and the strip-meta-keys rule.
+ * Other keys (`type`, `enum`, `optional`, lifecycle, etc.) are documentation
+ * for tools and humans.
+ */
+export const SPEC_KEYS = new Set([
+  'type',
+  'default',
+  'optional',
+  'enum',
+  'values',
+  'format',
+  'length',
+  'target',
+  'item',
+  'pattern',
+  'immutable'
+]);
+
+/**
+ * FieldSpec: shape of a structured frontmatter field spec.
+ *
+ * Permissive on purpose — the plugin only inspects `default:` and ignores
+ * the rest. Tools that consume specs (lint, ingest) walk the same shape and
+ * apply their own validation.
+ */
+export interface FieldSpec {
+  type?: string;
+  default?: unknown;
+  optional?: boolean;
+  values?: unknown[];
+  enum?: unknown[];
+  format?: string;
+  length?: number;
+  target?: string;
+  item?: FieldSpec | Record<string, unknown>;
+  pattern?: string;
+  immutable?: boolean;
+  [metaKey: `$${string}`]: unknown;
+}
+
+/**
  * SchemaRule: one ordered entry inside a `.schema.yaml`'s `rules:` list.
  *
  * `schema` is always an inline object (no string form). `frontmatter-delete`

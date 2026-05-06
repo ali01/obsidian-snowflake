@@ -120,6 +120,50 @@ rules:
         archived: "{{time}}"
 ```
 
+### Structured field specs (optional)
+
+A frontmatter field's value can be either a **literal default** (current
+behavior) or a **structured spec** mapping. The two forms are
+distinguished by content: any mapping value containing a key from the
+recognized spec vocabulary is treated as a spec; otherwise the value is
+the literal default.
+
+```yaml
+rules:
+  - schema:
+      frontmatter:
+        # Literal — written verbatim into the new note's frontmatter.
+        title:                          # null placeholder
+        description: "default text"     # string default
+        tags: [auto, draft]             # list default
+        id: "{{snowflake_id}}"          # template default
+
+        # Structured spec — `default:` is materialized; the rest is metadata.
+        kind:
+          type: enum
+          values: [article, book, paper, podcast, video, thread, data]
+        priority:
+          type: enum
+          values: [1, 2, 3]
+          optional: true
+          $contract: |
+            Inbox-only triage. 1 = read soon. Dropped on promotion and
+            archive — irrelevant after the item leaves inbox/.
+```
+
+The plugin extracts `default:` (or `null` if absent) for each spec and
+ignores all other keys at write time. Tools that consume the spec
+directly — linters, ingest skills — read the full vocabulary from the
+same YAML file.
+
+**Recognized spec keys:** `type`, `default`, `optional`, `enum`/`values`,
+`format`, `length`, `target`, `item`, `pattern`, `immutable`. Plus any
+`$`-prefixed meta key (e.g. `$contract:` for prose documentation).
+
+`$`-prefixed keys are stripped from the materialized frontmatter at every
+nesting level, so `$contract:` and other meta keys never leak into user
+notes.
+
 ### Body: inline vs external file
 
 Use `body:` for short, inline bodies:

@@ -478,4 +478,173 @@ rules:
       expect(out).toContain('legacy');
     });
   });
+
+  describe('field spec extraction', () => {
+    test('Field with structured spec materializes as default', () => {
+      const out = TemplateLoaderTestUtils.serializeInlineSchema(
+        {
+          frontmatter: {
+            id: { type: 'id', default: '{{snowflake_id}}', length: 10 }
+          }
+        },
+        undefined
+      );
+      expect(out).toContain('id: ');
+      expect(out).toContain('{{snowflake_id}}');
+      expect(out).not.toContain('type:');
+      expect(out).not.toContain('length:');
+    });
+
+    test('Field with structured spec but no default materializes as empty', () => {
+      const out = TemplateLoaderTestUtils.serializeInlineSchema(
+        {
+          frontmatter: {
+            kind: {
+              type: 'enum',
+              values: ['article', 'book', 'paper']
+            }
+          }
+        },
+        undefined
+      );
+      expect(out).toContain('kind:');
+      expect(out).not.toContain('type:');
+      expect(out).not.toContain('values:');
+      expect(out).not.toContain('article');
+    });
+
+    test('Field with literal value passes through unchanged', () => {
+      const out = TemplateLoaderTestUtils.serializeInlineSchema(
+        {
+          frontmatter: {
+            description: 'default text',
+            tags: ['auto', 'draft'],
+            ref: '{{snowflake_id}}'
+          }
+        },
+        undefined
+      );
+      expect(out).toContain('description: default text');
+      expect(out).toMatch(/tags:\s*\n\s*-\s*auto\s*\n\s*-\s*draft/);
+      expect(out).toContain('{{snowflake_id}}');
+    });
+
+    test('$contract and other $-prefixed keys never leak into output', () => {
+      const out = TemplateLoaderTestUtils.serializeInlineSchema(
+        {
+          frontmatter: {
+            priority: {
+              type: 'enum',
+              values: [1, 2, 3],
+              optional: true,
+              $contract: 'Inbox-only triage. 1 = read soon.'
+            },
+            $loose: 'should not appear'
+          }
+        },
+        undefined
+      );
+      expect(out).not.toContain('$contract');
+      expect(out).not.toContain('Inbox-only');
+      expect(out).not.toContain('$loose');
+      expect(out).not.toContain('should not appear');
+      expect(out).toContain('priority:');
+    });
+
+    test('Mixed literal and structured fields in the same frontmatter block', () => {
+      const out = TemplateLoaderTestUtils.serializeInlineSchema(
+        {
+          frontmatter: {
+            id: { type: 'id', default: 'x8K2n5pQ7A' },
+            title: null,
+            kind: { type: 'enum', values: ['article'] },
+            tags: ['auto']
+          }
+        },
+        undefined
+      );
+      expect(out).toContain('id: x8K2n5pQ7A');
+      expect(out).toContain('title:');
+      expect(out).toContain('kind:');
+      expect(out).toMatch(/tags:\s*\n\s*-\s*auto/);
+    });
+
+    test('Structured spec inside body-file flow is unchanged (frontmatter-only feature)', () => {
+      // body-file references a body-only .md; the inline frontmatter still
+      // applies the spec extraction. This is the same code path; the test
+      // just confirms structured specs and body-file coexist.
+      const out = TemplateLoaderTestUtils.serializeInlineSchema(
+        {
+          frontmatter: {
+            id: { type: 'id', default: '{{snowflake_id}}' }
+          },
+          body: '# {{title}}\nbody content'
+        },
+        undefined
+      );
+      expect(out).toContain('{{snowflake_id}}');
+      expect(out).toContain('# {{title}}');
+      expect(out).toContain('body content');
+    });
+
+    test('fieldDefault: structured spec returns default', () => {
+      expect(
+        TemplateLoaderTestUtils.fieldDefault({
+          type: 'string',
+          default: 'hello'
+        })
+      ).toBe('hello');
+    });
+
+    test('fieldDefault: structured spec without default returns null', () => {
+      expect(
+        TemplateLoaderTestUtils.fieldDefault({
+          type: 'enum',
+          values: ['a', 'b']
+        })
+      ).toBeNull();
+    });
+
+    test('fieldDefault: literal scalar passes through', () => {
+      expect(TemplateLoaderTestUtils.fieldDefault('foo')).toBe('foo');
+      expect(TemplateLoaderTestUtils.fieldDefault(42)).toBe(42);
+      expect(TemplateLoaderTestUtils.fieldDefault(null)).toBeNull();
+    });
+
+    test('fieldDefault: $-only mapping treated as spec', () => {
+      // A mapping that only has $-prefixed keys (no SPEC_KEYS) is still a
+      // spec — meta keys count as a spec marker.
+      expect(
+        TemplateLoaderTestUtils.fieldDefault({
+          $contract: 'just a note'
+        })
+      ).toBeNull();
+    });
+
+    test('fieldDefault: literal mapping with no spec keys passes through', () => {
+      const literal = { foo: 'bar', count: 3 };
+      expect(TemplateLoaderTestUtils.fieldDefault(literal)).toEqual(literal);
+    });
+
+    test('stripMetaKeys: removes $-prefixed keys recursively', () => {
+      const input = {
+        keep: 1,
+        $contract: 'drop',
+        nested: {
+          also_keep: 2,
+          $note: 'drop',
+          deeper: { $hidden: 'drop', visible: true }
+        },
+        list: [{ $meta: 'drop', x: 1 }, 'untouched']
+      };
+      expect(TemplateLoaderTestUtils.stripMetaKeys(input)).toEqual({
+        keep: 1,
+        nested: {
+          also_keep: 2,
+          deeper: { visible: true }
+        },
+        list: [{ x: 1 }, 'untouched']
+      });
+    });
+  });
 });

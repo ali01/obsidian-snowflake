@@ -23,6 +23,7 @@ import type {
   ResolvedTemplate,
   InlineSchema
 } from './types';
+import { SPEC_KEYS } from './types';
 import { findSchemaFile } from './schema-locator';
 import { parseSchema } from './schema-parser';
 import { selectTemplates } from './schema-resolver';
@@ -242,7 +243,11 @@ function serializeInlineSchema(
   schema: InlineSchema,
   frontmatterDelete: string[] | undefined
 ): string {
-  const fmObj: Record<string, unknown> = { ...(schema.frontmatter ?? {}) };
+  const fmObj: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema.frontmatter ?? {})) {
+    if (key.startsWith('$')) continue;
+    fmObj[key] = stripMetaKeys(fieldDefault(value));
+  }
   if (frontmatterDelete && frontmatterDelete.length > 0) {
     fmObj['delete'] = frontmatterDelete;
   }
@@ -266,6 +271,50 @@ function serializeInlineSchema(
   return body === '' ? fmBlock : fmBlock + body;
 }
 
+/**
+ * If `value` is a structured field spec (a mapping containing any key from
+ * `SPEC_KEYS` or any `$`-prefixed meta key), return its `default:` (or null
+ * if absent). Otherwise return the value verbatim — preserves backward-
+ * compatible literal-default behavior for every existing schema.
+ */
+function fieldDefault(value: unknown): unknown {
+  if (!isPlainObject(value)) return value;
+  if (!hasAnySpecKey(value)) return value;
+  return 'default' in value ? value.default : null;
+}
+
+/**
+ * Recursively remove keys starting with `$` from any mapping or array of
+ * mappings. The `$` prefix marks plugin metadata (`$contract:`, future meta
+ * keys) that must never leak into materialized note frontmatter.
+ */
+function stripMetaKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripMetaKeys(v));
+  }
+  if (isPlainObject(value)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (k.startsWith('$')) continue;
+      out[k] = stripMetaKeys(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+function hasAnySpecKey(obj: Record<string, unknown>): boolean {
+  for (const key of Object.keys(obj)) {
+    if (SPEC_KEYS.has(key)) return true;
+    if (key.startsWith('$')) return true;
+  }
+  return false;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 function describeResolved(r: ResolvedTemplate): string {
   const bodyFile = r.schema['body-file'];
   if (bodyFile !== undefined) return bodyFile;
@@ -282,5 +331,7 @@ export const TemplateLoaderTestUtils = {
     schema: InlineSchema,
     frontmatterDelete: string[] | undefined
   ): string => serializeInlineSchema(schema, frontmatterDelete),
-  relativeTo: (filePath: string, anchor: string): string => relativeTo(filePath, anchor)
+  relativeTo: (filePath: string, anchor: string): string => relativeTo(filePath, anchor),
+  fieldDefault: (value: unknown): unknown => fieldDefault(value),
+  stripMetaKeys: (value: unknown): unknown => stripMetaKeys(value)
 };

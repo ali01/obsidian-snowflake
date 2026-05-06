@@ -186,6 +186,19 @@ var import_obsidian4 = require("obsidian");
 function isMarkdownFile(file) {
   return file.extension === "md";
 }
+var SPEC_KEYS = /* @__PURE__ */ new Set([
+  "type",
+  "default",
+  "optional",
+  "enum",
+  "values",
+  "format",
+  "length",
+  "target",
+  "item",
+  "pattern",
+  "immutable"
+]);
 
 // node_modules/js-yaml/dist/js-yaml.mjs
 function isNothing(subject) {
@@ -3398,7 +3411,11 @@ function resolveTemplatePath(ref, templateAnchor) {
 }
 function serializeInlineSchema(schema2, frontmatterDelete) {
   var _a, _b;
-  const fmObj = { ...(_a = schema2.frontmatter) != null ? _a : {} };
+  const fmObj = {};
+  for (const [key, value] of Object.entries((_a = schema2.frontmatter) != null ? _a : {})) {
+    if (key.startsWith("$")) continue;
+    fmObj[key] = stripMetaKeys(fieldDefault(value));
+  }
   if (frontmatterDelete && frontmatterDelete.length > 0) {
     fmObj["delete"] = frontmatterDelete;
   }
@@ -3414,6 +3431,35 @@ function serializeInlineSchema(schema2, frontmatterDelete) {
   });
   const fmBlock = "---\n" + yaml + "---\n";
   return body === "" ? fmBlock : fmBlock + body;
+}
+function fieldDefault(value) {
+  if (!isPlainObject2(value)) return value;
+  if (!hasAnySpecKey(value)) return value;
+  return "default" in value ? value.default : null;
+}
+function stripMetaKeys(value) {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripMetaKeys(v));
+  }
+  if (isPlainObject2(value)) {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (k.startsWith("$")) continue;
+      out[k] = stripMetaKeys(v);
+    }
+    return out;
+  }
+  return value;
+}
+function hasAnySpecKey(obj) {
+  for (const key of Object.keys(obj)) {
+    if (SPEC_KEYS.has(key)) return true;
+    if (key.startsWith("$")) return true;
+  }
+  return false;
+}
+function isPlainObject2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function describeResolved(r) {
   const bodyFile = r.schema["body-file"];
