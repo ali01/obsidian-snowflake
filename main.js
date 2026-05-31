@@ -2824,6 +2824,113 @@ async function findSchemaFile(vault, folderPath) {
   return null;
 }
 
+// src/pattern-matcher.ts
+var PLACEHOLDER_PATTERN = /^\{\{\s*([A-Za-z][A-Za-z0-9_]*)\s*\}\}$/;
+function matchesExclusionPattern(filePath, patterns) {
+  var _a;
+  if (!patterns || patterns.length === 0) {
+    return false;
+  }
+  const fileName = (_a = filePath.split("/").pop()) != null ? _a : filePath;
+  return patterns.some((pattern) => {
+    if (!pattern || pattern.trim() === "") {
+      return false;
+    }
+    if (pattern.endsWith("/")) {
+      const dirPath = pattern.slice(0, -1);
+      return filePath.startsWith(dirPath + "/") || filePath === dirPath;
+    }
+    if (pattern === filePath || pattern === fileName) {
+      return true;
+    }
+    const regexPattern = globToRegex(pattern);
+    return regexPattern.test(filePath) || regexPattern.test(fileName);
+  });
+}
+function matchesGlob(filePath, pattern) {
+  if (!pattern || pattern.trim() === "") {
+    return false;
+  }
+  if (validateMatchPattern(pattern) !== null) {
+    return false;
+  }
+  return matchPatternToRegex(pattern).test(filePath);
+}
+function validateMatchPattern(pattern) {
+  let searchIndex = 0;
+  while (searchIndex < pattern.length) {
+    const nextOpen = pattern.indexOf("{{", searchIndex);
+    const nextClose = pattern.indexOf("}}", searchIndex);
+    if (nextOpen === -1) {
+      return nextClose === -1 ? null : "malformed placeholder";
+    }
+    if (nextClose !== -1 && nextClose < nextOpen) {
+      return "malformed placeholder";
+    }
+    const end = pattern.indexOf("}}", nextOpen + 2);
+    if (end === -1) {
+      return "malformed placeholder";
+    }
+    const placeholder = pattern.slice(nextOpen, end + 2);
+    if (!PLACEHOLDER_PATTERN.test(placeholder)) {
+      return `malformed placeholder ${placeholder}`;
+    }
+    searchIndex = end + 2;
+  }
+  return null;
+}
+function matchPatternToRegex(pattern) {
+  var _a;
+  const validationError = validateMatchPattern(pattern);
+  if (validationError !== null) {
+    throw new Error(validationError);
+  }
+  const capturedNames = /* @__PURE__ */ new Set();
+  let regex = "";
+  for (let i = 0; i < pattern.length; ) {
+    if (pattern.startsWith("{{", i)) {
+      const end = pattern.indexOf("}}", i + 2);
+      const placeholder = pattern.slice(i, end + 2);
+      const name = (_a = PLACEHOLDER_PATTERN.exec(placeholder)) == null ? void 0 : _a[1];
+      if (name === void 0) {
+        throw new Error(`malformed placeholder ${placeholder}`);
+      }
+      if (capturedNames.has(name)) {
+        regex += `\\k<${name}>`;
+      } else {
+        capturedNames.add(name);
+        regex += `(?<${name}>[^/]+)`;
+      }
+      i = end + 2;
+      continue;
+    }
+    if (pattern.startsWith("**", i)) {
+      regex += ".*";
+      i += 2;
+      continue;
+    }
+    const char = pattern[i];
+    if (char === "*") {
+      regex += "[^/]*";
+    } else if (char === "?") {
+      regex += ".";
+    } else {
+      regex += escapeRegexChar(char);
+    }
+    i++;
+  }
+  return new RegExp(`^${regex}$`);
+}
+function globToRegex(glob) {
+  let pattern = glob.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+  pattern = pattern.replace(/\*\*/g, "{{DOUBLESTAR}}").replace(/\*/g, "[^/]*").replace(/\?/g, ".").replace(/{{DOUBLESTAR}}/g, ".*");
+  pattern = "^" + pattern + "$";
+  return new RegExp(pattern);
+}
+function escapeRegexChar(char) {
+  return /[.+^${}()|[\]\\]/.test(char) ? `\\${char}` : char;
+}
+
 // src/schema-parser.ts
 function parseSchema(yamlText, schemaPath = "<schema>") {
   let raw;
@@ -2900,6 +3007,13 @@ function parseMatch(raw, schemaPath, index) {
       );
       return null;
     }
+    const validationError = validateMatchPattern(raw);
+    if (validationError !== null) {
+      console.warn(
+        `Snowflake: ${schemaPath}: rules[${String(index)}].match has ${validationError}.`
+      );
+      return null;
+    }
     return raw;
   }
   if (Array.isArray(raw)) {
@@ -2914,6 +3028,13 @@ function parseMatch(raw, schemaPath, index) {
       if (typeof item !== "string" || item.trim() === "") {
         console.warn(
           `Snowflake: ${schemaPath}: rules[${String(index)}].match entries must all be non-empty strings.`
+        );
+        return null;
+      }
+      const validationError = validateMatchPattern(item);
+      if (validationError !== null) {
+        console.warn(
+          `Snowflake: ${schemaPath}: rules[${String(index)}].match entry has ${validationError}.`
         );
         return null;
       }
@@ -2989,41 +3110,6 @@ function parseStringList(raw, schemaPath, context) {
 }
 function isPlainObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-// src/pattern-matcher.ts
-function matchesExclusionPattern(filePath, patterns) {
-  var _a;
-  if (!patterns || patterns.length === 0) {
-    return false;
-  }
-  const fileName = (_a = filePath.split("/").pop()) != null ? _a : filePath;
-  return patterns.some((pattern) => {
-    if (!pattern || pattern.trim() === "") {
-      return false;
-    }
-    if (pattern.endsWith("/")) {
-      const dirPath = pattern.slice(0, -1);
-      return filePath.startsWith(dirPath + "/") || filePath === dirPath;
-    }
-    if (pattern === filePath || pattern === fileName) {
-      return true;
-    }
-    const regexPattern = globToRegex(pattern);
-    return regexPattern.test(filePath) || regexPattern.test(fileName);
-  });
-}
-function matchesGlob(filePath, pattern) {
-  if (!pattern || pattern.trim() === "") {
-    return false;
-  }
-  return globToRegex(pattern).test(filePath);
-}
-function globToRegex(glob) {
-  let pattern = glob.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-  pattern = pattern.replace(/\*\*/g, "{{DOUBLESTAR}}").replace(/\*/g, "[^/]*").replace(/\?/g, ".").replace(/{{DOUBLESTAR}}/g, ".*");
-  pattern = "^" + pattern + "$";
-  return new RegExp(pattern);
 }
 
 // src/schema-resolver.ts

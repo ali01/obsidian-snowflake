@@ -206,6 +206,24 @@ rules:
     });
   });
 
+  test('Parses a match with repeated path placeholders', () => {
+    const yaml = `
+rules:
+  - match: "invest/{{company}}/{{company}}.md"
+    schema:
+      frontmatter:
+        type: company
+`;
+    expect(parseSchema(yaml)).toEqual({
+      rules: [
+        {
+          match: 'invest/{{company}}/{{company}}.md',
+          schema: { frontmatter: { type: 'company' } }
+        }
+      ]
+    });
+  });
+
   test('Rejects an empty match list', () => {
     expect(
       parseSchema(`
@@ -237,6 +255,19 @@ rules:
         type: note
 `)
     ).toBeNull();
+  });
+
+  test('Rejects a match with malformed path placeholders', () => {
+    expect(
+      parseSchema(`
+rules:
+  - match: "invest/{{company-name}}/{{company-name}}.md"
+    schema:
+      frontmatter:
+        type: company
+`)
+    ).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('malformed placeholder'));
   });
 
   test('Rejects a rule missing schema', () => {

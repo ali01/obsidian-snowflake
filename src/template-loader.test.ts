@@ -195,6 +195,39 @@ describe('TemplateLoader', () => {
       expect(merged).toContain('archived:');
     });
 
+    test('Placeholder matches route same-name directory index pages only', async () => {
+      mockVault.addFile(
+        'brain/.schema.yaml',
+        `rules:
+  - match: "invest/{{company}}/{{company}}.md"
+    schema:
+      frontmatter:
+        type: company
+  - match: "invest/**/MEETINGS.md"
+    schema:
+      frontmatter:
+        type: meetings
+`
+      );
+
+      const companyChain = await loader.getTemplateChain(makeFile('brain/invest/Acme/Acme.md'));
+      expect(companyChain.templates.map((t) => t.resolvedTemplate.schema)).toEqual([
+        { frontmatter: { type: 'company' } }
+      ]);
+
+      const meetingsChain = await loader.getTemplateChain(
+        makeFile('brain/invest/Acme/MEETINGS.md')
+      );
+      expect(meetingsChain.templates.map((t) => t.resolvedTemplate.schema)).toEqual([
+        { frontmatter: { type: 'meetings' } }
+      ]);
+
+      const artifactChain = await loader.getTemplateChain(
+        makeFile('brain/invest/Acme/Research Report.md')
+      );
+      expect(artifactChain.templates).toHaveLength(0);
+    });
+
     test('Inherits from ancestor schemas root → leaf', async () => {
       mockVault.addFile(
         '.schema.yaml',

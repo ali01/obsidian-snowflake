@@ -79,13 +79,15 @@ exclude vault-wide, put an `exclude:` list in a vault-root `.schema.yaml`.
 
 An ordered list. Each rule has:
 
-- `match` — optional glob (`*`, `**`, `?` supported) evaluated relative to
-  the schema's folder. May be a single string or a list of patterns; a list
-  matches when **any** of its patterns matches. **Every rule whose `match:`
-  fires contributes**, in declaration order — later rules override earlier
-  ones for scalar frontmatter and append to lists. A rule with no `match:`
-  is a base layer that fires for every file; rules after it are overlays,
-  not "unreachable".
+- `match` — optional path pattern evaluated relative to the schema's folder.
+  Globs (`*`, `**`, `?`) are supported, as are named path captures like
+  `{{company}}/{{company}}.md`. A capture matches one path segment; repeating
+  the same name requires the same text. May be a single string or a list of
+  patterns; a list matches when **any** pattern matches. **Every rule whose
+  `match:` fires contributes**, in declaration order — later rules override
+  earlier ones for scalar frontmatter and append to lists. A rule with no
+  `match:` is a base layer that fires for every file; rules after it are
+  overlays, not "unreachable".
 - `schema` — an inline mapping with any of:
   - `frontmatter` — inline frontmatter map (the only place frontmatter
     can live).
@@ -97,6 +99,24 @@ An ordered list. Each rule has:
 
 If no rule matches and there is no catch-all, the schema contributes nothing
 — but the inheritance walk continues through ancestors.
+
+#### Dynamic path captures
+
+Use `{{name}}` inside `match:` when part of the path is not known ahead of
+time but must repeat elsewhere in the same path:
+
+```yaml
+rules:
+  - match: "invest/{{company}}/{{company}}.md"
+    schema:
+      frontmatter:
+        type: company
+```
+
+This matches `invest/Acme/Acme.md` and `invest/Acme AI/Acme AI.md`, but not
+`invest/Acme/MEETINGS.md` or `invest/Acme/Other.md`. Path captures are only
+for rule matching; they are not template variables like `{{title}}`,
+`{{date}}`, or `{{snowflake_id}}`.
 
 #### Layering rules within one schema
 
@@ -259,6 +279,9 @@ rules if you need it everywhere.
 
 ## Variables
 
+Template variables are evaluated inside materialized template content, not in
+`match:` patterns. Path captures in `match:` are a separate routing feature.
+
 | Variable           | Replacement                                          |
 | ------------------ | ---------------------------------------------------- |
 | `{{title}}`        | Filename without `.md`                               |
@@ -315,9 +338,9 @@ src/
 ├── template-loader.ts         # walks the schema chain & materializes templates
 ├── schema-locator.ts          # finds .schema.yaml or .schema/schema.yaml
 ├── schema-parser.ts           # validates and parses schema YAML
-├── schema-resolver.ts         # picks a template via first-match-wins (catch-all = no `match:`)
+├── schema-resolver.ts         # selects every matching schema rule
 ├── frontmatter-merger.ts      # YAML frontmatter merge engine
-├── pattern-matcher.ts         # glob → regex
+├── pattern-matcher.ts         # glob/path-capture matching
 ├── template-variables.ts      # {{title}} / {{date}} / {{time}} / {{snowflake_id}}
 ├── nanoid.ts                  # ID generation
 └── ui/                        # settings + modals

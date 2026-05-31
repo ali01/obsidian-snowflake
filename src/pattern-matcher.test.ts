@@ -1,4 +1,9 @@
-import { matchesExclusionPattern, matchesGlob, globToRegex } from './pattern-matcher';
+import {
+  matchesExclusionPattern,
+  matchesGlob,
+  globToRegex,
+  validateMatchPattern
+} from './pattern-matcher';
 
 describe('PatternMatcher', () => {
   describe('matchesExclusionPattern', () => {
@@ -102,6 +107,12 @@ describe('PatternMatcher', () => {
       expect(matchesExclusionPattern('folder/draft-123.md', patterns)).toBe(true);
       expect(matchesExclusionPattern('Current/file.md', patterns)).toBe(false);
     });
+
+    test('Should not treat placeholders as captures in exclusions', () => {
+      const patterns = ['invest/{{company}}/{{company}}.md'];
+
+      expect(matchesExclusionPattern('invest/Acme/Acme.md', patterns)).toBe(false);
+    });
   });
 
   describe('matchesGlob', () => {
@@ -120,6 +131,34 @@ describe('PatternMatcher', () => {
     test('Should return false for empty pattern', () => {
       expect(matchesGlob('any.md', '')).toBe(false);
       expect(matchesGlob('any.md', '   ')).toBe(false);
+    });
+
+    test('Should match repeated path placeholders by equality', () => {
+      const pattern = 'invest/{{company}}/{{company}}.md';
+
+      expect(matchesGlob('invest/Acme/Acme.md', pattern)).toBe(true);
+      expect(matchesGlob('invest/Acme/MEETINGS.md', pattern)).toBe(false);
+      expect(matchesGlob('invest/Acme/Other.md', pattern)).toBe(false);
+      expect(matchesGlob('invest/Acme AI/Acme AI.md', pattern)).toBe(true);
+    });
+
+    test('Should keep path placeholders within one path segment', () => {
+      expect(matchesGlob('invest/Acme/AI/AI.md', 'invest/{{company}}/{{company}}.md')).toBe(
+        false
+      );
+    });
+
+    test('Should support whitespace inside path placeholders', () => {
+      expect(matchesGlob('invest/Acme/Acme.md', 'invest/{{ company }}/{{company}}.md')).toBe(
+        true
+      );
+    });
+
+    test('Should reject malformed path placeholders', () => {
+      expect(validateMatchPattern('invest/{{company-name}}/{{company-name}}.md')).toContain(
+        'malformed placeholder'
+      );
+      expect(matchesGlob('invest/Acme/Acme.md', 'invest/{{company-name}}.md')).toBe(false);
     });
   });
 

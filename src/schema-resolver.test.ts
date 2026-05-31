@@ -154,4 +154,27 @@ describe('selectTemplates', () => {
       { frontmatter: { archived: '{{time}}' } }
     ]);
   });
+
+  test('A placeholder match participates in accumulating rules', () => {
+    const config: SchemaConfig = {
+      rules: [
+        {
+          match: 'invest/**',
+          schema: { frontmatter: { tier: 'invest' } }
+        },
+        {
+          match: 'invest/{{company}}/{{company}}.md',
+          schema: { frontmatter: { type: 'company' } }
+        }
+      ]
+    };
+
+    expect(selectTemplates(config, 'invest/Acme/Acme.md').map((r) => r.schema)).toEqual([
+      { frontmatter: { tier: 'invest' } },
+      { frontmatter: { type: 'company' } }
+    ]);
+    expect(selectTemplates(config, 'invest/Acme/MEETINGS.md').map((r) => r.schema)).toEqual([
+      { frontmatter: { tier: 'invest' } }
+    ]);
+  });
 });

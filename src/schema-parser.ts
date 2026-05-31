@@ -11,6 +11,7 @@
 
 import { load as parseYaml, YAMLException } from 'js-yaml';
 import type { SchemaConfig, SchemaRule, InlineSchema } from './types';
+import { validateMatchPattern } from './pattern-matcher';
 
 /**
  * Parse `.schema.yaml` text into a typed `SchemaConfig`.
@@ -114,6 +115,14 @@ function parseMatch(
       );
       return null;
     }
+    const validationError = validateMatchPattern(raw);
+    if (validationError !== null) {
+      console.warn(
+        `Snowflake: ${schemaPath}: rules[${String(index)}].match has ` +
+          `${validationError}.`
+      );
+      return null;
+    }
     return raw;
   }
   if (Array.isArray(raw)) {
@@ -129,6 +138,14 @@ function parseMatch(
         console.warn(
           `Snowflake: ${schemaPath}: rules[${String(index)}].match entries ` +
             `must all be non-empty strings.`
+        );
+        return null;
+      }
+      const validationError = validateMatchPattern(item);
+      if (validationError !== null) {
+        console.warn(
+          `Snowflake: ${schemaPath}: rules[${String(index)}].match entry ` +
+            `has ${validationError}.`
         );
         return null;
       }

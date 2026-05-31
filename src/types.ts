@@ -144,10 +144,9 @@ export interface FieldSpec {
  * lists property names to exclude from the inherited frontmatter when this
  * rule's schema is merged into the chain.
  *
- * `match` is optional. It can be a single glob (string) or a list of globs
- * (string[]) — a list matches when any of its patterns matches. A rule with
- * no `match:` is the catch-all and matches every file. Any rule appearing
- * after a catch-all is unreachable.
+ * `match` is optional. It can be a single path pattern (string) or a list of
+ * path patterns (string[]) — a list matches when any of its patterns matches.
+ * A rule with no `match:` is a base layer that matches every file.
  */
 export interface SchemaRule {
   match?: string | string[];
