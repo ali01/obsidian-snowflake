@@ -20,7 +20,8 @@ export interface SnowflakeSettings {
 /**
  * TemplateVariableContext: Data available for template variable replacement
  *
- * Variables: {{title}}, {{date}}, {{time}}, {{snowflake_id}}.
+ * Variables: {{title}}, {{date}}, {{time}}, {{snowflake_id}},
+ * {{parent_directory}}.
  * snowflakeId is optional because it's generated lazily only when the
  * template actually contains {{snowflake_id}}.
  */
@@ -28,6 +29,7 @@ export interface TemplateVariableContext {
   title: string;
   date: string;
   time: string;
+  parentDirectory: string;
   snowflakeId?: string;
 }
 

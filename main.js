@@ -122,6 +122,9 @@ var SnowflakeSettingTab = class extends import_obsidian.PluginSettingTab {
       text: `{{time}} - Current time (using your format: ${this.plugin.settings.timeFormat})`
     });
     variableList.createEl("li", { text: "{{snowflake_id}} - Unique 10-character ID" });
+    variableList.createEl("li", {
+      text: "{{parent_directory}} - The note parent folder, or vault folder at root"
+    });
     containerEl.createEl("p", {
       cls: "setting-item-description",
       text: "File excludes: add an `exclude:` list to any `.schema.yaml` to skip matching files in that subtree (replaces the old global exclude patterns setting)."
@@ -3573,8 +3576,13 @@ var VARIABLE_HANDLERS = {
   title: (context) => context.title,
   date: (context) => context.date,
   time: (context) => context.time,
-  snowflakeId: (context) => context.snowflakeId
+  snowflake_id: (context) => context.snowflakeId,
+  parent_directory: (context) => context.parentDirectory
 };
+function isFileSystemAdapterLike(adapter) {
+  const candidate = adapter;
+  return typeof (candidate == null ? void 0 : candidate.getBasePath) === "function";
+}
 var TemplateVariableProcessor = class {
   constructor(dateFormat = DEFAULT_DATE_FORMAT, timeFormat = DEFAULT_TIME_FORMAT) {
     this.dateFormat = dateFormat;
@@ -3583,7 +3591,8 @@ var TemplateVariableProcessor = class {
   /**
    * Process template content and replace all variables
    *
-   * REQ-011: Replace {{title}}, {{date}}, {{time}}, {{snowflake_id}}
+   * REQ-011: Replace {{title}}, {{date}}, {{time}}, {{snowflake_id}},
+   * {{parent_directory}}
    * REQ-016: Ensure same ID value for multiple {{snowflake_id}} instances
    *
    * @param templateContent - The template content to process
@@ -3618,12 +3627,32 @@ var TemplateVariableProcessor = class {
       title: file.basename,
       // filename without .md extension
       date: now.format(this.dateFormat),
-      time: now.format(this.timeFormat)
+      time: now.format(this.timeFormat),
+      parentDirectory: this.getParentDirectory(file)
     };
     if (generateId) {
       context.snowflakeId = generateNanoID();
     }
     return context;
+  }
+  getParentDirectory(file) {
+    if (file.parent !== null && !file.parent.isRoot()) {
+      return file.parent.name;
+    }
+    return this.getVaultDirectoryName(file);
+  }
+  getVaultDirectoryName(file) {
+    var _a, _b;
+    const vault = file.vault;
+    if (isFileSystemAdapterLike(vault.adapter)) {
+      const basePath = vault.adapter.getBasePath().replace(/[\\/]+$/, "");
+      const pathParts = basePath.split(/[\\/]/);
+      const directoryName = pathParts[pathParts.length - 1];
+      if (directoryName !== "") {
+        return directoryName;
+      }
+    }
+    return (_b = (_a = vault.getName) == null ? void 0 : _a.call(vault)) != null ? _b : "";
   }
   /**
    * Replace all variables in the content
@@ -3637,11 +3666,10 @@ var TemplateVariableProcessor = class {
    */
   replaceVariables(content, context) {
     return content.replace(VARIABLE_REGEX, (match, varName) => {
-      const handlerKey = varName === "snowflake_id" ? "snowflakeId" : varName;
-      if (!(handlerKey in VARIABLE_HANDLERS)) {
+      if (!(varName in VARIABLE_HANDLERS)) {
         return match;
       }
-      const handler = VARIABLE_HANDLERS[handlerKey];
+      const handler = VARIABLE_HANDLERS[varName];
       const value = handler(context);
       return value != null ? value : match;
     });
@@ -3680,7 +3708,7 @@ var TemplateVariableProcessor = class {
     const matches = templateContent.matchAll(VARIABLE_REGEX);
     for (const match of matches) {
       const varName = match[1];
-      if (!(varName in VARIABLE_HANDLERS) && varName !== "snowflake_id") {
+      if (!(varName in VARIABLE_HANDLERS)) {
         invalidVars.push(varName);
       }
     }

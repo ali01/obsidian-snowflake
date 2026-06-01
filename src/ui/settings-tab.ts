@@ -125,6 +125,9 @@ export class SnowflakeSettingTab extends PluginSettingTab {
       text: `{{time}} - Current time (using your format: ${this.plugin.settings.timeFormat})`
     });
     variableList.createEl('li', { text: '{{snowflake_id}} - Unique 10-character ID' });
+    variableList.createEl('li', {
+      text: '{{parent_directory}} - The note parent folder, or vault folder at root'
+    });
 
     containerEl.createEl('p', {
       cls: 'setting-item-description',

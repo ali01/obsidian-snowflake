@@ -12,15 +12,37 @@ import {
 } from './template-variables';
 import { MarkdownFile } from './types';
 
+interface MockFolder {
+  name: string;
+  path: string;
+  isRoot: () => boolean;
+}
+
+interface MockFileOptions {
+  parent?: MockFolder | null;
+  vaultName?: string;
+  vaultBasePath?: string;
+}
+
 // Mock file for testing
-function createMockFile(basename: string): MarkdownFile {
+function createMockFile(basename: string, options: MockFileOptions = {}): MarkdownFile {
+  const vault = {
+    adapter:
+      options.vaultBasePath === undefined
+        ? {}
+        : {
+            getBasePath: (): string => options.vaultBasePath ?? ''
+          },
+    getName: (): string => options.vaultName ?? 'Test Vault'
+  };
+
   return {
     basename,
     extension: 'md' as const,
     path: `test/${basename}.md`,
     name: `${basename}.md`,
-    parent: null,
-    vault: {} as any,
+    parent: options.parent ?? null,
+    vault,
     stat: {
       ctime: Date.now(),
       mtime: Date.now(),
@@ -86,6 +108,52 @@ describe('TemplateVariableProcessor', () => {
       expect(matches![0]).toBe(matches![1]); // Same ID
     });
 
+    test('Should replace {{parent_directory}} with immediate parent folder name', async () => {
+      const parent = {
+        name: 'Companies',
+        path: 'invest/Companies',
+        isRoot: (): boolean => false
+      };
+      const file = createMockFile('Acme', { parent });
+      const result = processor.processTemplate('Parent: {{parent_directory}}', file);
+
+      expect(result.content).toBe('Parent: Companies');
+      expect(result.variables.parentDirectory).toBe('Companies');
+    });
+
+    test('Should use vault directory basename for root notes', async () => {
+      const root = {
+        name: '',
+        path: '',
+        isRoot: (): boolean => true
+      };
+      const file = createMockFile('Root Note', {
+        parent: root,
+        vaultBasePath: '/Users/alive/walros',
+        vaultName: 'Fallback Vault'
+      });
+      const result = processor.processTemplate('Parent: {{parent_directory}}', file);
+
+      expect(result.content).toBe('Parent: walros');
+      expect(result.variables.parentDirectory).toBe('walros');
+    });
+
+    test('Should fall back to vault name when root base path is unavailable', async () => {
+      const root = {
+        name: '',
+        path: '',
+        isRoot: (): boolean => true
+      };
+      const file = createMockFile('Root Note', {
+        parent: root,
+        vaultName: 'Personal Vault'
+      });
+      const result = processor.processTemplate('Parent: {{parent_directory}}', file);
+
+      expect(result.content).toBe('Parent: Personal Vault');
+      expect(result.variables.parentDirectory).toBe('Personal Vault');
+    });
+
     test('Should not generate ID if not in template', async () => {
       const template = 'Title: {{title}}';
       const result = processor.processTemplate(template, mockFile);
@@ -135,6 +203,13 @@ describe('TemplateVariableProcessor', () => {
       expect(invalid).toEqual(['bad1', 'bad2']);
     });
 
+    test('Should recognize {{parent_directory}} as a valid variable', () => {
+      const template = '{{parent_directory}} {{bad}}';
+      const invalid = TemplateVariableProcessorTestUtils.validateTemplate(processor, template);
+
+      expect(invalid).toEqual(['bad']);
+    });
+
     test('Should handle empty template', async () => {
       const result = await processor.processTemplate('', mockFile);
       expect(result.content).toBe('');
@@ -153,7 +228,8 @@ describe('TemplateVariableProcessor', () => {
       expect(vars).toContain('title');
       expect(vars).toContain('date');
       expect(vars).toContain('time');
-      expect(vars).toContain('snowflakeId');
+      expect(vars).toContain('snowflake_id');
+      expect(vars).toContain('parent_directory');
     });
 
     test('Should handle duplicate invalid variables', () => {

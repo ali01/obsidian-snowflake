@@ -6,6 +6,7 @@
  * - {{date}} → Current date (REQ-012: default "YYYY-MM-DD")
  * - {{time}} → Current time (REQ-013: default "HH:mm")
  * - {{snowflake_id}} → A unique 10-character ID (REQ-015)
+ * - {{parent_directory}} → The note's immediate parent folder
  *
  * REQ-014: Where users have configured custom date/time formats in settings,
  * the plugin shall use those formats instead of defaults.
@@ -37,8 +38,23 @@ const VARIABLE_HANDLERS = {
   title: (context: TemplateVariableContext): string => context.title,
   date: (context: TemplateVariableContext): string => context.date,
   time: (context: TemplateVariableContext): string => context.time,
-  snowflakeId: (context: TemplateVariableContext): string | undefined => context.snowflakeId
+  snowflake_id: (context: TemplateVariableContext): string | undefined => context.snowflakeId,
+  parent_directory: (context: TemplateVariableContext): string => context.parentDirectory
 };
+
+interface VaultDirectorySource {
+  adapter?: unknown;
+  getName?: () => string;
+}
+
+interface FileSystemAdapterLike {
+  getBasePath: () => string;
+}
+
+function isFileSystemAdapterLike(adapter: unknown): adapter is FileSystemAdapterLike {
+  const candidate = adapter as Partial<FileSystemAdapterLike> | null;
+  return typeof candidate?.getBasePath === 'function';
+}
 
 /**
  * TemplateVariableProcessor: Main class for processing template variables
@@ -59,7 +75,8 @@ export class TemplateVariableProcessor {
   /**
    * Process template content and replace all variables
    *
-   * REQ-011: Replace {{title}}, {{date}}, {{time}}, {{snowflake_id}}
+   * REQ-011: Replace {{title}}, {{date}}, {{time}}, {{snowflake_id}},
+   * {{parent_directory}}
    * REQ-016: Ensure same ID value for multiple {{snowflake_id}} instances
    *
    * @param templateContent - The template content to process
@@ -102,7 +119,8 @@ export class TemplateVariableProcessor {
     const context: TemplateVariableContext = {
       title: file.basename, // filename without .md extension
       date: now.format(this.dateFormat),
-      time: now.format(this.timeFormat)
+      time: now.format(this.timeFormat),
+      parentDirectory: this.getParentDirectory(file)
     };
 
     // Only generate ID if template contains {{snowflake_id}}
@@ -111,6 +129,30 @@ export class TemplateVariableProcessor {
     }
 
     return context;
+  }
+
+  private getParentDirectory(file: MarkdownFile): string {
+    if (file.parent !== null && !file.parent.isRoot()) {
+      return file.parent.name;
+    }
+
+    return this.getVaultDirectoryName(file);
+  }
+
+  private getVaultDirectoryName(file: MarkdownFile): string {
+    const vault = file.vault as unknown as VaultDirectorySource;
+
+    if (isFileSystemAdapterLike(vault.adapter)) {
+      const basePath = vault.adapter.getBasePath().replace(/[\\/]+$/, '');
+      const pathParts = basePath.split(/[\\/]/);
+      const directoryName = pathParts[pathParts.length - 1];
+
+      if (directoryName !== '') {
+        return directoryName;
+      }
+    }
+
+    return vault.getName?.() ?? '';
   }
 
   /**
@@ -125,17 +167,12 @@ export class TemplateVariableProcessor {
    */
   private replaceVariables(content: string, context: TemplateVariableContext): string {
     return content.replace(VARIABLE_REGEX, (match, varName: string) => {
-      // Get handler for this variable
-      // Check if variable name is known
-      // Special handling for snowflake_id alias
-      const handlerKey = varName === 'snowflake_id' ? 'snowflakeId' : varName;
-
-      if (!(handlerKey in VARIABLE_HANDLERS)) {
+      if (!(varName in VARIABLE_HANDLERS)) {
         // REQ-027: Leave malformed/unknown variables unchanged
         return match;
       }
 
-      const handler = VARIABLE_HANDLERS[handlerKey as keyof typeof VARIABLE_HANDLERS];
+      const handler = VARIABLE_HANDLERS[varName as keyof typeof VARIABLE_HANDLERS];
 
       // Get value from context
       const value = handler(context);
@@ -182,8 +219,7 @@ export class TemplateVariableProcessor {
 
     for (const match of matches) {
       const varName = match[1];
-      // Check for both original name and alias
-      if (!(varName in VARIABLE_HANDLERS) && varName !== 'snowflake_id') {
+      if (!(varName in VARIABLE_HANDLERS)) {
         invalidVars.push(varName);
       }
     }
@@ -278,6 +314,14 @@ export class ExtensibleVariableRegistry implements VariableRegistry {
       process: (ctx): string => {
         const context = ctx as TemplateVariableContext;
         return context.snowflakeId ?? '';
+      }
+    });
+
+    this.register({
+      name: 'parent_directory',
+      process: (ctx): string => {
+        const context = ctx as TemplateVariableContext;
+        return context.parentDirectory;
       }
     });
   }

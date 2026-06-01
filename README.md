@@ -211,7 +211,7 @@ rules:
 ```
 
 Both forms support all variables (`{{title}}`, `{{date}}`, `{{time}}`,
-`{{snowflake_id}}`).
+`{{snowflake_id}}`, `{{parent_directory}}`).
 
 #### `body-file` paths
 
@@ -288,6 +288,7 @@ Template variables are evaluated inside materialized template content, not in
 | `{{date}}`         | Current date (configurable format, default `YYYY-MM-DD`) |
 | `{{time}}`         | Current time (configurable format, default `HH:mm`)  |
 | `{{snowflake_id}}` | Cryptographically-secure 10-character ID            |
+| `{{parent_directory}}` | Immediate parent folder, or vault folder at root |
 
 Customize date and time formats in **Settings → Snowflake**. Both fields
 accept moment.js format strings.
@@ -341,7 +342,7 @@ src/
 ├── schema-resolver.ts         # selects every matching schema rule
 ├── frontmatter-merger.ts      # YAML frontmatter merge engine
 ├── pattern-matcher.ts         # glob/path-capture matching
-├── template-variables.ts      # {{title}} / {{date}} / {{time}} / {{snowflake_id}}
+├── template-variables.ts      # built-in template variables
 ├── nanoid.ts                  # ID generation
 └── ui/                        # settings + modals
 ```
